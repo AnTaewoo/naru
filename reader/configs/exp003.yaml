@@ -1,0 +1,52 @@
+# exp003 — KLUE NER 1단계 → 헤드 교체 → 우리 train 2단계 (R4.4)
+# 2단계 설정은 exp002와 같게 둔다 — 차이가 1단계에서만 나야 비교가 된다.
+exp_id: exp003
+title: KLUE NER 전이 후 우리 train 미세조정
+system: token_cls
+data_version: v1
+
+hypothesis: null
+primary_metric: norm_f1
+expected:
+  val_norm_f1: null
+  val_span_f1: null
+  val_norm_f1_at_100: null         # 학습량 곡선 100문장 지점
+decision_rule: null
+max_attempts: 5
+
+model:
+  name: klue/roberta-base
+  revision: null
+  license: null
+
+stage1:
+  data: data/raw/klue_ner          # MANIFEST: klue_ner
+  labels: klue_bio                 # R1.4에서 확인한 태그 목록 그대로
+  epochs: 3
+  lr: 5.0e-5
+  batch_size: 32
+  max_length: 256
+  seed: 13
+
+stage2:
+  head_init: reinit                # reinit | map_from_klue — PLAN 질문
+  labels: bio
+  input:
+    context: none
+  train:                           # exp002.train과 같게
+    epochs: 20
+    lr: 5.0e-5
+    batch_size: 16
+    max_length: 256
+    warmup_ratio: 0.1
+    weight_decay: 0.01
+    early_stopping:
+      metric: val_span_f1
+      patience: 3
+    seeds: [13, 42, 2027]
+
+learning_curve: [50, 100, 200, all]
+
+normalize: ours
+eval:
+  splits: [val]

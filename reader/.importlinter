@@ -1,0 +1,29 @@
+# 패키지 경계 — CLAUDE.md §5. make layers (make check에 포함)
+# 이 파일은 .claude/settings.json이 Claude의 Edit을 막는다. 바꾸려면 태우가 직접, 이유를 ADR에.
+
+[importlinter]
+root_packages =
+    notice_ner
+include_external_packages = True
+
+[importlinter:contract:labeling-rule-only]
+# 정답이 특정 시스템 출력 쪽으로 기우는 걸 막는다 (CLAUDE.md §2.3)
+name = labeling은 규칙만 — LLM·학습 모델 import 금지
+type = forbidden
+source_modules =
+    notice_ner.labeling
+forbidden_modules =
+    notice_ner.models
+    anthropic
+    transformers
+    torch
+    peft
+
+[importlinter:contract:models-no-eval]
+# 학습 중 val 지표는 notice_ner.metrics로 계산한다 (CLAUDE.md §5)
+name = models는 eval(test 잠금)을 모른다
+type = forbidden
+source_modules =
+    notice_ner.models
+forbidden_modules =
+    notice_ner.eval
