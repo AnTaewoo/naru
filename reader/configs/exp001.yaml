@@ -1,0 +1,24 @@
+# exp001 — 규칙 기준선 (R4.2)
+# 사전 등록 칸(hypothesis·expected·decision_rule)은 R4.2 PLAN에서 태우와 채우고 실행 전에 커밋한다. 실행 후 수정 금지.
+exp_id: exp001
+title: 지명사전·별칭 일치 + TIME 정규식
+system: rule
+data_version: v1
+
+hypothesis: null
+primary_metric: norm_f1
+expected:
+  val_norm_f1: null
+  val_span_f1: null
+decision_rule: null
+max_attempts: 5
+
+rule:
+  match: exact_or_alias            # exact | exact_or_alias — PLAN 질문
+  aliases: data/gazetteer/aliases_train.csv   # R4.1이 train 정답에서 만든 것
+  longest_match: true              # 겹치면 긴 쪽 (가이드 §1 중첩 없음)
+  # TIME 패턴은 src/notice_ner/models/rule.py 에. 패턴마다 근거 train sentence_id 주석
+
+normalize: ours                    # 공용 정규화기 (R4.1)
+eval:
+  splits: [val]                    # test·test_ood는 R4.7의 make test-run 으로만

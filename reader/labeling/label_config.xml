@@ -1,0 +1,30 @@
+<!--
+  notice-ner 라벨 설정 v0
+  R0.4에서 Label Studio 프로젝트에 붙여넣고, 실제 export JSON을 열어 구조를 labeling/README.md §2에 적는다.
+  태그·경계·정규형 규칙: docs/labeling_guide.md
+  task 데이터 키: text, context_prev, context_next, meta  (meta = "출처 · 매체 · 게시시각" — ls_import가 만든다)
+-->
+<View>
+  <Header value="$meta"/>
+  <View style="color:#868e96; font-size:90%; margin-bottom:6px">
+    <Text name="ctx_prev" value="$context_prev"/>
+  </View>
+  <Labels name="label" toName="text">
+    <Label value="TIME" background="#e8590c"/>
+    <Label value="ROAD" background="#1971c2"/>
+    <Label value="INTERSECTION" background="#2f9e44"/>
+    <Label value="POI" background="#9c36b5"/>
+    <Label value="ADDRESS" background="#495057"/>
+  </Labels>
+  <Text name="text" value="$text" granularity="symbol"/>
+  <View style="color:#868e96; font-size:90%; margin-top:6px">
+    <Text name="ctx_next" value="$context_next"/>
+  </View>
+  <TextArea name="canonical" toName="text" perRegion="true" editable="true" required="true"
+            maxSubmissions="1" displayMode="region-list" rows="1"
+            placeholder="정규형 — 가이드 §3, 교차로·도로는 browse.html에서 복사"/>
+  <Choices name="quality" toName="text" choice="single" showInline="true">
+    <Choice value="ok" selected="true"/>
+    <Choice value="drop"/>
+  </Choices>
+</View>

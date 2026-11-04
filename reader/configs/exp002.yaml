@@ -1,0 +1,40 @@
+# exp002 — klue/roberta-base 토큰 분류, 우리 train만 (R4.3)
+# 하이퍼파라미터는 초안. PLAN에서 확정하고, 사전 등록과 함께 실행 전에 커밋한다.
+exp_id: exp002
+title: klue/roberta-base BIO 토큰 분류 — 우리 train만
+system: token_cls
+data_version: v1
+
+hypothesis: null
+primary_metric: norm_f1
+expected:
+  val_norm_f1: null
+  val_span_f1: null
+decision_rule: null
+max_attempts: 5
+
+model:
+  name: klue/roberta-base
+  revision: null                   # R4.3에서 HF 커밋 해시로 고정
+  license: null                    # 모델 카드를 열어 확인해 적는다
+labels: bio                        # 5태그 × B/I + O = 11
+input:
+  context: none                    # none | prev_next — PLAN 질문 (주석자는 문맥을 본다)
+
+train:
+  epochs: 20
+  lr: 5.0e-5
+  batch_size: 16
+  max_length: 256
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  early_stopping:
+    metric: val_span_f1            # notice_ner.metrics 로 계산
+    patience: 3
+  seeds: [13, 42, 2027]
+
+learning_curve: [50, 100, 200, all]   # train 크기별, val에서만. 라벨을 더 할지의 근거
+
+normalize: ours
+eval:
+  splits: [val]

@@ -1,0 +1,14 @@
+# Label Studio — 라벨링 서버 (R0.4). make ls-up / make ls-down
+# 이미지 태그는 .env의 LABEL_STUDIO_VERSION으로 고정한다. 비어 있으면 compose가 에러를 내고 멈춘다.
+services:
+  label-studio:
+    image: heartexlabs/label-studio:${LABEL_STUDIO_VERSION:?.env에 LABEL_STUDIO_VERSION 태그를 고정하세요 - R0.4}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./labeling/ls-data:/label-studio/data
+    # 첫 계정(태우)을 만든 뒤 아래 두 줄 주석을 풀어 초대 링크 없는 가입을 막는다.
+    # 환경변수 이름은 설치한 버전 문서에서 확인한다 (R0.4).
+    # environment:
+    #   - LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK=true
+    restart: unless-stopped
