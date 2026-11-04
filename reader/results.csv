@@ -1,1 +1,0 @@
-run_at,exp_id,variant,model,seed,split,slice,data_version,n_sent,n_gold,norm_f1,norm_f1_lo,norm_f1_hi,span_f1,span_f1_lo,span_f1_hi,e2e_jaccard,e2e_jaccard_lo,e2e_jaccard_hi,point_r15,point_p15,latency_p50_ms,latency_p95_ms,cost_per_1k_usd,git_commit,config_sha256,rerun_reason
