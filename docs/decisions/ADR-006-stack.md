@@ -32,5 +32,5 @@
 | httpx / anthropic SDK | 0.28.1 / 2.6.0 | 2026-11-07 (T0.1) |
 | import-linter | 2.16 | 2026-11-07 (T0.1) |
 | MySQL 이미지 | mysql:8.4 (서버 8.4.13, 호스트 포트 3307) | 2026-11-07 (T0.1) |
-| Node / pnpm | | |
-| Next.js / React / TypeScript / maplibre-gl | | |
+| Node / pnpm | 18.20.7 (nvm) / 12.6.0 (corepack shim ~/.local/bin) | 2026-11-08 (T5.0) |
+| Next.js / React / TypeScript / maplibre-gl | 15.5.29 / 19.3.1 / 5.9.3 / 6.17.0 — Node 18 이라 Next 16(>=20.9) 불가, 15.5 고정. eslint 9.39 + typescript-eslint 8.72, vitest 3.2.7 + jsdom 26.1, Playwright 1.56.1 | 2026-11-08 (T5.0) |

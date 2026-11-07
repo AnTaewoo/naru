@@ -1,5 +1,5 @@
 # Naru — 명령 설명은 .claude/CLAUDE.md §4
-.PHONY: setup check layers check-no-fakes lint type test fe-check schema dev fetch record record-llm record-candidates record-naru-api
+.PHONY: setup check layers check-no-fakes lint type test fe-check schema dev dev-be fetch record record-llm record-candidates record-naru-api
 
 setup:
 	uv sync --all-groups
@@ -37,8 +37,11 @@ schema:
 	@test -f scripts/export_schema.py || { echo "아직 없음 — T2.1"; exit 1; }
 	uv run python scripts/export_schema.py
 
-# Flask :5000 (T3.4). Next.js :3000 은 T5.0 에서 붙인다. AI 워커는 python -m naru_ai.worker --once
+# Flask :5000 + Next.js :3000 (T3.4·T5.0). AI 워커는 따로: uv run python -m naru_ai.worker --once
 dev:
+	@trap 'kill 0' EXIT; uv run flask --app naru_be.app run --port 5000 & pnpm -C packages/fe dev
+
+dev-be:
 	uv run flask --app naru_be.app run --port 5000
 
 fetch:
