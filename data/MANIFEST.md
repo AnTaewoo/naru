@@ -65,7 +65,8 @@
 - 라이선스: 서울시 기사·포스터는 공공누리 제4유형 표기(출처표시·상업적 이용 금지·변경 금지). GPX는 표준노드링크(제한 없음) 위에 우리가 그린 파생물
 - `seoul_marathon_2026_timetable.json` (sha256 `a637ea1d…9692`): `event{name,date,start,finish,start_time}` + `segments[16]` = 출발지 + 1~15구간. 행마다 `label, section, control_start, control_end`(ISO +09:00), `source_url, published_at, fetched_at`. 예: 1구간 "세종대로 사거리~숭례문 오거리" 07:20~08:08, 15구간 "종합운동장 동문 앞~종합운동장 사거리" 05:00~14:30. 11~14구간(송파역·석촌역·가락시장)은 10 km 코스 구간
 - `seoul_marathon_2026.gpx` (sha256 `79bdd885…9850`, 점 870개, 웨이포인트 18개): **공식 GPX 없음 → 디지타이즈.** 포스터 코스 설명의 교차로 17개 구간을 `nodelink_seoul_20261014` 노드(NODE_NAME 또는 두 도로명 링크 공유 노드)로 잡고, 구간별 허용 도로명 링크만으로 무방향 최단경로를 이어 붙임. 길이 **42.534 km (공식 대비 +0.8%)**, 폴백 0. 코스 지도 km 표지(5·7.5·22.5·27.5·32.5·37.5·40)와 누적 거리가 맞는 것을 확인. 청계천로 왕복(청계6가→청계광장→고산자교→무교동)은 같은 차로 링크를 왕복으로 씀
-- `seoul_marathon_2026_course_meta.json`: 구간별 노드·허용 도로·실제 지난 도로·길이·폴백 여부, 출처 URL
+- `seoul_marathon_2026_10km.gpx` (T2.2에서 추가, 점 154개): 10 km 코스 디지타이즈 — 종합운동장교차로 → 출발 종합운동장역(동문) → 올림픽로 → 잠실역사거리 → 송파대로 → 석촌역사거리 → 가락시장역사거리(U턴) → 되돌아 → 동문 도착. 첫 구간 285 m는 15구간 "동문 앞~종합운동장 사거리" 통제구간(코스 아님). 코스 길이 **11.44 km로 공식 10 km보다 14% 길다** — 반환점을 가락시장역 사거리로 잡았는데 지도 5 km 표지는 그보다 몇백 m 앞. 12·13구간(송파대로 왕복) 통제 선으로 쓰기엔 보수적(조금 넓음). 석촌역~가락시장역 2구간은 송파대로 링크가 끊겨 폴백
+- `seoul_marathon_2026_course_meta.json`: 구간별 노드·허용 도로·실제 지난 도로·길이·폴백 여부, 출처 URL. `course_10km` 항목에 10 km 코스 같은 정보
 - 세종대로 통과: 1·2구간(출발~세종대로사거리~숭례문)이 세종대로. 테스트 `packages/ai/tests/test_course_data.py`
 
 ### notices/smpa (서울경찰청 '오늘의 주요집회' PDF, 수동)
@@ -98,6 +99,7 @@
 | rtd | 2026-11-07 | 1 | 실시간 도시데이터 citydata 광화문·덕수궁 (json, 175 KB) |
 | kakao | 2026-11-07 | 2 | 로컬 키워드 검색 숭례문·덕수궁 (`kakao/keyword/<sha1(검색어)>.json`, 리졸버 재생용). 아래 "recorded/kakao" |
 | bus | 2026-11-07 | 1 | 버스위치 getBusPosByRtid 노선 100100118, 차량 12대 (json). 아래 "recorded/bus" |
+| candidates/course | 2026-11-07 | 1 | `make record-candidates SOURCE=course` — CourseIngestor(T2.2) 출력 `CandidateBatch` 그대로: 후보 16개(시각표 16구간, geometry line, scheduled, confidence 0.9, evidence timetable). BE 테스트(T2.3)가 naru_ai 없이 읽는다 |
 
 ### recorded/bus (서울 버스위치정보, data.go.kr)
 - 출처: http://ws.bus.go.kr/api/rest/buspos/getBusPosByRtid (`serviceKey`=data.go.kr 일반 인증키, `busRouteId`, `resultType=json`). 개발계정 일 1,000회
