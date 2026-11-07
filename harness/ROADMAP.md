@@ -130,7 +130,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 테스트(실데이터): 후보 수 == 시각표 구간 수, window 일치. `scripts/record_candidates.py --source course` → `data/recorded/candidates/course/<ts>.json`
 
 ### T2.3 ClosureEngine ★
-- status: TODO
+- status: DOING
 - depends: T2.1
 - 산출: `naru_be/models/domain/closure_engine.py` — `apply(candidate, crosswalk_ids) -> list[ClosureState]`, 전이는 ARCHITECTURE 표. 임계값 config
 - 테스트(실데이터): T2.2 recorded 후보 → scheduled; 시각표 시작 시각 경과 → confirmed(코스는 시각표가 실측 증거); window 종료+30분 → released. BE 테스트는 naru_ai를 import하지 않는다
@@ -184,7 +184,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 ### T4.1 AnthropicClient · recorder · 프롬프트 v1 ★
 - status: TODO
 - depends: T0.5, T2.1
-- 산출: `naru_ai/llm/client.py`(tool use, `input_schema`·`tool_choice` — 쓰는 SDK 문서를 열어 파라미터명 확인·주석), `naru_ai/llm/recorder.py`, `llm/prompts/notice_v1.md`(few-shot 8문장은 `sentences.jsonl`의 id로, 규정·기대값은 `data/raw/notices/cases_v1.jsonl`(T0.6) 기준), `scripts/record_llm.py`(`make record-llm`)
+- 산출: `naru_ai/llm/client.py`(tool use, `input_schema`·`tool_choice` — 쓰는 SDK 문서를 열어 파라미터명 확인·주석), `naru_ai/llm/recorder.py`, `llm/prompts/notice_v1.md`(few-shot 8문장은 `sentences.jsonl`의 id로. **`prompts/notice_v1.md`는 규칙서 `docs/data/notice_parser_rules_v2.md` §1~§5·§9에서 생성하고, 출력은 §9.1의 `items[] / impact / impact_reason / toward / approx` 스키마**. 기대값은 `data/raw/notices/cases_v1.jsonl`(T0.6) 기준), `scripts/record_llm.py`(`make record-llm`)
 - 실데이터: live 3문장 → recorded. 비용 예상을 시작 메모에
 - 테스트(재생): 응답이 `spans`·`segments` 스키마 통과. recorded `model`·`prompt_version` ≠ 설정 → fail
 
@@ -198,7 +198,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 ### T4.3 평가 — 규칙 기준선 vs Claude ★
 - status: TODO
 - depends: T4.2, T0.6
-- 산출: `notice/rule_baseline.py`(지명사전·별칭 일치 + 시간 정규식), `notice/eval.py`(입력 = `data/raw/notices/cases_v1.jsonl`(T0.6, 30케이스): 정규형 F1·구간 F1·횡단보도 Jaccard, type별(정상/놓치기쉬움/거절) 정확도, 케이스 단위 부트스트랩 CI), `make record-llm`으로 val 문장 전부 기록, `docs/eval/notice_<date>.md` 결과 표
+- 산출: `notice/rule_baseline.py`(지명사전·별칭 일치 + 시간 정규식), `notice/eval.py` — 입력 둘로 나눠 평가: **정확도** = `data/raw/notices/cases_v1.jsonl`(실제 공지 34건, T0.6) · **견고성** = `data/recorded/syntitan/agent_questions.csv`(합성 163건). 통과 기준은 규칙서 §7·§9.3(window 분 단위·impact·items 수·segments 순서·toward·approx ±10분), 정규형 F1·구간 F1·횡단보도 Jaccard, type별(정상/놓치기쉬움/거절) 정확도, 케이스 단위 부트스트랩 CI, `make record-llm`으로 val 문장 전부 기록, `docs/eval/notice_<date>.md` 결과 표
 - 테스트: 정답을 예측으로 넣으면 F1 = 1.0. 정렬기 왕복
 - **이 표가 보고서 2.3 "AI가 필요한가"의 숫자다.** 임계값(review 0.7 등)은 결과 보고 태우가 정한다
 

@@ -13,6 +13,7 @@ Naru(나루)는 마라톤·집회 행진으로 횡단보도가 막힐 때, 통�
 | FE 화면 목업 (참고용, 데이터는 예시) | `docs/mockups/01_home.html` · `02_route.html` · `03_closure.html` — 규칙은 CONVENTIONS §5.9 |
 | 결정 기록 | `docs/decisions/ADR-*.md` — 바꾸려면 여기 먼저 |
 | 절차 | `.claude/skills/` (task-cycle, real-data-testing) |
+| 공지 파서 규칙 (프롬프트의 원본) | `docs/data/notice_parser_rules_v2.md` — 바꾸면 프롬프트 버전도 올린다 |
 
 ARCHITECTURE·INTERFACE와 충돌하는 구현은 하지 않는다. 바꾸려면 ADR 초안 → 태우 승인. 이 파일은 스킬보다 우선한다.
 
