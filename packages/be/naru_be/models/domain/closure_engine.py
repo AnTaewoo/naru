@@ -77,6 +77,22 @@ class ClosureEngine:
             return Status.confirmed, _transition(base, start, "scheduled→confirmed", "window_start")
         return Status.scheduled, None
 
+    def status_of_state(self, state: ClosureState, at: datetime) -> Status:
+        """저장된 상태를 시각 at 로 다시 판정 (라우터·컨트롤러용). 규칙은 status_at 과 같다."""
+        if state.status is Status.zone_scheduled or state.impact is Impact.unknown:
+            return Status.zone_scheduled
+        start, end = state.window.start, state.window.end
+        confirmable = state.confidence >= self.settings.confirmed_confidence and any(
+            e.kind in CONFIRMING_EVIDENCE for e in state.evidence
+        )
+        if end is not None and at >= end + timedelta(minutes=self.settings.released_grace_min):
+            return Status.released
+        if state.status is Status.released:
+            return Status.released
+        if confirmable and start is not None and at >= start:
+            return Status.confirmed
+        return Status.scheduled
+
     def apply(
         self, candidate: ClosureCandidate, crosswalk_ids: Iterable[str], at: datetime | None = None
     ) -> list[ClosureState]:

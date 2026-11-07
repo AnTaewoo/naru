@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     unknown_impact_road_m: float = 30.0
     toward_confidence_cap: float = 0.65
 
+    # 라우터 (T3.1): 보행 속도, 수직 이동 패널티(연결 간선 길이에 더하는 m)
+    walk_speed_mps: float = 1.2
+    stairs_penalty_m: float = 25.0
+    elevator_penalty_m: float = 40.0
+
     # CrosswalkIndex (T1.2)
     point_radius_m: float = 30.0
     line_buffer_m: float = 15.0

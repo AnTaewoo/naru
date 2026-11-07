@@ -59,6 +59,7 @@ class PedEdge:
     length_m: float
     crosswalk_ids: tuple[str, ...]  # 횡단보도 관리번호 (OA-23081). crosswalk 간선에만, 없을 수 있다
     coords: tuple[LngLat, ...]  # WGS84, u → v 순서
+    name: str | None = None  # 지하도는 '<역명> 지하보도', 육교는 '육교'. 나머지 None (legs 이름)
 
 
 @dataclass(frozen=True)
@@ -93,6 +94,10 @@ def _to_m(coords: Iterable[LngLat]) -> list[tuple[float, float]]:
     return [_TO_5179.transform(x, y) for x, y in coords]
 
 
+def kind_name(kind: EdgeKind) -> str | None:
+    return {EdgeKind.underpass: "지하보도", EdgeKind.overpass: "육교"}.get(kind)
+
+
 def latest_spatial_dir(data_dir: Path) -> Path:
     dirs = sorted((data_dir / "raw").glob("seoul_spatial_*"))
     if not dirs:
@@ -108,6 +113,18 @@ class PedGraph:
     def __init__(self, graph: nx.Graph[str], stats: BuildStats) -> None:
         self.graph = graph
         self.stats = stats
+        self._node_ids = list(graph.nodes)
+        self._tree = STRtree(
+            [shapely.Point(graph.nodes[n]["x"], graph.nodes[n]["y"]) for n in self._node_ids]
+        )
+
+    def nearest_node(self, lng: float, lat: float) -> tuple[str, float]:
+        """가장 가까운 노드와 거리(m)."""
+        x, y = _TO_5179.transform(lng, lat)
+        p = shapely.Point(x, y)
+        i = int(self._tree.nearest(p))
+        n = self._node_ids[i]
+        return n, p.distance(shapely.Point(self.graph.nodes[n]["x"], self.graph.nodes[n]["y"]))
 
     @classmethod
     def from_seoul_spatial(cls, spatial_dir: Path, settings: Settings | None = None) -> PedGraph:
@@ -225,7 +242,13 @@ class _Builder:
                 continue  # 도보망에 이미 같은 간선이 있고 kind도 위에서 정했다
             coords = _wkt_coords(r["LNKG_WKT"])
             u, v = self._ensure_endpoints(r, coords, prefix)
-            self._add_edge(u, v, PedEdge(prefix + link_id, kind, float(r["LNKG_LEN"]), (), coords))
+            station = r.get("SBWY_STN_NM") or ""
+            name = (
+                f"{station} 지하보도" if kind is EdgeKind.underpass and station else kind_name(kind)
+            )
+            self._add_edge(
+                u, v, PedEdge(prefix + link_id, kind, float(r["LNKG_LEN"]), (), coords, name)
+            )
 
     def _endpoint_ids(self, row: dict[str, Any], prefix: str) -> tuple[str, str]:
         return prefix + _id(row["BGNG_LNKG_ID"]), prefix + _id(row["END_LNKG_ID"])
