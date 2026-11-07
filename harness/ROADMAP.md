@@ -208,16 +208,16 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 산출: `worker.py`(스케줄 공지 5분·코스 1회, `--once` 플래그로 시연용 1회 실행), `publish.py`(httpx POST, 3회 재시도)
 - 테스트: e2e — `make dev` + `python -m naru_ai.worker --once` → BE `/closures`에 공지 후보 반영 확인
 
-### PC-4 (태우)
-- [ ] 평가 표(규칙 vs Haiku vs Sonnet)를 읽고 review 임계값·모델을 정한다 → ADR-007에 추가
-- [ ] 기록된 집회 공지 1건이 지도에 segment 선 + 횡단보도로 나오는 걸 본다
+### PC-4 (태우) — 통과 2026-11-08 ("다음". 임계값 review 0.7·confirmed 0.8·모델 haiku-5-5/notice_v2 유지, Sonnet 비교·ADR-007 추가는 보류)
+- [x] 평가 표(규칙 vs Haiku vs Sonnet)를 읽고 review 임계값·모델을 정한다 → ADR-007에 추가
+- [x] 기록된 집회 공지 1건이 지도에 segment 선 + 횡단보도로 나오는 걸 본다 (API: /closures 광화문 15:30 → 37개)
 
 ---
 
 ## P5 — FE · 배포 ★ (CONVENTIONS §5)
 
 ### T5.0 Next.js 스캐폴드 ★
-- status: TODO
+- status: DOING
 - depends: T3.4
 - 산출: `packages/fe` (App Router, React 19, TS strict, pnpm, eslint+prettier, vitest, Playwright), `next.config.ts` rewrites(`/api/:path*` → `NARU_API_ORIGIN`, `/internal/*` 제외), `app/{layout,page,providers}.tsx`, `make schema` → `src/types/contracts.d.ts`, `make check`에 `pnpm check` 연결
 - 테스트: `pnpm check` 초록, `contracts.d.ts`에 `ClosureCandidate`·`RouteResponse`, `make dev`로 rewrites 확인
