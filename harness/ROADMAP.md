@@ -189,14 +189,14 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 테스트(재생): 응답이 `spans`·`segments` 스키마 통과. recorded `model`·`prompt_version` ≠ 설정 → fail
 
 ### T4.2 NoticeParser · Resolver · CandidateBuilder ★
-- status: DOING
+- status: DONE
 - depends: T4.1, T1.3, T0.7
 - 산출: `notice/parser.py`(호출·재생 → 정렬기 start/end → segments 검증), `notice/gazetteer.py`·`notice/resolver.py`(교차로·도로명·카카오 기록), `notice/candidates.py`(segment 양 끝 풀림 → `SegmentGeom`, 아니면 `PointGeom`; confidence 규칙: 출처 종류 + 시간 명시 여부)
 - 테스트(실데이터): recorded 응답 1건 → 후보 ≥ 1, `SegmentGeom.from_.lng`가 카카오 기록 좌표와 일치, 못 푼 정규형은 후보 없음(추측 좌표 0). `scripts/record_candidates.py --source notice`
 - 쪼개기: T4.2a(parser) / T4.2b(resolver) / T4.2c(builder)
 
 ### T4.3 평가 — 규칙 기준선 vs Claude ★
-- status: TODO
+- status: DOING
 - depends: T4.2, T0.6
 - 산출: `notice/rule_baseline.py`(지명사전·별칭 일치 + 시간 정규식), `notice/eval.py` — 입력 둘로 나눠 평가: **정확도** = `data/raw/notices/cases_v1.jsonl`(실제 공지 34건, T0.6) · **견고성** = `data/recorded/syntitan/agent_questions.csv`(합성 163건). 통과 기준은 규칙서 §7·§9.3(window 분 단위·impact·items 수·segments 순서·toward·approx ±10분), 정규형 F1·구간 F1·횡단보도 Jaccard, type별(정상/놓치기쉬움/거절) 정확도, 케이스 단위 부트스트랩 CI, `make record-llm`으로 val 문장 전부 기록, `docs/eval/notice_<date>.md` 결과 표
 - 테스트: 정답을 예측으로 넣으면 F1 = 1.0. 정렬기 왕복

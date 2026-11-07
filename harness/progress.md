@@ -123,3 +123,9 @@
 - 정한 것: temperature 는 못 씀(Haiku 5.5 400, SDK 키 없음) → strict schema + 규칙 confidence (CLAUDE.md §3-8·CONVENTIONS §3.2 갱신, 태우). max_tokens 4096. number min/max 는 API 가 거부해 스키마에서 제거. 강제 tool 호출은 thinking 없음(T4.3 에서 auto 비교 가능). guard.py 에 prompts/ 허용(태우)
 - 막힌 것 / 태우 대기: guard.py 변경·T4.1_stop.txt 는 태우가 커밋. TOPIS 문장은 줄 단위라 T4.2 에서 notice_id 로 묶어야 함
 - 커밋: 17e1a44, 9f25116, f37b3a9, b968a75, cdd2479(하네스) / 이 항목의 커밋
+
+## 2026-11-07 · T4.2 DONE
+- 한 것: `notice/gazetteer.py`(OA-23081 교차로명 7,592 → 관리번호별 횡단보도 평균점, 접미사·변형, 중복 None; 노드링크 ROAD_NAME 2,972·road_class; 별칭 csv), `notice/resolver.py`(교차로 → 카카오 기록 재생: 서울 bbox·AREA 힌트·식당 등 카테고리 제외·방향어 뗀 재시도, None), `notice/parser.py`(재생 → 정렬기 → segment 양 끝 검증), `notice/candidates.py`(SegmentGeom/PointGeom, toward 0.65·unknown 0.65 상한, notice_ref·evidence), `record_api --queries`(카카오 9건 live), `record-candidates SOURCE=notice`(후보 3). 테스트 8개
+- 정한 것: 교차로 사전이 카카오보다 먼저. 도로명 사전은 도로명코드 대신 노드링크 ROAD_NAME. 카카오 1순위에서 식당·카페 등 9개 카테고리 제외('사랑채' 사례). confidence 는 파서 값 + 상한만. '사랑채 동측 건너편'은 못 풀어 출발지 point 만(틀린 선보다 빠진 점)
+- 막힌 것 / 태우 대기: '민주당사' 서울시당 vs 중앙당 선택은 T4.3 에서 확인. guard.py 변경은 태우 커밋
+- 커밋: a4d252f, ac2b6b1, 0ff69d1, 342a4ac, 16228e7, 0adfbad / 이 항목의 커밋
