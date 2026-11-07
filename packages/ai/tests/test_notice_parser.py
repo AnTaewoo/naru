@@ -38,7 +38,7 @@ def test_replay_aligns_every_span(
         env = NoticeEnvelope.from_sentence(sentences[sid])
         assert env.notice_id and env.source_url.startswith("https://")
         parsed = parser.parse(env)
-        assert parsed.model == "claude-haiku-5-5" and parsed.prompt_version == "notice_v1"
+        assert parsed.model == "claude-haiku-5-5" and parsed.prompt_version == "notice_v2"
         assert len(parsed.items) == 1 and parsed.dropped_spans == 0
         (pi,) = parsed.items
         assert pi.dropped_segments == 0 and len(pi.segments) == len(pi.item.segments) >= 1

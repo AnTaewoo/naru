@@ -83,7 +83,7 @@
 - 300건 범위: create_date 2026-05-08 ~ 2026-11-06. 분류 통제안내 154 · 버스안내 104 · (그 외 정책·기상·기타 42는 문장으로 안 씀)
 
 ### notices/sentences.jsonl (T0.5 산출, `uv run python scripts/build_notices.py`)
-- 파일: `data/raw/notices/sentences.jsonl` (1,918,115 B, 2,810행, sha256 `58fef9ca003ea02e97b25eaae045aaf947b33bfa8e2f1b75ac2af6655db257c5`) + `sentences_meta.json`. git에 올리지 않는다(.gitignore `data/raw/notices/*.jsonl|*.json`) — raw 규칙. 다시 만들려면 PDF + recorded로 `uv run python scripts/build_notices.py`
+- 파일: `data/raw/notices/sentences.jsonl` (1,923,246 B, 2,821행, sha256 `12df407e9734f660c287a59c1da7017eead32f7ee4527f5d2253dee2adb556e0`; 2026-11-08 `scripts/append_fewshot_sentences.py` 로 프롬프트 v2 예시 원문 11행(N001·N006·N009·N011·N045·N049·N059·N067·N070·N099·N100, fields.fewshot) 추가 — news 2행은 출처 URL 미상) + `sentences_meta.json`. git에 올리지 않는다(.gitignore `data/raw/notices/*.jsonl|*.json`) — raw 규칙. 다시 만들려면 PDF + recorded로 `uv run python scripts/build_notices.py`
 - 레코드: `sentence_id, notice_id, text, context_prev, context_next, source_type(smpa|topis), source_url, published_at(+09:00), fetched_at, event_date, fields`
 - smpa 13행: 표 행 하나 = 문장 하나. `text` = 셀을 왼쪽부터 공백으로 이은 원문(빈 비고 제외), 셀 안 줄바꿈만 공백. 예 `smpa-20261107-r01` "12:00~16:00 동화면세점 앞 → 종로1R → 동화면세점 앞 <세종대로 등> 50,000명 종로, 남대문". `fields`에 time/place/headcount/station/note/file
 - topis 2,797행(공지 258건): 제목(l000) + 본문 줄(l001~). 본문은 블록 태그(p/br/div/li/tr)에서만 줄을 나누고 인라인 태그(span/b)는 지움 — 글자는 손대지 않음. `fetched_at` = 기록 파일 `called_at`. 예 `topis-6301-l005` "- 의사당대로 국회앞교차로 → 글래드호텔 앞 3개차로 통제"
@@ -147,7 +147,8 @@
 - 출처: `make record-llm NOTICES=<sentences.jsonl> LIMIT=3` → `scripts/record_llm.py`. 모델 `claude-haiku-5-5`, 프롬프트 `notice_v1`(`packages/ai/naru_ai/llm/prompts/notice_v1.md`, 규칙서 v2 §0~§5·§9 + few-shot 8문장). 경로 `data/recorded/llm/anthropic/claude-haiku-5-5@api/notice_v1/<sentence_id>.json`. 기록일 2026-11-07, 호출 3회
 - 입력: `sentences.jsonl` 의 경찰청 3행(few-shot 에 없는 것) — smpa-20261107-r06(出 약칭), smpa-20261109-r01(`·` 연속 지점), smpa-20261109-r02(방향어). strict tool `parse_notice`, tool_choice 강제, temperature 없음(Haiku 5.5 는 400)
 - 파일 형식: `api, model, prompt_version, sentence_id, called_at, request{system, messages, tool}, response(Message 원문), usage, elapsed_ms`. 키 없음. 시스템 프롬프트 11,072 토큰이 캐시됨(2·3번째 호출 cache_read)
-- 파일 202개 (2026-11-07~08): sentences.jsonl 문장 5건(T4.1 3 + T4.4 r01·r04 — few-shot 에 있는 문장, 워커 e2e 용), 라벨 케이스 K-001~K-034 34건 + 합성 C-* 163건(T4.3 평가, `scripts/record_llm.py --ids all --max-calls`, 합성 봉투는 source news·published_at 2026-11-07T00:00+09:00 고정). 호출 합계 202회, 캐시 제외 입력 ≈ 95k·출력 ≈ 110k 토큰(≈ $0.09)
+- `notice_v1/` 202개 (2026-11-07~08, 1차): sentences.jsonl 문장 5건(T4.1 3 + T4.4 r01·r04 — v1 few-shot 문장, 워커 e2e 용), 라벨 케이스 K-001~K-034 34건 + 합성 C-* 163건(T4.3 평가, `scripts/record_llm.py --ids all --max-calls`, 합성 봉투는 source news·published_at 2026-11-07T00:00+09:00 고정). 호출 합계 202회, 캐시 제외 입력 ≈ 95k·출력 ≈ 110k 토큰(≈ $0.09)
+- `notice_v2/` 39개 (2026-11-08, 태우의 프롬프트 v2·라벨 교체 뒤 재기록): 라벨 K-001~K-034 34건 + 문장 5건(r01·r04·r06·1109-r01·1109-r02). 호출 39회, 캐시 제외 입력 ≈ 15k·출력 ≈ 19k 토큰(≈ $0.01). 합성 163건은 v2 로 미기록
 
 ### recorded/candidates/notice (공지 → ClosureCandidate, T4.2)
 - 출처: `make record-candidates SOURCE=notice` → `scripts/record_candidates.py`. 기록된 LLM 응답 3건(recorded/llm) 재생 → 정렬기 → 리졸버(OA-23081 교차로명 + 카카오 기록 재생) → CandidateBuilder. live 호출 없음. 파일 `data/recorded/candidates/notice/20261107T211233.json` sha256 2a3d3a74b3ab…, 후보 3개
@@ -155,8 +156,8 @@
 - 카카오 기록 추가 12건(`scripts/record_api.py --api kakao --queries ...`): 2026-11-07 의사당역 5번출구·의사당역·민주당사·하나증권·금감원·여의도역·국회의사당역 2번출구·국회의사당역·사랑채, 2026-11-08 동화면세점·서울시의회·고용노동청(T4.4 워커 e2e 용)
 
 ### notices/cases_v1 (공지 파서 라벨 — 정확도 평가, T0.6·T4.3)
-- 출처: 실제 공지(서울경찰청 「오늘의 주요집회」 smpa 22 · TOPIS 돌발 6 · TOPIS 공지 1 · 보도 3 · 서울시 보도자료 2)에서 뽑은 34건. 라벨(`expected.items`, 규칙서 v2 §9.1 스키마)은 태우가 직접 달았다(Syntitan 케이스 초안 검토 후 확정). 2026-11-07 수령
-- 파일: `data/raw/notices/cases_v1.jsonl` (34행, sha256 2d4ef95f0835a4116211358ee443f2509bb9eace3a4d306fa490b552fc4ce830). 열: case_id, notice_id, source, text, event_date, published_at, source_url, type(정상 21 / 놓치기쉬움 7 / none 5 / 거절 1), expected, notes, check
+- 출처: 실제 공지(서울경찰청 「오늘의 주요집회」 smpa 22 · TOPIS 돌발 6 · TOPIS 공지 1 · 보도 3 · 서울시 보도자료 2)에서 뽑은 34건. 라벨(`expected.items`, 규칙서 v2 §9.1 스키마)은 태우가 직접 달았다(Syntitan 케이스 초안 검토 후 확정). 2026-11-07 수령, **2026-11-08 교체**(T4.3 1차 결과 반영: 지점 집회 unknown, K-016 item 1, 잠수교 car_free, K-027 라벨 정정, construction 추가)
+- 파일: `data/raw/notices/cases_v1.jsonl` (34행, sha256 aacc1127c7b65fc50ed7e2e03d6839493ba4dc942898f3660b58cc25b8ca61d2). 열: case_id, notice_id, source, text, event_date, published_at, source_url, type(정상 16 / 놓치기쉬움 6 / none 6 / unknown 5 / 거절 1), expected, notes, check
 - 용도: `scripts/eval_notice.py` 정확도(impact·kind·segments·window 일치율). git 에 올리지 않는다(raw 규칙)
 
 ### recorded/syntitan (합성 입력 — 견고성용, T4.3)

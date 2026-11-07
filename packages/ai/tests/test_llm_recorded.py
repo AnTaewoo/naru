@@ -65,17 +65,19 @@ def test_strict_schema_has_no_loose_objects() -> None:
     assert "coordinates" not in json.dumps(schema) and "lng" not in json.dumps(schema)
 
 
-def test_prompt_v1_fewshot_ids_are_real_sentences(
+def test_prompt_fewshot_inputs_are_real_sentences(
     settings: Settings, sentences: dict[str, dict[str, object]]
 ) -> None:
     prompt = NoticePrompt.load(settings.prompt_version)
-    assert prompt.version == "notice_v1"
-    ids = prompt.fewshot_ids()
-    assert len(ids) >= 8 and set(ids) <= set(sentences)
-    for sid in ids:  # few-shot 의 원문이 실제 문장 그대로인지
-        assert str(sentences[sid]["text"]) in prompt.system, sid
-    for rule in ("좌표", "impact", "toward", "approx", "items", "motorway", "unknown_near"):
-        assert rule in prompt.system or rule == "unknown_near"
+    assert prompt.version == settings.prompt_version == "notice_v2"
+    envs = prompt.fewshot_envelopes()
+    assert len(envs) == 11  # E1~E11
+    texts = {str(r["text"]) for r in sentences.values()}
+    for env in envs:  # few-shot 원문이 sentences.jsonl 에 있다 (append_fewshot_sentences.py)
+        assert env["text"] in texts, str(env["text"])[:40]
+        assert env["source"] in ("smpa", "topis", "news")
+    for rule in ("좌표", "impact", "toward", "approx", "items", "motorway", "construction"):
+        assert rule in prompt.system
     env = NoticeEnvelope.from_sentence(sentences["smpa-20261107-r01"])
     msg = prompt.build_messages(env)
     assert msg[0]["role"] == "user" and "동화면세점" in str(msg[0]["content"])
@@ -111,7 +113,7 @@ def test_recorded_replays_validate_against_schema(
 
 
 def test_recorded_values_match_rules(recorder: LLMRecorder) -> None:
-    """기대값은 기록 파일을 열어 확인한 값 (2026-11-07 기록, claude-haiku-5-5 / notice_v1)."""
+    """기대값은 기록 파일을 열어 확인한 값 (2026-11-08 기록, claude-haiku-5-5 / notice_v2)."""
     # smpa-20261107-r06: 16:00~19:00 의사당역 5出 → 민주당사 <은행로 등> 5,000명 영등포
     rec: Recording = recorder.load("smpa-20261107-r06")
     item = NoticeOutput.model_validate(rec.tool_input()).items[0]
@@ -147,4 +149,7 @@ def test_recorded_values_match_rules(recorder: LLMRecorder) -> None:
     (seg,) = item.segments
     assert (seg.from_, seg.to) == ("국회의사당역 2번출구", "사랑채 동측 건너편")
     assert item.police_stations == ["영등포", "마포", "서대문", "종로"]
-    assert rec.usage["cache_creation_input_tokens"] == 11072  # 시스템 프롬프트가 캐시됐다
+    cached = int(str(rec.usage["cache_creation_input_tokens"])) + int(
+        str(rec.usage["cache_read_input_tokens"])
+    )
+    assert cached == 11324  # notice_v2 시스템 프롬프트 토큰 — 캐시로 썼다(생성 또는 읽기)

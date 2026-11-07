@@ -69,7 +69,7 @@ def test_expected_as_prediction_scores_one(cases: list[Case]) -> None:
     assert s.pass_rate == 1.0 and s.ci95 == (1.0, 1.0) and s.errors == 0
     assert all(v == 1.0 for v in s.rates.values()) and s.road_rate == 1.0
     assert sum(n for _, n in s.by_type.values()) == 34
-    assert set(s.by_type) == {"정상", "놓치기쉬움", "none", "거절"}
+    assert set(s.by_type) == {"정상", "놓치기쉬움", "none", "unknown", "거절"}  # 2026-11-08 라벨
     # 거절(K-034, items 0): blocks item 을 내면 실패, none 만 내면 통과
     k034 = by_id["K-034"]
     none_item = as_prediction(by_id["K-029"]).items[0].model_copy(update={"impact": "none"})
