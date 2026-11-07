@@ -117,3 +117,9 @@
 - 정한 것: 적재가 창 뒤여도 status_of_state 가 창으로 재판정(실측 bus_return 해제만 고정). **/closures 도 /route 와 같은 +60분 지평(태우 "+60분으로 하자")** → `ClosureRepository.active_horizon`, ARCHITECTURE 표·INTERFACE §3 보강. 405·415 → not_found·invalid_query. zone 후보는 ZoneMatcher v1 뒤, unknown 승격은 함수 단위 검증(실제 unknown 후보는 T4)
 - 막힌 것 / 태우 대기: 없음
 - 커밋: a7ea670 3211a25 ee79e6a e236c5f 29b9ed4 65d1d3c 25bdfa4 40973d8 + MANIFEST 재기록 / 이 항목의 커밋
+
+## 2026-11-07 · T4.1 DONE
+- 한 것: `naru_ai/config.py` Settings, `llm/notice_schema.py`(규칙서 v2 §9.1 pydantic → strict JSON Schema), `llm/client.py` AnthropicClient.complete_tool(strict tool + tool_choice 강제, 캐시, refusal·max_tokens·상한 예외, anthropic 2.6.0 파라미터 확인), `llm/prompt.py`, `llm/recorder.py`(model·prompt_version 불일치 fail), `llm/prompts/notice_v1.md`(규칙서 §0~§5·§9 + few-shot 8), `scripts/record_llm.py`. live 3문장 기록(≈$0.003, 시스템 프롬프트 11,072 토큰 캐시), 재생 테스트 4개
+- 정한 것: temperature 는 못 씀(Haiku 5.5 400, SDK 키 없음) → strict schema + 규칙 confidence (CLAUDE.md §3-8·CONVENTIONS §3.2 갱신, 태우). max_tokens 4096. number min/max 는 API 가 거부해 스키마에서 제거. 강제 tool 호출은 thinking 없음(T4.3 에서 auto 비교 가능). guard.py 에 prompts/ 허용(태우)
+- 막힌 것 / 태우 대기: guard.py 변경·T4.1_stop.txt 는 태우가 커밋. TOPIS 문장은 줄 단위라 T4.2 에서 notice_id 로 묶어야 함
+- 커밋: 17e1a44, 9f25116, f37b3a9, b968a75, cdd2479(하네스) / 이 항목의 커밋

@@ -182,14 +182,14 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 ## P4 — 공지 파서 (Claude API) ★ (AI 레인 — P1~P3과 병행 가능, 담당이 다르면)
 
 ### T4.1 AnthropicClient · recorder · 프롬프트 v1 ★
-- status: DOING
+- status: DONE
 - depends: T0.5, T2.1
 - 산출: `naru_ai/llm/client.py`(tool use, `input_schema`·`tool_choice` — 쓰는 SDK 문서를 열어 파라미터명 확인·주석), `naru_ai/llm/recorder.py`, `llm/prompts/notice_v1.md`(few-shot 8문장은 `sentences.jsonl`의 id로. **`prompts/notice_v1.md`는 규칙서 `docs/data/notice_parser_rules_v2.md` §1~§5·§9에서 생성하고, 출력은 §9.1의 `items[] / impact / impact_reason / toward / approx` 스키마**. 기대값은 `data/raw/notices/cases_v1.jsonl`(T0.6) 기준), `scripts/record_llm.py`(`make record-llm`)
 - 실데이터: live 3문장 → recorded. 비용 예상을 시작 메모에
 - 테스트(재생): 응답이 `spans`·`segments` 스키마 통과. recorded `model`·`prompt_version` ≠ 설정 → fail
 
 ### T4.2 NoticeParser · Resolver · CandidateBuilder ★
-- status: TODO
+- status: DOING
 - depends: T4.1, T1.3, T0.7
 - 산출: `notice/parser.py`(호출·재생 → 정렬기 start/end → segments 검증), `notice/gazetteer.py`·`notice/resolver.py`(교차로·도로명·카카오 기록), `notice/candidates.py`(segment 양 끝 풀림 → `SegmentGeom`, 아니면 `PointGeom`; confidence 규칙: 출처 종류 + 시간 명시 여부)
 - 테스트(실데이터): recorded 응답 1건 → 후보 ≥ 1, `SegmentGeom.from_.lng`가 카카오 기록 좌표와 일치, 못 푼 정규형은 후보 없음(추측 좌표 0). `scripts/record_candidates.py --source notice`
