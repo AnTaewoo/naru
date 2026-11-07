@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = Field(default="", validation_alias="ANTHROPIC_API_KEY")
     llm_model: str = Field(default="claude-haiku-5-5", validation_alias="NARU_LLM_MODEL")
-    prompt_version: str = Field(default="notice_v1", validation_alias="NARU_PROMPT_VERSION")
+    prompt_version: str = Field(default="notice_v2", validation_alias="NARU_PROMPT_VERSION")
     # tool 입력(items[] + spans)이 1024 토큰을 넘곤 한다 (CONVENTIONS §3.2 의 1024 는 v1 스키마 값)
     llm_max_tokens: int = Field(default=4096, validation_alias="NARU_LLM_MAX_TOKENS")
     # live 호출은 Task당 10회 이하 (CLAUDE.md §2)

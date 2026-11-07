@@ -14,7 +14,7 @@ from pathlib import Path
 from anthropic.types import MessageParam
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-SENTENCE_ID = re.compile(r"\b(?:smpa|topis)-[0-9]+-[lr][0-9]+\b")
+FEWSHOT_INPUT = re.compile(r"^입력 `(\{.*\})`\s*$")  # notice_v2: 예시마다 `입력 \`{봉투}\`` 한 줄
 
 
 @dataclass(frozen=True)
@@ -70,12 +70,14 @@ class NoticePrompt:
             raise ValueError(f"{path.name} 첫 줄에 버전 {version} 이 없다: {first!r}")
         return cls(version=version, system=text)
 
-    def fewshot_ids(self) -> list[str]:
-        seen: list[str] = []
-        for m in SENTENCE_ID.findall(self.system):
-            if m not in seen:
-                seen.append(m)
-        return seen
+    def fewshot_envelopes(self) -> list[dict[str, object]]:
+        """예시 입력 봉투들 (실제 공지 원문). sentences.jsonl 에 같은 text 가 있어야 한다."""
+        out: list[dict[str, object]] = []
+        for line in self.system.splitlines():
+            m = FEWSHOT_INPUT.match(line.strip())
+            if m:
+                out.append(json.loads(m.group(1)))
+        return out
 
     def build_messages(self, envelope: NoticeEnvelope) -> list[MessageParam]:
         content = (

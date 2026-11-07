@@ -14,7 +14,14 @@ from pydantic import BaseModel, ConfigDict, Field
 Kind = Literal["march", "rally_point", "rally_stretch", "closure", "marathon", "unknown"]
 Impact = Literal["blocks", "none", "unknown"]
 ImpactReason = Literal[
-    "motorway", "car_free", "sidewalk", "vehicle_measure", "released", "info_only", "unconfirmed"
+    "motorway",
+    "car_free",
+    "sidewalk",
+    "vehicle_measure",
+    "construction",  # 차로 공사·시설물 보수 (규칙서 v2 재판, 태우 2026-11-08)
+    "released",
+    "info_only",
+    "unconfirmed",
 ]
 Tag = Literal["TIME", "ROAD", "INTERSECTION", "POI", "ADDRESS", "AREA"]
 Direction = Literal["one_way", "both"]

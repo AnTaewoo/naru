@@ -129,6 +129,8 @@ class RuleBaseline:
             return kind, "none", "motorway"
         if "차 없는" in text:
             return kind, "none", "car_free"
+        if ("공사" in text or "보수" in text) and "보도" not in text:
+            return kind, "none", "construction"  # 차로 공사·시설물 보수 (보도 공사는 blocks)
         if "해제" in text or "정상 소통" in text:
             return kind, "none", "released"
         vehicle = any(w in text for w in ("가변차로", "무정차", "우회"))

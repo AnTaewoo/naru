@@ -52,10 +52,15 @@ def main(argv: list[str] | None = None) -> int:
     }
     accuracy = {name: (summarize(r), r) for name, r in results.items()}
     synthetic = load_synthetic(args.synthetic, SYNTHETIC_PUBLISHED_AT)
-    robust = {
-        "규칙 기준선": robustness(synthetic, baseline.parse),
-        f"Claude {settings.llm_model}": robustness(synthetic, claude),
-    }
+    robust = {"규칙 기준선": robustness(synthetic, baseline.parse)}
+    notes_extra: list[str] = []
+    if any(recorder.exists(env.sentence_id) for env in synthetic):
+        robust[f"Claude {settings.llm_model}"] = robustness(synthetic, claude)
+    else:
+        notes_extra.append(
+            f"합성 163건은 {settings.prompt_version} 으로 미기록 — Claude 견고성 행 없음 "
+            "(이전 프롬프트 결과는 docs/eval/ 의 이전 표)"
+        )
 
     today = datetime.now(KST)
     report = markdown_report(
@@ -68,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
             "·window(분, approx ±10분)·toward·points. road·impact_reason 은 참고",
             "거절 케이스(expected items 0)는 예측에 blocks/unknown item 이 없으면 통과",
             "오류 = 기록 없음·스키마 위반·응답 거부",
+            *notes_extra,
         ],
     )
     out = args.out or Path("docs/eval") / f"notice_{today:%Y%m%d}.md"
