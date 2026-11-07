@@ -196,14 +196,14 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 쪼개기: T4.2a(parser) / T4.2b(resolver) / T4.2c(builder)
 
 ### T4.3 평가 — 규칙 기준선 vs Claude ★
-- status: DOING
+- status: DONE
 - depends: T4.2, T0.6
 - 산출: `notice/rule_baseline.py`(지명사전·별칭 일치 + 시간 정규식), `notice/eval.py` — 입력 둘로 나눠 평가: **정확도** = `data/raw/notices/cases_v1.jsonl`(실제 공지 34건, T0.6) · **견고성** = `data/recorded/syntitan/agent_questions.csv`(합성 163건). 통과 기준은 규칙서 §7·§9.3(window 분 단위·impact·items 수·segments 순서·toward·approx ±10분), 정규형 F1·구간 F1·횡단보도 Jaccard, type별(정상/놓치기쉬움/거절) 정확도, 케이스 단위 부트스트랩 CI, `make record-llm`으로 val 문장 전부 기록, `docs/eval/notice_<date>.md` 결과 표
 - 테스트: 정답을 예측으로 넣으면 F1 = 1.0. 정렬기 왕복
 - **이 표가 보고서 2.3 "AI가 필요한가"의 숫자다.** 임계값(review 0.7 등)은 결과 보고 태우가 정한다
 
 ### T4.4 IngestWorker · CandidatePublisher ★
-- status: TODO
+- status: DOING
 - depends: T4.2, T3.4
 - 산출: `worker.py`(스케줄 공지 5분·코스 1회, `--once` 플래그로 시연용 1회 실행), `publish.py`(httpx POST, 3회 재시도)
 - 테스트: e2e — `make dev` + `python -m naru_ai.worker --once` → BE `/closures`에 공지 후보 반영 확인

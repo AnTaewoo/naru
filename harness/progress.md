@@ -129,3 +129,9 @@
 - 정한 것: 교차로 사전이 카카오보다 먼저. 도로명 사전은 도로명코드 대신 노드링크 ROAD_NAME. 카카오 1순위에서 식당·카페 등 9개 카테고리 제외('사랑채' 사례). confidence 는 파서 값 + 상한만. '사랑채 동측 건너편'은 못 풀어 출발지 point 만(틀린 선보다 빠진 점)
 - 막힌 것 / 태우 대기: '민주당사' 서울시당 vs 중앙당 선택은 T4.3 에서 확인. guard.py 변경은 태우 커밋
 - 커밋: a4d252f, ac2b6b1, 0ff69d1, 342a4ac, 16228e7, 0adfbad / 이 항목의 커밋
+
+## 2026-11-08 · T4.3 DONE
+- 한 것: `notice/rule_baseline.py`(규칙 기준선), `notice/eval_cases.py`·`eval.py`·`eval_report.py`(item 짝 비교 impact·kind·segments·window·toward·points, road·impact_reason 참고, 거절은 blocks 없음, 부트스트랩 CI, markdown), `scripts/eval_notice.py` → `docs/eval/notice_20261108.md`, `record_llm.py`(cases·csv 입력, --ids all, --max-calls). live 197회(34 라벨 + 163 합성, ≈$0.09) 기록 후 재생. 결과: 전부 일치 Claude 18/34(53%, CI 38~71) vs 규칙 14/34(41%); 합성 스키마 통과 Claude 163/163, 규칙 161/163
+- 정한 것: 두 숫자 따로(태우). Task당 10회 규칙은 평가 세트 1회 기록으로 넘김(--max-calls 명시). 합성 봉투 source news·published_at 고정. docs/eval 은 스크립트가 씀. 정규형 F1·Jaccard 는 라벨에 spans·좌표가 없어 제외
+- 막힌 것 / 태우 대기: 라벨↔규칙서 불일치 10건 결정 — 지점 집회 impact(K-012~015·020 blocks vs §9.2-12 unknown), K-016 items 1 vs 2, K-026 잠수교 blocks vs §9.2-3 car_free, K-031 impact_reason construction(스키마 밖), K-033 none 에 segment 요구, K-027 라벨이 문장과 불일치. 진짜 모델 오류 5건(K-010·011·019·028·008/032)
+- 커밋: 58850c5, 691385b, 77d42bf, 1d907a3, 2b62d92 / 이 항목의 커밋
