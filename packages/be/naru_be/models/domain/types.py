@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from naru_be.models.domain.ped_graph import EdgeKind
 from naru_contracts import Evidence, Status
 
 LngLat = tuple[float, float]
+KST = timezone(timedelta(hours=9))  # 응답 시각 표기 (CONVENTIONS §4.5). 저장은 UTC
 
 
 @dataclass(frozen=True)
