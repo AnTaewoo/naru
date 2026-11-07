@@ -116,6 +116,29 @@ LEGS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
         ("올림픽로", "송파대로"),
     ),
 )
+# 10 km 코스 (포스터: 잠실종합운동장 → 잠실종합운동장, 시각표 11~15구간).
+# 첫 구간(종합운동장교차로 → 동문)은 15구간 통제구간(동문 앞~사거리). 코스 길이에서 뺀다.
+# 노드(2026-11-07 nodelink_seoul NODE_NAME): 종합운동장교차로 1230039003, 종합운동장역 1230188204,
+# 잠실역사거리 1230001801, 석촌역사거리 1230001501, 가락시장역사거리 1230185801
+LEGS_10K: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
+    ("종합운동장교차로 → 출발 종합운동장역(동문)", "1230039003", "1230188204", ("올림픽로",)),
+    (
+        "출발 종합운동장역(동문) → 잠실역사거리",
+        "1230188204",
+        "1230001801",
+        ("올림픽로", "송파대로"),
+    ),
+    ("잠실역사거리 → 석촌역사거리", "1230001801", "1230001501", ("송파대로",)),
+    ("석촌역사거리 → 가락시장역사거리", "1230001501", "1230185801", ("송파대로",)),
+    ("가락시장역사거리 U턴 → 석촌역사거리", "1230185801", "1230001501", ("송파대로",)),
+    ("석촌역사거리 → 잠실역사거리", "1230001501", "1230001801", ("송파대로",)),
+    (
+        "잠실역사거리 → 종합운동장역(동문, 도착)",
+        "1230001801",
+        "1230188204",
+        ("올림픽로", "송파대로"),
+    ),
+)
 
 
 class _Text(HTMLParser):
@@ -208,7 +231,9 @@ def latest_nodelink(raw: Path) -> Path:
     return dirs[-1]
 
 
-def digitize(nodelink_dir: Path) -> tuple[list[tuple[float, float]], list[dict[str, object]]]:
+def digitize(
+    nodelink_dir: Path, legs: tuple[tuple[str, str, str, tuple[str, ...]], ...]
+) -> tuple[list[tuple[float, float]], list[dict[str, object]]]:
     """LEGS를 도로명 제한 최단경로로 이어 WGS84 좌표열과 구간 기록을 돌려준다."""
     nodes = gpd.read_file(nodelink_dir / "node.gpkg")
     links = gpd.read_file(nodelink_dir / "link.gpkg").to_crs(4326)
@@ -227,7 +252,7 @@ def digitize(nodelink_dir: Path) -> tuple[list[tuple[float, float]], list[dict[s
     full = graph(None)
     coords: list[tuple[float, float]] = []
     records: list[dict[str, object]] = []
-    for title, a, b, allowed in LEGS:
+    for title, a, b, allowed in legs:
         g, fallback = graph(allowed), False
         try:
             path = nx.shortest_path(g, a, b, weight="w")
@@ -269,9 +294,10 @@ def write_gpx(
     coords: list[tuple[float, float]],
     records: list[dict[str, object]],
     pos_of: dict[str, tuple[float, float]],
+    name: str,
 ) -> None:
     gpx = gpxpy.gpx.GPX()
-    gpx.name = f"{EVENT['name']} 풀코스 (디지타이즈)"
+    gpx.name = f"{EVENT['name']} {name} (디지타이즈)"
     gpx.description = (
         "표준노드링크 서울 추출본 위에서 공식 코스 설명 순서대로 이은 선. 출처는 _course_meta.json"
     )
@@ -318,14 +344,21 @@ def main(argv: list[str] | None = None) -> int:
     (out / "seoul_marathon_2026_timetable.json").write_text(
         json.dumps(timetable, ensure_ascii=False, indent=2) + "\n", "utf-8"
     )
-    log.info("시각표 %d구간 (%s)", len(timetable["segments"]), timetable["event"]["date"])  # type: ignore[arg-type,index]
+    segments = timetable["segments"]
+    event = timetable["event"]
+    assert isinstance(segments, list) and isinstance(event, dict)
+    log.info("시각표 %d구간 (%s)", len(segments), event["date"])
 
     nodelink_dir = latest_nodelink(args.raw)
-    coords, records = digitize(nodelink_dir)
+    coords, records = digitize(nodelink_dir, LEGS)
     nodes = gpd.read_file(nodelink_dir / "node.gpkg").to_crs(4326)
     pos_of = {r.NODE_ID: (r.geometry.x, r.geometry.y) for r in nodes.itertuples()}
-    write_gpx(out / "seoul_marathon_2026.gpx", coords, records, pos_of)
+    write_gpx(out / "seoul_marathon_2026.gpx", coords, records, pos_of, "풀코스")
     total_m = sum(float(r["length_m"]) for r in records)
+    coords_10k, records_10k = digitize(nodelink_dir, LEGS_10K)
+    write_gpx(out / "seoul_marathon_2026_10km.gpx", coords_10k, records_10k, pos_of, "10 km 코스")
+    total_10k = sum(float(r["length_m"]) for r in records_10k)
+    chute_m = float(records_10k[0]["length_m"])  # 종합운동장교차로 → 동문 (15구간, 코스 아님)
     meta = {
         "fetched_at": fetched_at,
         "method": "포스터 코스 설명 순서로 교차로 노드를 잇는 도로명 제한 최단경로 (무방향)",
@@ -336,6 +369,12 @@ def main(argv: list[str] | None = None) -> int:
         "deviation_pct": round(100 * (total_m / 1000 / OFFICIAL_LENGTH_KM - 1), 2),
         "points": len(coords),
         "legs": records,
+        "course_10km": {
+            "digitized_length_km": round((total_10k - chute_m) / 1000, 3),
+            "chute_m": round(chute_m, 1),
+            "points": len(coords_10k),
+            "legs": records_10k,
+        },
     }
     (out / "seoul_marathon_2026_course_meta.json").write_text(
         json.dumps(meta, ensure_ascii=False, indent=2) + "\n", "utf-8"
