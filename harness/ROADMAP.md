@@ -41,7 +41,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 테스트(실데이터): GeoPandas로 열어 행 수 > 0, WGS84, 횡단보도 파일에 교차로명·관리번호 컬럼 존재. 컬럼명은 **파일을 열어 확인한 뒤** 적는다
 
 ### T0.3 표준노드링크 (RoadGraph용) ★
-- status: TODO
+- status: DONE
 - depends: T0.1
 - 실데이터: 공공데이터포털 표준노드링크, 서울 종로구·중구·영등포구 필터
 - 산출: `scripts/fetch_nodelink.py`, MANIFEST
