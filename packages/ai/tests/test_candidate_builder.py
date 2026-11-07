@@ -39,7 +39,7 @@ def parsed(notices_dir: Path) -> dict[str, ParsedNotice]:
             row = json.loads(line)
             rows[row["sentence_id"]] = row
     parser = NoticeParser(settings, recorder)
-    ids = recorder.list_ids()
+    ids = [i for i in recorder.list_ids() if i in rows]  # 평가 기록(K-*·C-*) 제외
     return {sid: parser.parse(NoticeEnvelope.from_sentence(rows[sid])) for sid in ids}
 
 

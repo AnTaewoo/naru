@@ -58,7 +58,7 @@ def notice_batch(raw: Path, recorded: Path, produced_at: datetime) -> CandidateB
     builder = CandidateBuilder(Resolver(gazetteer, KakaoRecords(recorded)))
     parser = NoticeParser(settings, recorder)
     candidates: list[ClosureCandidate] = []
-    for sid in ids:
+    for sid in [i for i in ids if i in rows]:  # 평가 기록(K-*·C-*)은 문장이 아니다
         parsed = parser.parse(NoticeEnvelope.from_sentence(rows[sid]))
         built = builder.build(parsed)
         print(f"{sid}: items {len(parsed.items)}, dropped {parsed.dropped_spans}, n={len(built)}")

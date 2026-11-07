@@ -32,7 +32,9 @@ def parser() -> NoticeParser:
 def test_replay_aligns_every_span(
     parser: NoticeParser, sentences: dict[str, dict[str, object]]
 ) -> None:
-    for sid in parser.recorder.list_ids():
+    ids = [i for i in parser.recorder.list_ids() if i in sentences]  # 평가 기록(K-*·C-*) 제외
+    assert len(ids) >= 3
+    for sid in ids:
         env = NoticeEnvelope.from_sentence(sentences[sid])
         assert env.notice_id and env.source_url.startswith("https://")
         parsed = parser.parse(env)

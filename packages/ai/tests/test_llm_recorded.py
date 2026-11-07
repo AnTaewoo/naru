@@ -85,7 +85,9 @@ def test_prompt_v1_fewshot_ids_are_real_sentences(
 def test_recorded_replays_validate_against_schema(
     recorder: LLMRecorder, settings: Settings, sentences: dict[str, dict[str, object]]
 ) -> None:
-    for sid in recorder.list_ids():
+    ids = [i for i in recorder.list_ids() if i in sentences]  # K-*·C-* (평가 기록)는 제외
+    assert len(ids) >= 3
+    for sid in ids:
         rec = recorder.load(sid)
         assert rec.model == settings.llm_model and rec.prompt_version == settings.prompt_version
         tool = rec.request["tool"]
