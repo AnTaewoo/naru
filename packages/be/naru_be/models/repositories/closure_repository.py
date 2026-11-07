@@ -58,18 +58,22 @@ class ClosureRepository:
 
     def active_at(self, t: datetime, bbox: Bbox) -> list[ClosureState]:
         """t 에 살아 있는 상태: window_start <= t <= window_end+grace, bbox 안. status 저장값."""
-        if t.tzinfo is None:
+        return self.active_between(t, t, bbox)
+
+    def active_between(self, t0: datetime, t1: datetime, bbox: Bbox) -> list[ClosureState]:
+        """[t0, t1] 과 겹치는 상태: window_start <= t1, window_end+grace >= t0 (라우팅 지평)."""
+        if t0.tzinfo is None or t1.tzinfo is None:
             raise ValueError("오프셋 없는 시각")
-        t_utc = to_utc_naive(t)
-        assert t_utc is not None
+        t0_utc, t1_utc = to_utc_naive(t0), to_utc_naive(t1)
+        assert t0_utc is not None and t1_utc is not None
         grace = timedelta(minutes=self.settings.released_grace_min)
         e = ClosureStateEntity
         stmt = (
             select(e)
             .where(e.lng.between(Decimal(str(bbox[0])), Decimal(str(bbox[2]))))
             .where(e.lat.between(Decimal(str(bbox[1])), Decimal(str(bbox[3]))))
-            .where(or_(e.window_start.is_(None), e.window_start <= t_utc))
-            .where(or_(e.window_end.is_(None), e.window_end >= t_utc - grace))
+            .where(or_(e.window_start.is_(None), e.window_start <= t1_utc))
+            .where(or_(e.window_end.is_(None), e.window_end >= t0_utc - grace))
             .order_by(e.crosswalk_id, e.candidate_id)
         )
         with self._sessions.begin() as s:

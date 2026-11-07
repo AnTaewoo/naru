@@ -36,3 +36,13 @@ class Path:
     legs: tuple[RouteLeg, ...]
     avoided: tuple[AvoidedCrosswalk, ...]
     node_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RouteResult:
+    """RoutePlanner.plan 결과. View 가 RouteResponse(INTERFACE §2)로 바꾼다."""
+
+    path: Path  # 통제 반영 경로
+    baseline: Path  # 같은 그래프, 통제 미적용 (avoided 는 항상 비어 있다)
+    depart_at: datetime
+    computed_at: datetime

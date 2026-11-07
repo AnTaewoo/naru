@@ -110,6 +110,12 @@ def test_active_at_respects_window_and_bbox(
     assert repo.active_at(datetime(2026, 3, 15, 7, 19, tzinfo=KST), GWANGHWAMUN) == []
     assert len(repo.active_at(datetime(2026, 3, 15, 8, 37, tzinfo=KST), GWANGHWAMUN)) == 6
     assert repo.active_at(datetime(2026, 3, 15, 8, 39, tzinfo=KST), GWANGHWAMUN) == []
+    # 구간 조회(T3.2): 07:00~07:25 는 07:20 시작과 겹친다, 08:39~09:00 은 종료+30분 뒤라 아니다
+    t7 = datetime(2026, 3, 15, 7, 0, tzinfo=KST)
+    assert len(repo.active_between(t7, t7 + timedelta(minutes=25), GWANGHWAMUN)) == 6
+    assert repo.active_between(t7, t7 + timedelta(minutes=19), GWANGHWAMUN) == []
+    t839 = datetime(2026, 3, 15, 8, 39, tzinfo=KST)
+    assert repo.active_between(t839, t839 + timedelta(minutes=21), GWANGHWAMUN) == []
     # 여의도 bbox 에는 없다. UTC 로 같은 시각을 줘도 결과 같다
     yeouido = (126.910, 37.515, 126.940, 37.535)
     assert repo.active_at(datetime(2026, 3, 15, 7, 30, tzinfo=KST), yeouido) == []
