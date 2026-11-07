@@ -67,6 +67,26 @@
 - `seoul_marathon_2026_course_meta.json`: 구간별 노드·허용 도로·실제 지난 도로·길이·폴백 여부, 출처 URL
 - 세종대로 통과: 1·2구간(출발~세종대로사거리~숭례문)이 세종대로. 테스트 `packages/ai/tests/test_course_data.py`
 
+### notices/smpa (서울경찰청 '오늘의 주요집회' PDF, 수동)
+- 폴더: `data/raw/notices/smpa/` — `261107(토) 오늘의 주요집회.pdf`, `261108(일) …`, `261109(월) …` (각 1쪽, Hwp 2018 → Hancom PDF, 작성자 '정보상황실'). 태우가 2026-11-07 게시판(로그인)에서 받아 원본 파일명 그대로 둠
+- 출처: 서울경찰청 '오늘의 집회' 게시판 https://www.smpa.go.kr/user/nd54882.do (로그인·robots로 막혀 자동 수집 안 함, 태우 수동). 문서 안 "(2026. 11. 6. 18:00 기준 작성)" → `published_at`, 제목 옆 날짜 → `event_date`
+- sha256: 1107 `11d443cc…a82f`, 1108 `71aca42d…394f`, 1109 `4e5ff583…4abc`
+- 표 머리글(실제): `집회 일시 | 집회 장소(행진로) | 신고인원 | 관할서 | 비고`. 행 수(눈으로 셈, 2026-11-07): 6 / 3 / 4 = 13
+- 라이선스: 경찰청 공개 게시물 (별도 표기 없음). 문장 원문은 공개 정보
+
+### recorded/topis_notice (TOPIS 공지 NoticeList)
+- 파일: `data/recorded/topis_notice/20261107T153007.json` (818 KB, sha256 `4bee5a87…8ba6`) — `scripts/build_notices.py --topis` 1회 호출, 최신 300건
+- 출처: 서울 열린데이터광장 OA-22861 서울 교통정보시스템(TOPIS) 공지사항 https://data.seoul.go.kr/dataList/OA-22861/S/1/datasetView.do — Open API `NoticeList`, **xml만** (json은 ERROR-301), 한 번에 1,000건. 라이선스 공공누리 2유형(출처표시·상업적 이용 금지)
+- 필드(실제, xml 소문자): `bdwr_seq, bdwr_rtng_cd, bdwr_rtng_nm, bdwr_div_cd, bdwr_div_nm, bdwr_ttl_nm, bdwr_cts(HTML 이스케이프된 리치텍스트), update_date, create_date("2026-11-06 11:31:55"), url(https://topis.seoul.go.kr/notice/openNoticeView.do?blbdDivCd=02&bdwrSeq=…)`
+- 300건 범위: create_date 2026-05-08 ~ 2026-11-06. 분류 통제안내 154 · 버스안내 104 · (그 외 정책·기상·기타 42는 문장으로 안 씀)
+
+### notices/sentences.jsonl (T0.5 산출, `uv run python scripts/build_notices.py`)
+- 파일: `data/raw/notices/sentences.jsonl` (1,918,115 B, 2,810행, sha256 `58fef9ca003ea02e97b25eaae045aaf947b33bfa8e2f1b75ac2af6655db257c5`) + `sentences_meta.json`. git에 올리지 않는다(.gitignore `data/raw/notices/*.jsonl|*.json`) — raw 규칙. 다시 만들려면 PDF + recorded로 `uv run python scripts/build_notices.py`
+- 레코드: `sentence_id, notice_id, text, context_prev, context_next, source_type(smpa|topis), source_url, published_at(+09:00), fetched_at, event_date, fields`
+- smpa 13행: 표 행 하나 = 문장 하나. `text` = 셀을 왼쪽부터 공백으로 이은 원문(빈 비고 제외), 셀 안 줄바꿈만 공백. 예 `smpa-20261107-r01` "12:00~16:00 동화면세점 앞 → 종로1R → 동화면세점 앞 <세종대로 등> 50,000명 종로, 남대문". `fields`에 time/place/headcount/station/note/file
+- topis 2,797행(공지 258건): 제목(l000) + 본문 줄(l001~). 본문은 블록 태그(p/br/div/li/tr)에서만 줄을 나누고 인라인 태그(span/b)는 지움 — 글자는 손대지 않음. `fetched_at` = 기록 파일 `called_at`. 예 `topis-6301-l005` "- 의사당대로 국회앞교차로 → 글래드호텔 앞 3개차로 통제"
+- 안 한 것: 보도 문장(naru-reader 수집본 import) — 이 머신에 naru-reader 저장소가 없다
+
 ## recorded
 
 | api | 최초 기록 | 파일 수 | 비고 |

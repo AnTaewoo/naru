@@ -22,9 +22,9 @@ import pdfplumber
 
 KST = timezone(timedelta(hours=9))
 
-# 서울경찰청 '오늘의 집회' 게시판 (로그인 필요, 첨부 PDF를 사람이 받는다).
-# 2026-11-07 직접 접속은 "시스템 오류" — 태우가 받은 페이지 URL로 바꿀 것
-SMPA_BOARD_URL = "https://www.smpa.go.kr/user/nd54515.do"
+# 서울경찰청 '오늘의 집회' 게시판. 로그인·robots로 막혀 있어 자동 수집하지 않는다 —
+# PDF는 태우가 수동으로 notices/smpa 에 넣고, 이 상수는 source_url 기록용이다 (2026-11-07 태우 확인)
+SMPA_BOARD_URL = "https://www.smpa.go.kr/user/nd54882.do"
 SMPA_HEADER = ("집회 일시", "집회 장소(행진로)", "신고인원", "관할서", "비고")
 SMPA_FIELDS = ("time", "place", "headcount", "station", "note")
 SMPA_BASIS_RE = re.compile(
