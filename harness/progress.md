@@ -141,3 +141,9 @@
 - 정한 것: 합성 163건은 v2 로 재기록 안 함(허용 34회 밖) → 표에서 Claude 견고성 행 생략, v1 표 참조. 워커 e2e 핀은 v2 값(공지 후보 7·횡단보도 37 — r04 를 v2 가 segment 3개로 냄)
 - 막힌 것 / 태우 대기: ① `.env` NARU_PROMPT_VERSION 이 아직 notice_v1 (코드 기본값은 v2, 이번엔 환경변수로 덮어 실행) ② `docs/data/naru_parser_spec_v2.md` → `notice_parser_rules_v2.md` 덮어쓰기는 분류기가 막아 태우가 ③ few-shot news 2행(N099·N100) 출처 URL 미상 ④ guard.py 변경 커밋
 - 커밋: 이 항목 직전 2개 / 이 항목의 커밋
+
+## 2026-11-08 · T4.4 DONE
+- 한 것: `naru_ai/publish.py` CandidatePublisher(httpx POST, 토큰, 5xx·연결 3회 재시도, 4xx 즉시 실패), `naru_ai/worker.py` IngestWorker(코스 1회 + 공지 재생 → 내용 해시 batch_id, `--once`/`--live`, run_forever 5분), `naru_ai/log.py`, Settings(NARU_BE_URL·NARU_INTERNAL_TOKEN). e2e `packages/be/tests/test_e2e_worker.py`(WSGITransport 로 실제 Flask + MySQL): 코스 16/183 + 공지 7/37(v2), /closures 광화문 12:30 13·15:30 37, 재실행 멱등, 401
+- 정한 것: e2e 테스트만 naru_ai·naru_be 를 함께 import(패키지는 여전히 독립). 광화문 시연용으로 few-shot 문장 r01·r04 기록. 돌발·버스 스케줄은 P6. few-shot news 2행 URL 은 태우 확인값으로 채움
+- 막힌 것 / 태우 대기: PC-4 — review 임계값·모델 결정(Sonnet 비교는 live 34회·≈$0.2 라 승인 필요), 지도 확인
+- 커밋: 97360ce, bd483bf, 25fdb7e, 0969ad4, 616c041 + URL 보강·규칙서 커밋 / 이 항목의 커밋
