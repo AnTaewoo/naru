@@ -1,5 +1,5 @@
 # ADR-008 공지 파서 v2 출력(impact·toward·approx)을 BE가 어떻게 받는가 — 초안
-- 상태: **제안** (2026-11-07, Claude 초안 → 태우 승인 대기). 승인 전에는 `naru_contracts`·INTERFACE를 바꾸지 않는다
+- 상태: **승인** (2026-11-07, 태우) — 열린 질문 답: 1 해제 공지(`none/released`)는 별도 ADR로 미룸 · 2 `impact` **필수** · 3 30 m·0.65 그대로
 - 근거 문서: `docs/data/notice_parser_rules_v2.md` §9.1(출력 스키마), §9.2 4·8·12(뒤 단계 = BE 규칙)
 - 개정 대상: INTERFACE v0.5 → **v0.6** (아래 변경 목록), ARCHITECTURE "ClosureState 상태기계" 표 비고 한 줄, `naru_be/config.py` 상수 3개
 

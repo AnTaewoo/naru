@@ -1,11 +1,11 @@
-# INTERFACE.md — 파트 간 계약 v0.5
+# INTERFACE.md — 파트 간 계약 v0.6
 
 파트 경계의 단일 기준. 스키마를 바꾸면 **이 파일 먼저** 고치고, 하위호환이 깨지면 버전을 올린다. 변경은 ADR + 태우 승인.
 코드 구현은 `packages/contracts`(`naru_contracts`, pydantic v2) 하나뿐이다. 테스트가 이 문서의 예시 JSON 블록을 그대로 파싱하므로, 예시를 고치면 코드도 고쳐야 한다. FE 타입은 `make schema`로 생성한다.
 
 **표기 규칙**: enum 코드값은 영어 snake_case(한국어 라벨은 FE `i18n/ko.ts`). 시간은 ISO 8601 + 오프셋 필수, 서버 응답은 `+09:00`. 좌표는 `[lng, lat]`.
 
-## §1 AI → BE: `ClosureCandidate` (v0.5)
+## §1 AI → BE: `ClosureCandidate` (v0.6)
 
 AI 워커가 내놓는 유일한 출력. BE의 `CandidateIntake`(Model)가 `CrosswalkIndex`로 `geometry`를 `crosswalk_ids[]`로 바꾼 뒤 `ClosureEngine`에 넘긴다.
 **모델(Claude)은 좌표를 만들지 않는다.** AI는 공지에서 표현(spans)과 구간(segments)을 뽑고, 리졸버가 정규형 → 좌표(`PlacePoint`)를 채운다. 선은 BE가 도로 그래프로 만든다.
@@ -16,6 +16,7 @@ AI 워커가 내놓는 유일한 출력. BE의 `CandidateIntake`(Model)가 `Cros
   "source": "smpa",
   "type": "march",
   "status_hint": "scheduled",
+  "impact": "blocks",
   "geometry": {
     "kind": "segment",
     "from_": {"canonical": "KB금융지주", "lng": 126.9256, "lat": 37.5215, "gazetteer_source": "kakao", "gazetteer_id": "8123456"},
@@ -31,6 +32,8 @@ AI 워커가 내놓는 유일한 출력. BE의 `CandidateIntake`(Model)가 `Cros
   ],
   "notice_ref": {"notice_id": "smpa-20261107-row12", "sentence_id": "s_000412", "source_url": "https://www.smpa.go.kr/...", "published_at": "2026-11-06T18:00:00+09:00",
                  "excerpt": "※행진: KB금융지주→여의도역 5번出→KB증권 본사(19:00出, 0.5km, 2개차로)"},
+  "toward": null,
+  "approx": false,
   "review_required": false
 }
 ```
@@ -38,13 +41,16 @@ AI 워커가 내놓는 유일한 출력. BE의 `CandidateIntake`(Model)가 `Cros
 
 | kind | 필드 | 누가 만드나 | BE 처리 (`CrosswalkIndex`) |
 |---|---|---|---|
-| `point` | `coordinates: [lng, lat]` | 리졸버 (교차로·장소·주소) | `from_point` 반경 30m |
+| `point` | `coordinates: [lng, lat]` | 리졸버 (교차로·장소·주소) | `from_point` 반경 30m. `impact: unknown`이면 먼저 도로 30 m 규칙(ADR-008) — 승격 안 되면 `zone_scheduled` |
 | `line` | `coordinates: [[lng, lat], …]` | 코스 GPX, 버스 이탈 구간, 돌발 링크 | `from_line` 버퍼 15m (코스·버스), 링크 폭 |
 | `segment` | `from_`, `to`, `via[]`: `PlacePoint` · `road`, `road_class` | 리졸버 (Claude segments 출력) | `from_segment`: 도로 그래프 최단경로(from→via→to, road 있으면 그 도로만) → LineString → 등급별 버퍼(대로 25 / 로 15 / 길 8 m) → `from_line` |
 | `zone` | `zone_name`, `polygon` | ZoneMatcher | 라우팅 무관, `zone_scheduled` 표시만 |
 
 - `from_`·`to` 중 하나라도 리졸버가 못 풀면 `segment`를 만들지 않고 풀린 쪽만 `point`로 보낸다. 틀린 선보다 빠진 점이 낫다.
 - `confidence < 0.7` → `review_required: true`. BE는 적재하되 라우팅에 쓰지 않는다.
+- `impact ∈ {blocks, unknown}` **필수** (ADR-008, 파서 규칙서 §9). 파서의 `none`(자동차전용도로·차 없는 거리·보도·차량 조치·해제·안내)은 AI가 후보를 만들지 않는다. `unknown`(점유 표현 없는 지점 집회)이면 `confidence ≤ 0.65`여야 하고(→ review_required), BE `CandidateIntake`가 지점이 도로 링크 30 m 안이거나 지점들이 도로를 감싸면 `blocks`로 승격(evidence `detail.rule: unknown_near_road`), 아니면 `zone_scheduled`로 표시만. 코스·돌발·버스는 항상 `blocks`.
+- `toward`: 종료 지점 없는 행진의 방향 표현을 **문장 그대로**(예: `"을지로입구역"`). `geometry.kind ∈ {point, segment}`일 때만. 리졸버가 풀면 AI가 `segment`(출발지 → toward)를 만들고 `confidence`를 0.65로 상한(검토 큐), 못 풀면 `point`만 보낸다.
+- `approx`: 파서가 근사 시간("14시경", "오후")을 양끝 10분씩 넓혔으면 `true`. BE는 window를 넓히지도 좁히지도 않고 상태·응답에 그대로 싣는다. 평가는 ±10분 허용.
 - `window.end`가 null이면 "종료 미정". 엔진은 시작+6시간을 임시 end로 두고 evidence에 남긴다.
 - `evidence[].kind ∈ {notice, timetable, topis_incident, bus_skip, bus_return, rtd_spike}`. `ref`는 데이터·recorded 파일 경로.
 - `notice_ref`는 공지에서 온 후보에만. `excerpt`를 FE `EvidencePopover`에 그대로 보여준다.
@@ -69,7 +75,7 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 - 같은 `batch_id`를 다시 보내면 중복 적용하지 않는다(멱등). 재시도 안전.
 - 브라우저에서 부르지 않는다. Next.js rewrites 대상에서 `/internal/*`는 제외한다.
 
-## §2 BE → FE: `GET /route` (v0.5)
+## §2 BE → FE: `GET /route` (v0.6)
 
 **요청** `from=lat,lng` · `to=lat,lng` · `depart_at=ISO8601` · `mode=walk`  (FE는 같은 오리진 `/api/route`로 호출 → Next.js rewrites → Flask `/route`)
 
@@ -83,7 +89,7 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
     {"kind": "underpass", "name": "시청역 지하보도", "distance_m": 120}
   ],
   "avoided": [
-    {"crosswalk_id": "<관리번호>", "status": "confirmed", "reason": "세종대로 전면통제", "until": "2027-03-21T11:15:00+09:00",
+    {"crosswalk_id": "<관리번호>", "status": "confirmed", "reason": "세종대로 전면통제", "until": "2027-03-21T11:15:00+09:00", "approx": false,
      "evidence": [{"kind": "bus_skip", "ref": "data/recorded/seoul_bus_pos/20270321-080015.json", "at": "2027-03-21T08:00:15+09:00"}]}
   ],
   "baseline": {
@@ -96,9 +102,9 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 ```
 - `baseline`은 같은 그래프에서 closures를 끈 경로. FE "통제 전후 비교"에 쓴다. 외부 API 아님.
 - `legs[].kind`로 FE가 아이콘·안내 문구를 고른다.
-- `avoided[].evidence`는 §1의 evidence를 그대로 전달.
+- `avoided[].evidence`는 §1의 evidence를 그대로 전달. `avoided[].approx`는 후보의 `approx` 그대로 (FE "약" 표시).
 
-## §3 BE → FE: `GET /closures` (v0.5)
+## §3 BE → FE: `GET /closures` (v0.6)
 
 **요청** `bbox=minLng,minLat,maxLng,maxLat` · `at=ISO8601`
 
@@ -108,7 +114,7 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
   "type": "FeatureCollection",
   "features": [
     {"type": "Feature", "geometry": {"type": "Point", "coordinates": [126.9769, 37.5725]},
-     "properties": {"crosswalk_id": "<관리번호>", "status": "confirmed", "confidence": 0.85,
+     "properties": {"crosswalk_id": "<관리번호>", "status": "confirmed", "confidence": 0.85, "impact": "blocks", "approx": false,
                     "window": {"start": "...", "end": "..."}, "reason": "...", "evidence": [ ... ]}},
     {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[ ... ]]},
      "properties": {"zone_name": "광화문·덕수궁", "status": "zone_scheduled", "confidence": 0.4,
@@ -121,6 +127,7 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 | 필드 | 코드값 | FE 라벨 |
 |---|---|---|
 | `status` / `status_hint` | `scheduled` · `confirmed` · `released` · `zone_scheduled` | 예정 · 확인 · 해제 · 예정 구역 |
+| `impact` | `blocks` · `unknown` | 통제 · 미확인 (ADR-008) |
 | `source` | `course` · `smpa` · `topis` · `news` · `seoul_press` · `incident` · `bus` · `rtd` | 코스 · 경찰청 공지 · TOPIS · 보도 · 보도자료 · 돌발 · 버스 · 혼잡 |
 | `type` | `marathon` · `march` · `rally` · `event` · `incident` | 마라톤 · 행진 · 집회 · 행사 · 돌발 |
 | `geometry.kind` | `point` · `line` · `segment` · `zone` | — |
@@ -145,3 +152,4 @@ ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, �
 | 2026-11-04 | v0.3 | enum 코드값 영어화(§4), 오류 응답(§6), 코드 구현을 naru_contracts로 일원화 (ADR-006) | — |
 | 2026-11-04 | v0.4 | §1.1 AI→BE 전송(`POST /internal/candidates`, 멱등 batch), 401 `unauthorized`, FE는 `/api/*` rewrites 경유 (ADR-006 개정 1) | — |
 | 2026-11-06 | v0.5 | §1 geometry를 `point / line / segment / zone`으로 재정의, `segment`(from/to/via PlacePoint + road_class)·`notice_ref` 추가, source에 smpa/topis/news/seoul_press, Claude API 확정(ADR-007) | — |
+| 2026-11-07 | v0.6 | §1 `impact`(필수, blocks/unknown)·`toward`·`approx` 추가, unknown이면 confidence ≤ 0.65, §2 `avoided[].approx`, §3 properties `impact`·`approx`, §4 `impact` 행 (ADR-008) | 태우 승인 |
