@@ -1,0 +1,45 @@
+{
+  "name": "naru-fe",
+  "version": "0.5.0",
+  "private": true,
+  "description": "Naru FE — Next.js App Router. 화면만 (CONVENTIONS §5)",
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "packageManager": "pnpm@12.6.0",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "test": "vitest run",
+    "check": "tsc --noEmit && eslint . && prettier --check . && vitest run",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "maplibre-gl": "6.16.0",
+    "next": "15.5.29",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "3.3.3",
+    "@playwright/test": "1.56.1",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "18.19.130",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "4.7.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "15.5.29",
+    "jsdom": "26.1.0",
+    "prettier": "3.9.10",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.1",
+    "vite": "6.4.5",
+    "vitest": "3.2.7"
+  }
+}
