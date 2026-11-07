@@ -56,7 +56,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 테스트: 길이 42.195km ± 2%, 시각표 구간 ≥ 4
 
 ### T0.5 공지 문장 수집 ★
-- status: TODO
+- status: DONE
 - depends: T0.1
 - 🧑 태우: 서울경찰청 '오늘의 집회' 첨부를 **매일** `data/raw/notices/smpa/<YYYYMMDD>.<pdf|hwp|jpg>`에. 과거분 확보 범위 확인
 - 산출: `naru_ai/notice/source.py`(smpa PDF 표 → 문장 레코드, TOPIS 공지 API → 문장, 보도 문장은 naru-reader 수집본 import), `scripts/build_notices.py` → `data/raw/notices/sentences.jsonl`(`sentence_id, text, context_prev, context_next, source_type, source_url, published_at, fetched_at`)

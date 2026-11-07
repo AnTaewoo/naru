@@ -39,3 +39,9 @@
 - 정한 것: 공식 GPX 없음(누리집은 2027 대회로 전환) → 디지타이즈. 청계천로 왕복은 같은 차로 링크 왕복(무방향). 도착점은 '종합운동장역' 노드. 첫 시도 36.6 km는 청계천로 서쪽 끝(청계광장, 포스터 '시청삼거리') 왕복 누락 — 코스 지도 km 표지로 찾아 수정
 - 막힌 것 / 태우 대기: 없음
 - 커밋: d5d7a1f, 7a97d09 / 이 항목의 커밋
+
+## 2026-11-07 · T0.5 DONE
+- 한 것: `naru_ai/notice/source.py`(SmpaPdfSource·TopisNoticeSource·NoticeSentence), `scripts/build_notices.py` — 서울경찰청 PDF 3일치 표 13행 + TOPIS 공지(NoticeList xml, 최신 300건 중 통제안내·버스안내 258건) 2,797줄 → `sentences.jsonl` 2,810행. 테스트 4개
+- 정한 것: smpa text = 표 한 행을 셀 순서로 공백 연결(fields에 구조). TOPIS 본문은 블록 태그에서만 줄 나눔. TOPIS 원문은 recorded, 문장 jsonl은 raw(.gitignore, MANIFEST sha256) — 태우 지시로 git 제외. SMPA_BOARD_URL=nd54882(기록용, 자동 수집 안 함, 태우 확인). PDF 원본 파일명 유지. 보도 문장 import는 태우 지시로 건너뜀
+- 막힌 것 / 태우 대기: 없음. T0.6(라벨)은 팀 작업 대기
+- 커밋: 10489d4, debe772, 9f17921 / 이 항목의 커밋
