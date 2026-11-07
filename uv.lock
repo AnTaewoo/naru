@@ -1190,7 +1190,10 @@ dev = [
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
+    { name = "types-networkx" },
+    { name = "types-openpyxl" },
     { name = "types-pymysql" },
+    { name = "types-shapely" },
 ]
 
 [package.metadata]
@@ -1207,7 +1210,10 @@ dev = [
     { name = "mypy", specifier = ">=1.11" },
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.6" },
+    { name = "types-networkx", specifier = ">=3.6.1.20261031" },
+    { name = "types-openpyxl", specifier = ">=3.1.5.20261017" },
     { name = "types-pymysql" },
+    { name = "types-shapely", specifier = ">=2.1.0.20261030" },
 ]
 
 [[package]]
@@ -2117,12 +2123,42 @@ wheels = [
 ]
 
 [[package]]
+name = "types-networkx"
+version = "3.6.1.20261031"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/a9/a35e2e1f48a0b7e70cf3e82a040696bdfbadff6951cfd1d8378016e6e81a/types_networkx-3.6.1.20261031.tar.gz", hash = "sha256:7fcbd2a8dc0fed5ae41322a9e72c299e931e2c9c242ea5b75799c0b6545f6272", size = 77166 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2f/a6/85359ab6bbb9ef5160e1c4dfbe61b79bd643b95423eec28e1747e9a8580b/types_networkx-3.6.1.20261031-py3-none-any.whl", hash = "sha256:5989df7934033028e340164270e5786d6b93f57c8731f7b16bcd5d1302f35acc", size = 167604 },
+]
+
+[[package]]
+name = "types-openpyxl"
+version = "3.1.5.20261017"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/af/13/ce0b36e7e29ee31ec75d6718d48d28d2d48ad319ddf4665f81c8f3a8fc95/types_openpyxl-3.1.5.20261017.tar.gz", hash = "sha256:3deb3b6279b65ab379c126df0ee1fd27500c9628edb8d9667d73f637462917dc", size = 102026 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2b/17/a091e90fde3e90eff9168354269626e210a4c3c688910d8c9176b8a08cb4/types_openpyxl-3.1.5.20261017-py3-none-any.whl", hash = "sha256:3315cfebad290cc7ade1fccaf3a46ee820b3a8e7df726ff4f18d30ab7f383d68", size = 165886 },
+]
+
+[[package]]
 name = "types-pymysql"
 version = "1.2.0.20260923"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/58/cb/2c4017b0da85cbed15296b0569141f2c56790752aa4facc60ea199db24df/types_pymysql-1.2.0.20260923.tar.gz", hash = "sha256:2d02420956deeed7366c3b2b7dfaac3b33ad800d754327857f7b38f59751a59c", size = 22943 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/af/f3/75928f071b26151423e7a681defd6eee6fa8181de70cb22ea2211c295d39/types_pymysql-1.2.0.20260923-py3-none-any.whl", hash = "sha256:2042fc2d0745eba181c3070221fdc9ac12baaa4908f79c1cb0f953c8c44efcc5", size = 23383 },
+]
+
+[[package]]
+name = "types-shapely"
+version = "2.1.0.20261030"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d1/fb/c94c0e74109e5778cd619c36ea1f9ad21bb5f3b60c6a4287022c55433e86/types_shapely-2.1.0.20261030.tar.gz", hash = "sha256:2299ee7c5e671ea1f76c190236e1d7895dfd1a32672ff1f4c163da830cd96230", size = 27888 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2b/2e/5d2b8b9a9e6f79749b1817a2a31f36982b2d8ea5873a80eba9daab8fcdee/types_shapely-2.1.0.20261030-py3-none-any.whl", hash = "sha256:73b477a4a4e0e400ddc5324c7f556b9e4aea74bf0e4bcaafe49f66975a27b05f", size = 38616 },
 ]
 
 [[package]]

@@ -21,6 +21,9 @@ dev = [
   "import-linter>=2.1",
   "types-PyMySQL",
   "folium>=0.17",
+  "types-networkx>=3.6.1.20261031",
+  "types-shapely>=2.1.0.20261030",
+  "types-openpyxl>=3.1.5.20261017",
 ]
 
 [tool.ruff]
