@@ -3,11 +3,46 @@
 데이터가 없으면 실패한다. skip하지 않는다.
 """
 
+import json
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 
 DATA = Path(__file__).resolve().parents[3] / "data"
+
+
+@pytest.fixture(scope="session")
+def notices_dir() -> Path:
+    """`data/raw/notices/` — sentences.jsonl (scripts/build_notices.py 산출)."""
+    d = DATA / "raw" / "notices"
+    assert (d / "sentences.jsonl").exists(), (
+        "실데이터 없음: uv run python scripts/build_notices.py 먼저"
+    )
+    return d
+
+
+@pytest.fixture(scope="session")
+def smpa_dir() -> Path:
+    """`data/raw/notices/smpa/` — 서울경찰청 '오늘의 주요집회' PDF (태우가 수동으로 받음)."""
+    d = DATA / "raw" / "notices" / "smpa"
+    assert list(d.glob("*.pdf")), "실데이터 없음: 오늘의 집회 PDF를 notices/smpa 에 넣는다"
+    return d
+
+
+@pytest.fixture(scope="session")
+def topis_recorded() -> list[tuple[str, datetime]]:
+    """`data/recorded/topis_notice/*.json` — TOPIS NoticeList 응답 기록 (status 200만)."""
+    d = DATA / "recorded" / "topis_notice"
+    files = sorted(d.glob("*.json"))
+    assert files, "기록 없음: uv run python scripts/build_notices.py --topis 먼저"
+    out = []
+    for p in files:
+        rec = json.loads(p.read_text("utf-8"))
+        if rec["status"] == 200:
+            out.append((rec["raw"], datetime.fromisoformat(rec["called_at"])))
+    assert out, "status 200 기록이 없다"
+    return out
 
 
 @pytest.fixture(scope="session")
