@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     confirmed_confidence: float = 0.8
     scheduled_cost_factor: float = 3.0  # scheduled 간선 비용 x3
     released_grace_min: int = 30  # 시각표 종료 + 30분 → released
+    unknown_end_hours: int = 6  # window.end 없으면 시작 + 6시간을 임시 end 로 (INTERFACE §1)
 
     # CrosswalkIndex (T1.2)
     point_radius_m: float = 30.0
