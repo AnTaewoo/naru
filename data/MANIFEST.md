@@ -83,7 +83,7 @@
 - 300건 범위: create_date 2026-05-08 ~ 2026-11-06. 분류 통제안내 154 · 버스안내 104 · (그 외 정책·기상·기타 42는 문장으로 안 씀)
 
 ### notices/sentences.jsonl (T0.5 산출, `uv run python scripts/build_notices.py`)
-- 파일: `data/raw/notices/sentences.jsonl` (1,923,246 B, 2,821행, sha256 `12df407e9734f660c287a59c1da7017eead32f7ee4527f5d2253dee2adb556e0`; 2026-11-08 `scripts/append_fewshot_sentences.py` 로 프롬프트 v2 예시 원문 11행(N001·N006·N009·N011·N045·N049·N059·N067·N070·N099·N100, fields.fewshot) 추가 — news 2행은 출처 URL 미상) + `sentences_meta.json`. git에 올리지 않는다(.gitignore `data/raw/notices/*.jsonl|*.json`) — raw 규칙. 다시 만들려면 PDF + recorded로 `uv run python scripts/build_notices.py`
+- 파일: `data/raw/notices/sentences.jsonl` (1,923,366 B, 2,821행, sha256 `d69c8115fe9c3fc3dabb8cc63d0082285eedd5812f4563ed5ef37d9b42e2dbd5`; 2026-11-08 `scripts/append_fewshot_sentences.py` 로 프롬프트 v2 예시 원문 11행(N001·N006·N009·N011·N045·N049·N059·N067·N070·N099·N100, fields.fewshot) 추가. news 2행(N099·N100) 출처 URL 은 태우 확인 econovill 756361) + `sentences_meta.json`. git에 올리지 않는다(.gitignore `data/raw/notices/*.jsonl|*.json`) — raw 규칙. 다시 만들려면 PDF + recorded로 `uv run python scripts/build_notices.py`
 - 레코드: `sentence_id, notice_id, text, context_prev, context_next, source_type(smpa|topis), source_url, published_at(+09:00), fetched_at, event_date, fields`
 - smpa 13행: 표 행 하나 = 문장 하나. `text` = 셀을 왼쪽부터 공백으로 이은 원문(빈 비고 제외), 셀 안 줄바꿈만 공백. 예 `smpa-20261107-r01` "12:00~16:00 동화면세점 앞 → 종로1R → 동화면세점 앞 <세종대로 등> 50,000명 종로, 남대문". `fields`에 time/place/headcount/station/note/file
 - topis 2,797행(공지 258건): 제목(l000) + 본문 줄(l001~). 본문은 블록 태그(p/br/div/li/tr)에서만 줄을 나누고 인라인 태그(span/b)는 지움 — 글자는 손대지 않음. `fetched_at` = 기록 파일 `called_at`. 예 `topis-6301-l005` "- 의사당대로 국회앞교차로 → 글래드호텔 앞 3개차로 통제"

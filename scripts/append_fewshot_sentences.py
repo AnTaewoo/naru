@@ -19,6 +19,11 @@ SOURCE_URL = {  # sentences.jsonl 의 기존 행과 같은 출처 URL. news 는 
     "topis": "https://topis.seoul.go.kr/notice/openNoticeList.do",
 }
 DEFAULT_IDS = "N001,N006,N009,N011,N045,N049,N059,N067,N070,N099,N100"  # E1~E11 (태우, 2026-11-08)
+# 봉투에 없던 출처 URL — 태우가 notices_v2 에서 확인해 준 값 (2026-11-08). 같은 기사 두 문장
+FEWSHOT_SOURCE_URLS = {
+    "N099": "https://www.econovill.com/news/articleView.html?idxno=756361",
+    "N100": "https://www.econovill.com/news/articleView.html?idxno=756361",
+}
 
 
 def envelopes(prompt: Path) -> list[dict[str, object]]:
@@ -28,6 +33,25 @@ def envelopes(prompt: Path) -> list[dict[str, object]]:
         if m:
             out.append(json.loads(m.group(1)))
     return out
+
+
+def fill_source_urls(sentences: Path) -> int:
+    """이미 들어간 few-shot 행 중 source_url 이 빈 것을 FEWSHOT_SOURCE_URLS 로 채운다 (멱등)."""
+    lines = sentences.read_text("utf-8").splitlines()
+    out: list[str] = []
+    filled = 0
+    for line in lines:
+        if line.strip():
+            row = json.loads(line)
+            url = FEWSHOT_SOURCE_URLS.get(row["sentence_id"])
+            if url and not row.get("source_url"):
+                row["source_url"] = url
+                filled += 1
+                line = json.dumps(row, ensure_ascii=False)
+        out.append(line)
+    if filled:
+        sentences.write_text("\n".join(out) + "\n", "utf-8")
+    return filled
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -48,6 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         if line.strip()
     }
     now = datetime.now(KST).isoformat(timespec="seconds")
+    filled = fill_source_urls(args.sentences)
     added = 0
     with args.sentences.open("a", encoding="utf-8") as f:
         for n, (sid, env) in enumerate(zip(ids, envs, strict=True), start=1):
@@ -62,7 +87,7 @@ def main(argv: list[str] | None = None) -> int:
                 "context_prev": None,
                 "context_next": None,
                 "source_type": source,
-                "source_url": SOURCE_URL.get(source, ""),
+                "source_url": FEWSHOT_SOURCE_URLS.get(sid, SOURCE_URL.get(source, "")),
                 "published_at": env["published_at"],
                 "fetched_at": now,
                 "event_date": env.get("event_date"),
@@ -71,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
             added += 1
             print(f"{sid}: 추가 — {str(env['text'])[:60]}")
-    print(f"추가 {added}행 → {args.sentences}")
+    print(f"추가 {added}행, 출처 URL 보강 {filled}행 → {args.sentences}")
     meta_path = args.sentences.with_name("sentences_meta.json")
     if meta_path.exists():
         meta = json.loads(meta_path.read_text("utf-8"))
@@ -81,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
         meta["fewshot"] = {
             "prompt": args.prompt.stem,
             "sentences": sum(1 for r in rows if (r.get("fields") or {}).get("fewshot")),
-            "note": "프롬프트 예시 원문(봉투 그대로). news 는 source_url 미상(빈 문자열)",
+            "note": "프롬프트 예시 원문(봉투 그대로). news 2행 출처 URL 은 태우 확인",
         }
         meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", "utf-8")
         print(f"meta total {meta['total']}, fewshot {meta['fewshot']['sentences']}")

@@ -88,7 +88,8 @@ def test_sentences_jsonl_has_sources(notices_dir: Path) -> None:
     assert len(fewshot) == 11 and meta["fewshot"]["sentences"] == 11  # 프롬프트 v2 예시 E1~E11
     assert sum(1 for r in rows if r["source_type"] == "smpa") == 13 + 4  # PDF 6+3+4, few-shot 4
     for r in rows:
-        assert r["text"] and r["published_at"] and r["fetched_at"]
-        if not (r.get("fields") or {}).get("fewshot"):
-            assert r["source_url"]  # few-shot news 2건(N099·N100)은 출처 URL 미상 — 태우 보강 대기
+        assert r["text"] and r["source_url"] and r["published_at"] and r["fetched_at"]
         assert r["published_at"].endswith("+09:00")
+    by_id = {r["sentence_id"]: r for r in rows}
+    assert by_id["N099"]["source_url"].startswith("https://www.econovill.com/")  # 태우 확인
+    assert by_id["N100"]["source_url"] == by_id["N099"]["source_url"]  # 같은 기사 두 문장
