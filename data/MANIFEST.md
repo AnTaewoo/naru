@@ -96,7 +96,13 @@
 | links | 2026-11-07 | 8 | 돌발 링크 4개의 LinkInfo + LinkVerInfo (`make record API=links --limit 4`) |
 | rtd | 2026-11-07 | 1 | 실시간 도시데이터 citydata 광화문·덕수궁 (json, 175 KB) |
 | kakao | 2026-11-07 | 2 | 로컬 키워드 검색 숭례문·덕수궁 (`kakao/keyword/<sha1(검색어)>.json`, 리졸버 재생용). 아래 "recorded/kakao" |
-| bus | — | 0 | `DATA_GO_KR_KEY` 없음 — 넣은 뒤 `make record API=bus` |
+| bus | 2026-11-07 | 1 | 버스위치 getBusPosByRtid 노선 100100118, 차량 12대 (json). 아래 "recorded/bus" |
+
+### recorded/bus (서울 버스위치정보, data.go.kr)
+- 출처: http://ws.bus.go.kr/api/rest/buspos/getBusPosByRtid (`serviceKey`=data.go.kr 일반 인증키, `busRouteId`, `resultType=json`). 개발계정 일 1,000회
+- 파일: `data/recorded/bus/20261107T155630_getBusPosByRtid.json` (6 KB)
+- 응답(실제): `comMsgHeader`, `msgHeader{headerCd("0"=정상), headerMsg, itemCount}` — **itemCount는 0으로 와도 itemList에 12대가 있다**, `msgBody.itemList[]{vehId, plainNo, busType, dataTm(YYYYMMDDHHmmss KST), gpsX, gpsY(WGS84 문자열), posX, posY, tmX, tmY, sectOrd, sectionId, sectDist, fullSectDist, rtDist, stopFlag, lastStnId, lastStTm, nextStId, nextStTm, isrunyn, islastyn, isFullFlag, congetion, trnstnid}`
+- 노선 100100118은 활용가이드 예시 노선. 기록 시각 15:54~15:56, 차량 위치 126.909~126.959 / 37.495~37.614 (서울 서부). P6 버스 우회 감지에서 광화문 경유 노선으로 바꿔 기록한다
 
 ### recorded/kakao (카카오 로컬 키워드 검색)
 - 출처: https://dapi.kakao.com/v2/local/search/keyword.json (`Authorization: KakaoAK <REST 키>`). 앱 `naru`에 카카오맵(로컬) API 사용 설정 필요(꺼져 있으면 403 "disabled OPEN_MAP_AND_LOCAL service"). 이용약관상 결과 저장은 서비스 내부 캐시 용도

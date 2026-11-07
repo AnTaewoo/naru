@@ -120,3 +120,39 @@ def test_kakao_keyword_records(recorded_dir: Path) -> None:
         assert {"id", "place_name", "x", "y", "address_name", "road_address_name"} <= set(top)
         assert (top["place_name"], top["id"], top["x"], top["y"]) == (name, doc_id, x, y)
         assert SEOUL[0] < float(top["x"]) < SEOUL[2] and SEOUL[1] < float(top["y"]) < SEOUL[3]
+
+
+def test_bus_positions_record(recorded_dir: Path) -> None:
+    # 2026-11-07 15:56 기록, 노선 100100118 (활용가이드 예시)
+    # msgHeader.itemCount는 0이어도 itemList가 있다
+    rec = json.loads(
+        (recorded_dir / "bus" / "20261107T155630_getBusPosByRtid.json").read_text("utf-8")
+    )
+    assert rec["status"] == 200 and rec["params"] == {
+        "busRouteId": "100100118",
+        "resultType": "json",
+    }
+    assert rec["endpoint"].endswith("getBusPosByRtid?serviceKey=<키>")
+    body = json.loads(rec["raw"])
+    assert body["msgHeader"]["headerCd"] == "0"  # 정상 (오류코드는 bus 메모·활용가이드)
+    items = body["msgBody"]["itemList"]
+    assert len(items) == 12
+    fields = {"vehId", "plainNo", "dataTm", "gpsX", "gpsY", "posX", "posY", "tmX", "tmY"}
+    fields |= {
+        "sectOrd",
+        "sectionId",
+        "sectDist",
+        "stopFlag",
+        "lastStnId",
+        "nextStId",
+        "isrunyn",
+        "congetion",
+    }
+    assert all(fields <= set(it) for it in items)
+    first = items[0]
+    assert first["vehId"] == "111033056" and first["dataTm"] == "20261107155417"
+    assert all(it["dataTm"].startswith("20261107") for it in items)
+    assert all(
+        SEOUL[0] < float(it["gpsX"]) < SEOUL[2] and SEOUL[1] < float(it["gpsY"]) < SEOUL[3]
+        for it in items
+    )
