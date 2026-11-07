@@ -105,3 +105,9 @@
 - 정한 것: 조회 지평 60분(route_horizon_min) — active_at만 쓰면 걷는 동안 시작하는 통제를 놓침. Repository에 active_between 추가(ARCHITECTURE 표엔 active_at만). 좌표 파싱 실패는 Model이 InvalidQueryError(field). computed_at은 UTC(View가 +09:00)
 - 막힌 것 / 태우 대기: 없음
 - 커밋: 5034842, 0d29bda, 198516a / 이 항목의 커밋
+
+## 2026-11-07 · T3.3 DONE
+- 한 것: `views/route_view.py`(RouteResult → RouteResponse → jsonify), `closure_view.py`(ClosureState → GeoJSON Point Feature), `error_view.py`(NaruError·ValidationError → ErrorBody + HTTP, render_code), `views/_time.py`(+09:00 변환), `types.KST`. 테스트 3개(라우터 실제 결과 → contracts model_validate, until 08:08+09:00, 183 Feature, 오류 코드·필드) + conftest `course_world` 세션 픽스처
+- 정한 것: 예정-구역 Polygon Feature는 ZoneMatcher(v1) 폴리곤이 생기면(실데이터 없이 분기 안 만듦). 뷰 테스트는 맨 Flask() 앱 컨텍스트. 한글 이스케이프(ensure_ascii)는 T3.4 create_app에서 끔. 404·401·500은 app factory가 render_code로
+- 막힌 것 / 태우 대기: 없음
+- 커밋: 5d69f69, c4d60a9 / 이 항목의 커밋

@@ -161,13 +161,13 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 테스트: baseline은 통제 전 경로와 동일, avoided에 Repository의 confirmed가 있다. Flask import 없음
 
 ### T3.3 View ★
-- status: DOING
+- status: DONE
 - depends: T3.2
 - 산출: `views/{route_view, closure_view, error_view}.py`
 - 테스트: 실제 RouteResult → render → `RouteResponse.model_validate` 통과, `+09:00`. `views-no-db` KEPT
 
 ### T3.4 Controller · app factory · candidate_controller ★
-- status: TODO
+- status: DOING
 - depends: T3.3
 - 산출: `app.py`(`create_app`), `controllers/{_deps, route_controller, closure_controller, candidate_controller}.py`, `models/domain/candidate_intake.py`(batch_id 멱등, geometry kind별 CrosswalkIndex 분기)
 - 테스트: `test_client()`로 실제 그래프·실제 폐쇄 호출 → contracts 검증. 오프셋 없는 `depart_at` → 400. recorded course batch POST → 202, 재전송 → 변화 없음, 토큰 없음 → 401
