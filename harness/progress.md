@@ -99,3 +99,9 @@
 - 정한 것: 도착 시각 판정은 라벨 하나짜리 A*(엄밀한 시간의존 최단경로 아님, 도보 10분엔 충분). 저장 status 대신 status_of_state로 매번 재판정. 접근 구간(출발·도착 ↔ 최근접 노드)은 직선으로 거리·좌표에 포함
 - 막힌 것 / 태우 대기: 카카오 '교보빌딩' 1순위가 서초 교보타워(3순위가 광화문) — T4.2 리졸버가 범위 힌트로 골라야 함(MANIFEST 기록)
 - 커밋: 383e569, 6634752, 1adcecf / 이 항목의 커밋
+
+## 2026-11-07 · T3.2 DONE
+- 한 것: `routers.py` 공통 `_AStarRouter` + `BaselineRouter.route(src, dst)`(통제 미적용, route_free 대체), `route_planner.py` RoutePlanner.plan(RouteQuery) → RouteResult(path·baseline·depart_at·computed_at) — lat,lng 파싱(parse_latlng), bbox(+1 km)·출발+60분 지평으로 `ClosureRepository.active_between` 조회 → 두 라우터. `errors.py`(NaruError → InvalidQueryError 400·NoRouteError 422, INTERFACE §6 코드). 실제 MySQL 테스트 4개(통제 후 path==baseline 808 m, 통제 중 저장소 confirmed가 avoided에, 지평 조회로 출발 뒤 시작하는 통제 회피 846 m, invalid_query·Flask 미import)
+- 정한 것: 조회 지평 60분(route_horizon_min) — active_at만 쓰면 걷는 동안 시작하는 통제를 놓침. Repository에 active_between 추가(ARCHITECTURE 표엔 active_at만). 좌표 파싱 실패는 Model이 InvalidQueryError(field). computed_at은 UTC(View가 +09:00)
+- 막힌 것 / 태우 대기: 없음
+- 커밋: 5034842, 0d29bda, 198516a / 이 항목의 커밋

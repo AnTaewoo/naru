@@ -155,13 +155,13 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 테스트(실데이터): 교보빌딩 앞 → 덕수궁 대한문, (a) 통제 없는 시각 경로 < 1.5km (b) 통제 중 `avoided`에 폐쇄 횡단보도, `legs.kind`에 underpass/overpass
 
 ### T3.2 BaselineRouter · RoutePlanner ★
-- status: DOING
+- status: DONE
 - depends: T3.1, T2.4
 - 산출: `BaselineRouter`(같은 그래프, 통제 미적용), `route_planner.py` — `plan(query) -> RouteResult`(frozen dataclass)
 - 테스트: baseline은 통제 전 경로와 동일, avoided에 Repository의 confirmed가 있다. Flask import 없음
 
 ### T3.3 View ★
-- status: TODO
+- status: DOING
 - depends: T3.2
 - 산출: `views/{route_view, closure_view, error_view}.py`
 - 테스트: 실제 RouteResult → render → `RouteResponse.model_validate` 통과, `+09:00`. `views-no-db` KEPT
