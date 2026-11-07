@@ -119,6 +119,10 @@ class CrosswalkIndex:
     def __len__(self) -> int:
         return len(self._items)
 
+    @property
+    def crosswalks(self) -> list[Crosswalk]:
+        return list(self._items)
+
     def get(self, crosswalk_id: str) -> Crosswalk:
         return self._by_id[crosswalk_id]
 
