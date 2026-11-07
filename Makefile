@@ -37,8 +37,9 @@ schema:
 	@test -f scripts/export_schema.py || { echo "아직 없음 — T2.1"; exit 1; }
 	uv run python scripts/export_schema.py
 
+# Flask :5000 (T3.4). Next.js :3000 은 T5.0 에서 붙인다. AI 워커는 python -m naru_ai.worker --once
 dev:
-	@echo "T3.4·T5.0에서 만든다 (Flask :5000 + Next.js :3000, AI 워커는 python -m naru_ai.worker --once)"; exit 1
+	uv run flask --app naru_be.app run --port 5000
 
 fetch:
 	@test -n "$(SRC)" || { echo "SRC=seoul_spatial|nodelink|course|station"; exit 1; }
