@@ -87,3 +87,9 @@
 - 정한 것: confirmed 조건 = confidence ≥ 0.8 + 실측 증거(timetable·topis_incident·bus_skip) + start 경과. 공지만으론 시간이 지나도 scheduled. review_required 후보도 상태는 만듦(라우터가 제외). reason = evidence detail 구간명
 - 막힌 것 / 태우 대기: 규칙서 파일을 `notice_parser_rules_v2.md`로 개명(원래 naru_parser_spec_v2.md). T0.6의 "30개"는 34건과 다름(미수정). recorded/candidates/course 옛 파일 2개 삭제 요청. 해제 공지(none/released) 전달은 후속 ADR
 - 커밋: 227a6ec, c8a6b5f, 42399e8, 4265ffb + ADR-008 반영 4개 / 이 항목의 커밋
+
+## 2026-11-07 · T2.4 DONE · PC-2 통과
+- 한 것: `db.py`, `entities/closure_state.py`(closure_states: UTC DATETIME, DECIMAL 좌표, JSON evidence, impact·approx, 유일키 candidate_id+crosswalk_id), Alembic 0001, `ClosureRepository`(upsert_many ON DUPLICATE KEY, active_at(t, bbox) window+30분·bbox, KST↔UTC). 실제 MySQL naru_test 테스트 2개. `scripts/pc2_map.py`(3시각 지도) — 태우 "다음"
+- 정한 것: upsert 키 (candidate_id, crosswalk_id). active_at은 저장된 status 그대로(시각별 재계산은 라우터·컨트롤러). 테스트 정리는 DELETE
+- 막힌 것 / 태우 대기: 없음
+- 커밋: 55dc207, 60747dd, d866624 / 이 항목의 커밋

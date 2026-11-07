@@ -136,13 +136,13 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 테스트(실데이터): T2.2 recorded 후보 → scheduled; 시각표 시작 시각 경과 → confirmed(코스는 시각표가 실측 증거); window 종료+30분 → released. BE 테스트는 naru_ai를 import하지 않는다
 
 ### T2.4 ClosureRepository (MySQL) ★
-- status: TODO
+- status: DONE
 - depends: T2.3
 - 산출: `naru_be/db.py`, `models/entities/closure_state.py`, `models/repositories/closure_repository.py`, Alembic 1개
 - 테스트: 실제 MySQL `naru_test`, TRUNCATE. upsert 후 `active_at(t, bbox)`가 T2.3 결과를 돌려준다. KST 입력 → UTC 저장 → KST 반환
 
-### PC-2 (태우)
-- [ ] 시각표의 통제 전·중·후 3시각에 폐쇄 횡단보도를 지도에
+### PC-2 (태우) — 통과 2026-11-07 ("다음", scripts/pc2_map.py)
+- [x] 시각표의 통제 전·중·후 3시각에 폐쇄 횡단보도를 지도에
 
 ---
 
