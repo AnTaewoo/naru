@@ -1,0 +1,38 @@
+/* 전역은 리셋과 토큰만. 컴포넌트 스타일은 CSS Modules (CONVENTIONS §5.4) */
+:root {
+  --naru-bg: #f5f6f8;
+  --naru-surface: #ffffff;
+  --naru-text: #1f2328;
+  --naru-muted: #6b7280;
+  --naru-border: #e5e7eb;
+  --naru-primary: #2563eb;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  color: var(--naru-text);
+  background: var(--naru-bg);
+  font-family:
+    "Pretendard",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Apple SD Gothic Neo",
+    "Noto Sans KR",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}

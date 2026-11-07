@@ -1,0 +1,7 @@
+.footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--naru-border);
+  color: var(--naru-muted);
+  font-size: 12px;
+  text-align: center;
+}
