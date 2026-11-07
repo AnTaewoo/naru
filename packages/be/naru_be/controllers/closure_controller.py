@@ -1,4 +1,4 @@
-"""GET /closures — 검증 → Repository.active_at → Engine.restate(시각 재판정) → closure_view (§3)."""
+"""GET /closures — 검증 → Repository.active_horizon(at~+60분) → Engine.restate(at) → View."""
 
 from __future__ import annotations
 
@@ -16,5 +16,5 @@ bp = Blueprint("closures", __name__)
 def get_closures() -> Response:
     query = ClosuresQuery.model_validate(request.args.to_dict())  # 실패 → error_view 400
     m = naru_models()
-    states = m.engine.restate(m.repo.active_at(query.at, parse_bbox(query.bbox)), query.at)
+    states = m.engine.restate(m.repo.active_horizon(query.at, parse_bbox(query.bbox)), query.at)
     return closure_view.render(states)

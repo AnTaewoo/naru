@@ -107,6 +107,7 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 ## §3 BE → FE: `GET /closures` (v0.6)
 
 **요청** `bbox=minLng,minLat,maxLng,maxLat` · `at=ISO8601`
+- `at`에 진행 중인 통제 + `at`부터 60분(`route_horizon_min`) 안에 시작하는 통제. status는 `at` 기준으로 다시 판정한다(`/route`와 같은 지평이라 지도와 경로가 어긋나지 않는다). 2026-11-07 태우 결정
 
 **응답** GeoJSON FeatureCollection. Feature 하나 = 횡단보도 하나(Point) 또는 예정-구역 하나(Polygon).
 ```json
@@ -153,3 +154,4 @@ ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, �
 | 2026-11-04 | v0.4 | §1.1 AI→BE 전송(`POST /internal/candidates`, 멱등 batch), 401 `unauthorized`, FE는 `/api/*` rewrites 경유 (ADR-006 개정 1) | — |
 | 2026-11-06 | v0.5 | §1 geometry를 `point / line / segment / zone`으로 재정의, `segment`(from/to/via PlacePoint + road_class)·`notice_ref` 추가, source에 smpa/topis/news/seoul_press, Claude API 확정(ADR-007) | — |
 | 2026-11-07 | v0.6 | §1 `impact`(필수, blocks/unknown)·`toward`·`approx` 추가, unknown이면 confidence ≤ 0.65, §2 `avoided[].approx`, §3 properties `impact`·`approx`, §4 `impact` 행 (ADR-008) | 태우 승인 |
+| 2026-11-07 | v0.6 | §3 `at` 의미 보강: 진행 중 + 60분 안 시작 예정, status는 `at` 기준 재판정 (스키마 변경 없음) | 태우 결정 |

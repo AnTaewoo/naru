@@ -62,6 +62,10 @@ class ClosureRepository:
         """t 에 살아 있는 상태: window_start <= t <= window_end+grace, bbox 안. status 저장값."""
         return self.active_between(t, t, bbox)
 
+    def active_horizon(self, t: datetime, bbox: Bbox) -> list[ClosureState]:
+        """t 에 살아 있거나 t 뒤 route_horizon_min 안에 시작하는 상태 (route·closures 공통 지평)."""
+        return self.active_between(t, t + timedelta(minutes=self.settings.route_horizon_min), bbox)
+
     def active_between(self, t0: datetime, t1: datetime, bbox: Bbox) -> list[ClosureState]:
         """[t0, t1] 과 겹치는 상태: window_start <= t1, window_end+grace >= t0 (라우팅 지평)."""
         if t0.tzinfo is None or t1.tzinfo is None:

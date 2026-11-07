@@ -83,12 +83,16 @@ def test_closures_restated_at_time(client: FlaskClient) -> None:
     assert by_id["06-0000023206"].status is Status.confirmed
     assert by_id["06-0000023206"].window["start"] == datetime(2026, 3, 15, 7, 20, tzinfo=KST)
     assert all(f.geometry.type == "Point" for f in fc.features)
-    # active_at 은 시작한 창만 주고, 코스 후보는 시작하면 곧 confirmed → 전부 confirmed
-    assert {p.status for p in by_id.values()} == {Status.confirmed}
-    # 07:00: 출발지 구간(05:00~)만 활성. 1구간(07:20~)은 아직 안 나온다 (ARCHITECTURE: active_at)
+    # 07:45 엔 진행 중(confirmed)과 08:45 안에 시작할 구간(scheduled)이 같이 나온다 (+60분 지평)
+    assert {p.status for p in by_id.values()} == {Status.confirmed, Status.scheduled}
+    # 07:00: 출발지 구간(05:00~)은 confirmed, 1구간(07:20~)은 scheduled — /route 와 같은 지평
     resp = client.get("/closures", query_string=closures_q("2026-03-15T07:00:00+09:00"))
-    ids = {f["properties"]["crosswalk_id"] for f in resp.get_json()["features"]}
-    assert "06-0000036391" in ids and "06-0000023206" not in ids
+    props = [f["properties"] for f in resp.get_json()["features"]]
+    st = {p["crosswalk_id"]: p["status"] for p in props}
+    assert st["06-0000036391"] == "confirmed" and st["06-0000023206"] == "scheduled"
+    # 03:59: 아무것도 60분 안에 시작하지 않는다 (출발지 구간 05:00)
+    resp = client.get("/closures", query_string=closures_q("2026-03-15T03:59:00+09:00"))
+    assert resp.get_json()["features"] == []
     # 통제 전부 끝난 뒤 (종료+30분 지남) → 없음
     resp = client.get("/closures", query_string=closures_q("2026-03-15T13:30:00+09:00"))
     assert resp.get_json() == {"type": "FeatureCollection", "features": []}

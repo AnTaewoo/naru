@@ -61,7 +61,7 @@
 | 클래스/모듈 | 엔드포인트 | 부르는 Model | 넘기는 View |
 |---|---|---|---|
 | `route_controller` | `GET /route` | `RoutePlanner.plan(query)` | `route_view.render` |
-| `closure_controller` | `GET /closures` | `ClosureRepository.active_at(t, bbox)` | `closure_view.render` |
+| `closure_controller` | `GET /closures` | `ClosureRepository.active_horizon(t, bbox)` → `ClosureEngine.restate(states, t)` | `closure_view.render` |
 | `candidate_controller` | `POST /internal/candidates` | `CandidateIntake.accept(batch)` | 202 + 처리 건수 |
 
 **Model** — 데이터와 도메인 로직. Flask를 모른다.
@@ -72,7 +72,7 @@
 | `ClosureEngine` | `apply(candidate, crosswalk_ids) -> list[ClosureState]` · `transition(prev, evidence)` | 상태기계 |
 | `CandidateIntake` | `accept(batch) -> IntakeResult` | 후보 → CrosswalkIndex → ClosureEngine → Repository |
 | `ClosureStateEntity` | SQLAlchemy ORM, 테이블 `closure_states` | crosswalk_id, status, confidence, window_start/end(UTC), evidence(JSON), lng/lat |
-| `ClosureRepository` | `upsert(state)` · `active_at(t, bbox) -> list[ClosureState]` | DB 접근은 여기만 |
+| `ClosureRepository` | `upsert(state)` · `active_at(t, bbox)` · `active_horizon(t, bbox)`(t~t+60분 안 시작 포함, `/route`·`/closures` 공통) `-> list[ClosureState]` | DB 접근은 여기만 |
 | `PedGraph` | `edge.kind ∈ {sidewalk, crosswalk, underpass, overpass, stairs, elevator, station}` | NetworkX 인메모리 |
 | `TimeDependentRouter` | `route(src, dst, t, closures) -> Path` | A*. cost = dist + vertical + degraded. closed(t) → 제외 |
 | `BaselineRouter` | `route(src, dst) -> Path` | 같은 PedGraph, closures 미적용 |
@@ -110,7 +110,7 @@
                          [C] candidate_controller → [M] CandidateIntake → CrosswalkIndex(from_point / from_line / from_segment+RoadGraph) → ClosureEngine → ClosureRepository(MySQL)
 
            [C] route_controller → [M] RoutePlanner(Repository + TimeDependentRouter + BaselineRouter over PedGraph) → [V] route_view   ⑦
-           [C] closure_controller → [M] ClosureRepository.active_at → [V] closure_view                                             ⑧
+           [C] closure_controller → [M] ClosureRepository.active_horizon → ClosureEngine.restate → [V] closure_view              ⑧
                                                                                     ▼
                  Next.js /api/* rewrites → NaruApiClient → Time/Closure/Route Provider → MapView · LegList
 ```
