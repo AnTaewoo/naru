@@ -32,3 +32,11 @@ def course_dir() -> Path:
     d = DATA / "raw" / "course"
     assert (d / "seoul_marathon_2026.gpx").exists(), "실데이터 없음: make fetch SRC=course 먼저"
     return d
+
+
+@pytest.fixture(scope="session")
+def recorded_dir() -> Path:
+    """recorded 폴더 — scripts/record_*.py 산출 (AI 후보 배치, API 응답)."""
+    d = DATA / "recorded"
+    assert (d / "candidates").is_dir(), "기록 없음: make record-candidates SOURCE=course 먼저"
+    return d
