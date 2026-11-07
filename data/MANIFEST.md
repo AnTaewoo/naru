@@ -152,6 +152,11 @@
   - `smpa-20261109-r01.json` sha256 cc0df52e9332… (in 374 / out 545, 2514 ms)
   - `smpa-20261109-r02.json` sha256 33d60b759fba… (in 394 / out 541, 5618 ms)
 
+### recorded/candidates/notice (공지 → ClosureCandidate, T4.2)
+- 출처: `make record-candidates SOURCE=notice` → `scripts/record_candidates.py`. 기록된 LLM 응답 3건(recorded/llm) 재생 → 정렬기 → 리졸버(OA-23081 교차로명 + 카카오 기록 재생) → CandidateBuilder. live 호출 없음. 파일 `data/recorded/candidates/notice/20261107T211233.json` sha256 2a3d3a74b3ab…, 후보 3개
+- 내용: segment 2(의사당역 5번출구→민주당사, 하나증권 앞→금감원→여의도역), point 1(국회의사당역 2번출구 — '사랑채 동측 건너편'은 여의도 힌트로 못 풀어 출발지만). 좌표는 전부 카카오 기록 documents 또는 교차로 평균점
+- 카카오 기록 추가 9건(2026-11-07, `scripts/record_api.py --api kakao --queries ...`): 의사당역 5번출구·의사당역·민주당사·하나증권·금감원·여의도역·국회의사당역 2번출구·국회의사당역·사랑채
+
 ## field (현장 테스트 묶음)
 
 | 날짜 | 장소 | 포함 | 비고 |

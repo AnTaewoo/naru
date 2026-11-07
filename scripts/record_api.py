@@ -183,14 +183,20 @@ def record_bus(client: httpx.Client, settings: Settings, out: Path) -> None:
     )
 
 
-def record_kakao(client: httpx.Client, settings: Settings, out: Path) -> None:
+def record_kakao(
+    client: httpx.Client, settings: Settings, out: Path, queries: tuple[str, ...] = KAKAO_QUERIES
+) -> None:
+    """리졸버 재생용. --queries 로 공지에서 나온 정규 이름을 더 기록한다 (T4.2, 호출 ≤ 10/Task)."""
     key = need(settings.kakao_rest_key, "KAKAO_REST_KEY")
-    for query in KAKAO_QUERIES:
+    for query in queries:
+        name = hashlib.sha1(query.encode("utf-8")).hexdigest()
+        if (out / "kakao" / "keyword" / f"{name}.json").exists():
+            logging.info("kakao %s: 이미 기록 — 건너뜀", query)
+            continue
         called_at = datetime.now(KST)
         r = client.get(
             KAKAO_API, params={"query": query}, headers={"Authorization": f"KakaoAK {key}", **UA}
         )
-        name = hashlib.sha1(query.encode("utf-8")).hexdigest()
         write_record(
             out / "kakao" / "keyword" / f"{name}.json",
             "kakao",
@@ -208,6 +214,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--recorded", type=Path, default=Path("data/recorded"))
     ap.add_argument("--limit", type=int, default=4, help="links: 기록할 링크 수 (링크당 2회 호출)")
+    ap.add_argument("--queries", default="", help="kakao: 검색어 쉼표 구분 (없으면 KAKAO_QUERIES)")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)  # URL에 키가 있다
@@ -232,7 +239,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.api in ("bus", "all"):
             record_bus(client, settings, args.recorded)
         if args.api in ("kakao", "all"):
-            record_kakao(client, settings, args.recorded)
+            queries = tuple(q.strip() for q in args.queries.split(",") if q.strip())
+            record_kakao(client, settings, args.recorded, queries or KAKAO_QUERIES)
     return 0
 
 
