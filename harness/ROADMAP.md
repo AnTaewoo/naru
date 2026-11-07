@@ -63,16 +63,17 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 테스트(실데이터): PDF 3개 파싱 행 수 = 태우가 센 수(plan에 기록), 모든 레코드에 출처 3종
 - 주의: 문장을 다듬거나 지어내지 않는다. 이게 T4.x의 입력이다
 
-### T0.6 라벨 정답 가져오기 🧑★
+### T0.6 라벨 정답 — 케이스 30개 🧑★
 - status: TODO
 - depends: T0.5
-- 🧑 팀: naru-reader Label Studio로 200~300문장 라벨 (스팬 + 정규형, 구간 표현 100문장엔 from/to 관계도)
-- 산출: `data/raw/notices/labels_v1.jsonl` (naru-reader export 그대로, MANIFEST에 sha256)
-- Claude: `scripts/check_labels.py` — `text[start:end] == surface`, 태그 5종, 정규형 비어 있지 않음. 위반은 고치지 않고 목록으로
-- 테스트: 검증 규칙 전부 통과
+- 🧑 태우 혼자: Syntitan(큐빅 플랫폼)에 실제 공지 107행(경찰청 PDF 10일치·TOPIS 돌발·서울시 보도자료·기사) + 파서 규정을 올려 케이스 초안 30개를 뽑고, 원문 대조로 기대값 확정. 초안은 `data/recorded/syntitan/`, 확정본은 `data/raw/notices/cases_v1.jsonl`
+- 케이스 형식: `{notice_id, source, text, event_date, published_at, source_url, type(정상|놓치기쉬움|거절), expected{window, kind, scope, segments[{from,to,via,road,direction,lanes}], points, reject_reason}}`. **좌표 없음**
+- 배분: 정상 15 / 놓치기 쉬움 10 / 거절 5
+- Claude: `scripts/check_cases.py` — 위 스키마 검증(필수 필드, type 3종·배분, segments 필드, 거절이면 reject_reason). 위반은 고치지 않고 목록으로
+- DONE 조건: jsonl이 들어오고 스키마 검증 통과. **지금은 건너뛰고 PC-0 → T1.1** (2026-11-07 태우)
 
 ### T0.7 실제 API 응답 기록
-- status: TODO
+- status: DONE
 - depends: T0.1
 - 산출: `scripts/record_api.py --api bus|incident|rtd|kakao` → `data/recorded/<api>/<ts>.json`. 카카오는 `숭례문`·`덕수궁` 키워드 1회씩
 - 테스트: 기록 파일을 열어 확인한 필드 존재. 버스·돌발은 P6용이라 기록만(각 1회)
@@ -89,7 +90,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 ## P1 — PedGraph · RoadGraph · CrosswalkIndex ★
 
 ### T1.1 PedGraph ★
-- status: TODO
+- status: DOING
 - depends: PC-0
 - 산출: `naru_be/models/domain/ped_graph.py` — 도보 네트워크 → NetworkX. `edge.kind ∈ {sidewalk, crosswalk, underpass, overpass, stairs, elevator, station}`, `edge.crosswalk_id`
 - 테스트(실데이터): 종로구·중구 그래프 노드·엣지 > 0, 최대 연결 성분 ≥ 80%, crosswalk 엣지 > 100
@@ -183,7 +184,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 ### T4.1 AnthropicClient · recorder · 프롬프트 v1 ★
 - status: TODO
 - depends: T0.5, T2.1
-- 산출: `naru_ai/llm/client.py`(tool use, `input_schema`·`tool_choice` — 쓰는 SDK 문서를 열어 파라미터명 확인·주석), `naru_ai/llm/recorder.py`, `llm/prompts/notice_v1.md`(few-shot 8문장은 `sentences.jsonl`의 id로), `scripts/record_llm.py`(`make record-llm`)
+- 산출: `naru_ai/llm/client.py`(tool use, `input_schema`·`tool_choice` — 쓰는 SDK 문서를 열어 파라미터명 확인·주석), `naru_ai/llm/recorder.py`, `llm/prompts/notice_v1.md`(few-shot 8문장은 `sentences.jsonl`의 id로, 규정·기대값은 `data/raw/notices/cases_v1.jsonl`(T0.6) 기준), `scripts/record_llm.py`(`make record-llm`)
 - 실데이터: live 3문장 → recorded. 비용 예상을 시작 메모에
 - 테스트(재생): 응답이 `spans`·`segments` 스키마 통과. recorded `model`·`prompt_version` ≠ 설정 → fail
 
@@ -197,7 +198,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 ### T4.3 평가 — 규칙 기준선 vs Claude ★
 - status: TODO
 - depends: T4.2, T0.6
-- 산출: `notice/rule_baseline.py`(지명사전·별칭 일치 + 시간 정규식), `notice/eval.py`(정규형 F1·구간 F1·횡단보도 Jaccard, 기사 단위 부트스트랩 CI), `make record-llm`으로 val 문장 전부 기록, `docs/eval/notice_<date>.md` 결과 표
+- 산출: `notice/rule_baseline.py`(지명사전·별칭 일치 + 시간 정규식), `notice/eval.py`(입력 = `data/raw/notices/cases_v1.jsonl`(T0.6, 30케이스): 정규형 F1·구간 F1·횡단보도 Jaccard, type별(정상/놓치기쉬움/거절) 정확도, 케이스 단위 부트스트랩 CI), `make record-llm`으로 val 문장 전부 기록, `docs/eval/notice_<date>.md` 결과 표
 - 테스트: 정답을 예측으로 넣으면 F1 = 1.0. 정렬기 왕복
 - **이 표가 보고서 2.3 "AI가 필요한가"의 숫자다.** 임계값(review 0.7 등)은 결과 보고 태우가 정한다
 

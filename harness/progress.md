@@ -45,3 +45,9 @@
 - 정한 것: smpa text = 표 한 행을 셀 순서로 공백 연결(fields에 구조). TOPIS 본문은 블록 태그에서만 줄 나눔. TOPIS 원문은 recorded, 문장 jsonl은 raw(.gitignore, MANIFEST sha256) — 태우 지시로 git 제외. SMPA_BOARD_URL=nd54882(기록용, 자동 수집 안 함, 태우 확인). PDF 원본 파일명 유지. 보도 문장 import는 태우 지시로 건너뜀
 - 막힌 것 / 태우 대기: 없음. T0.6(라벨)은 팀 작업 대기
 - 커밋: 10489d4, debe772, 9f17921 / 이 항목의 커밋
+
+## 2026-11-07 · T0.7 DONE
+- 한 것: `scripts/record_api.py`(`make record API=incident|links|rtd|bus|kakao`) — TOPIS 돌발(코드표 2 + 실시간 53건, 집회및행사 15), 돌발 링크 4개 LinkInfo·LinkVerInfo, 도시데이터 광화문·덕수궁, 카카오 숭례문·덕수궁, 버스 100100118 12대. 호출 17회. 재생 테스트 6개, MANIFEST
+- 정한 것: grs80tm은 EPSG:5181. TOPIS 링크 ID는 표준노드링크와 같은 체계지만 4개 중 2개만 존재 → 좌표는 LinkVerInfo. 카카오는 `kakao/keyword/<sha1>.json`(스킬 §4.3). 응답 본문의 키도 가림(카카오 401이 키를 되돌려 줬음, 태우가 파일 삭제)
+- 막힌 것 / 태우 대기: 없음 (카카오 앱 로컬 API 활성화·DATA_GO_KR_KEY는 태우가 해결)
+- 커밋: d16deeb, 7fdb8b8, 1354724, ae02fb8 / 이 항목의 커밋
