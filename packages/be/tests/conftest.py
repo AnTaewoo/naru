@@ -3,11 +3,29 @@
 데이터가 없으면 실패한다. skip하지 않는다.
 """
 
+import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
 
+from naru_be.config import Settings
+from naru_be.models.domain.closure_engine import ClosureEngine
+from naru_be.models.domain.crosswalk_index import CrosswalkIndex
+from naru_be.models.domain.ped_graph import PedGraph
+from naru_contracts import CandidateBatch, ClosureState, LineGeom, Status
+
 DATA = Path(__file__).resolve().parents[3] / "data"
+KST = timezone(timedelta(hours=9))
+
+
+class CourseWorld(NamedTuple):
+    settings: Settings
+    ped: PedGraph
+    index: CrosswalkIndex
+    engine: ClosureEngine
+    states: list[ClosureState]  # 기록된 코스 후보 16건 → 04:00 KST 기준(전부 scheduled)
 
 
 @pytest.fixture(scope="session")
@@ -40,3 +58,22 @@ def recorded_dir() -> Path:
     d = DATA / "recorded"
     assert (d / "candidates").is_dir(), "기록 없음: make record-candidates SOURCE=course 먼저"
     return d
+
+
+@pytest.fixture(scope="session")
+def course_world(seoul_spatial_dir: Path, recorded_dir: Path) -> CourseWorld:
+    """도보망 + 횡단보도 색인 + 엔진 + 코스 후보 상태 (라우터·뷰 테스트 공용, 무거워서 세션 1회)."""
+    settings = Settings()
+    ped = PedGraph.from_seoul_spatial(seoul_spatial_dir, settings)
+    index = CrosswalkIndex.from_xlsx(seoul_spatial_dir / "OA-23081.xlsx", settings)
+    engine = ClosureEngine(index, settings)
+    files = sorted((recorded_dir / "candidates" / "course").glob("*.json"))
+    batch = CandidateBatch.model_validate(json.loads(files[-1].read_text("utf-8")))
+    states: list[ClosureState] = []
+    at = datetime(2026, 3, 15, 4, 0, tzinfo=KST)  # 첫 통제 전 — 라우터가 도착 시각으로 다시 판정
+    for c in batch.candidates:
+        assert isinstance(c.geometry, LineGeom)
+        ids = index.from_line(c.geometry.coordinates)
+        states += engine.apply(c, ids, at=at)
+    assert len(states) > 100 and {s.status for s in states} == {Status.scheduled}
+    return CourseWorld(settings, ped, index, engine, states)

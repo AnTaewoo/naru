@@ -3,18 +3,14 @@
 기대값은 2026-11-07 에 그래프를 돌려 확인한 값 (기준 755 m, 우회 777 m + 접근 구간).
 """
 
-import json
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import pytest
+from conftest import CourseWorld
 
-from naru_be.config import Settings
-from naru_be.models.domain.closure_engine import ClosureEngine
-from naru_be.models.domain.crosswalk_index import CrosswalkIndex
-from naru_be.models.domain.ped_graph import EdgeKind, PedGraph
+from naru_be.models.domain.ped_graph import EdgeKind
 from naru_be.models.domain.routers import BaselineRouter, TimeDependentRouter
-from naru_contracts import CandidateBatch, ClosureState, LineGeom, Status
+from naru_contracts import ClosureState, Status
 
 KST = timezone(timedelta(hours=9))
 # 카카오 기록: '광화문교보빌딩' id 24020019 (종로 1), '덕수궁 대한문' id 17582477
@@ -23,25 +19,9 @@ DAEHANMUN = (126.976542945622, 37.5650416322942)
 
 
 @pytest.fixture(scope="module")
-def world(
-    seoul_spatial_dir: Path, recorded_dir: Path
-) -> tuple[TimeDependentRouter, list[ClosureState]]:
-    settings = Settings()
-    ped = PedGraph.from_seoul_spatial(seoul_spatial_dir, settings)
-    index = CrosswalkIndex.from_xlsx(seoul_spatial_dir / "OA-23081.xlsx", settings)
-    engine = ClosureEngine(index, settings)
-    files = sorted((recorded_dir / "candidates" / "course").glob("*.json"))
-    batch = CandidateBatch.model_validate(json.loads(files[-1].read_text("utf-8")))
-    states: list[ClosureState] = []
-    for c in (
-        batch.candidates
-    ):  # 상태는 06:00 기준(전부 scheduled)으로 저장된 셈 — 라우터가 도착 시각으로 다시 판정
-        assert isinstance(c.geometry, LineGeom)
-        states += engine.apply(
-            c, index.from_line(c.geometry.coordinates), at=datetime(2026, 3, 15, 4, 0, tzinfo=KST)
-        )
-    assert len(states) > 100 and {s.status for s in states} == {Status.scheduled}
-    return TimeDependentRouter(ped, engine, settings), states
+def world(course_world: CourseWorld) -> tuple[TimeDependentRouter, list[ClosureState]]:
+    w = course_world
+    return TimeDependentRouter(w.ped, w.engine, w.settings), w.states
 
 
 def test_no_closure_route_is_short(world: tuple[TimeDependentRouter, list[ClosureState]]) -> None:
