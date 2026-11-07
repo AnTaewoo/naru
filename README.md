@@ -15,7 +15,7 @@ naru/
 ├── harness/                 ── 하네스 (작업 기록)
 │   ├── ARCHITECTURE.md      레인·클래스·흐름·상태기계 (설계의 진실)
 │   ├── ROADMAP.md           P0~P7 Task·PC, ★ = 11/16 경로
-│   ├── plans/active|completed/   Task별 PLAN·READ-ALONG·QUIZ
+│   ├── plans/active|completed/   Task별 PLAN·READ-ALONG
 │   ├── progress.md          세션 로그
 │   └── gates/check_no_fakes.sh
 ├── docs/                    ── 프로젝트 문서 (하네스를 지워도 남는다)
