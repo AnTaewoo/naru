@@ -90,7 +90,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 ## P1 — PedGraph · RoadGraph · CrosswalkIndex ★
 
 ### T1.1 PedGraph ★
-- status: DOING
+- status: DONE
 - depends: PC-0
 - 산출: `naru_be/models/domain/ped_graph.py` — 도보 네트워크 → NetworkX. `edge.kind ∈ {sidewalk, crosswalk, underpass, overpass, stairs, elevator, station}`, `edge.crosswalk_id`
 - 테스트(실데이터): 종로구·중구 그래프 노드·엣지 > 0, 최대 연결 성분 ≥ 80%, crosswalk 엣지 > 100

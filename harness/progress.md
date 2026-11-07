@@ -51,3 +51,9 @@
 - 정한 것: grs80tm은 EPSG:5181. TOPIS 링크 ID는 표준노드링크와 같은 체계지만 4개 중 2개만 존재 → 좌표는 LinkVerInfo. 카카오는 `kakao/keyword/<sha1>.json`(스킬 §4.3). 응답 본문의 키도 가림(카카오 401이 키를 되돌려 줬음, 태우가 파일 삭제)
 - 막힌 것 / 태우 대기: 없음 (카카오 앱 로컬 API 활성화·DATA_GO_KR_KEY는 태우가 해결)
 - 커밋: d16deeb, 7fdb8b8, 1354724, ae02fb8 / 이 항목의 커밋
+
+## 2026-11-07 · T1.1 DONE
+- 한 것: `naru_be/models/domain/ped_graph.py` PedGraph(도보망 종로·중구 + 지하도·육교 오버레이 → NetworkX, kind 7종, 관리번호 부착), `naru_be/config.py` Settings. 노드 15,183·간선 19,067·최대 성분 98%·crosswalk 1,346·관리번호 1,138/1,211 부착. 테스트 3개
+- 정한 것: 횡단보도 = 양끝 CRSWK 노드 링크 ∪ 대로변 오버레이 + 관리번호 점이 얹힌 ≤60 m sidewalk 승격(링크 CRSWK 플래그는 횡단보도 아님). crosswalk_ids 튜플. 지하도는 별도 망 → 출입구를 30 m 안 도보망 노드에 stairs/elevator로 연결. 엘리베이터·리프트 오버레이 미사용. 타입 스텁 3개 추가
+- 막힌 것 / 태우 대기: T0.2 결함 발견·고침 — SGG_NM 필터 페이지 겹침(유일 64~74%) → 서울 전체 492페이지 재수집(316ac4f). PC-0 체크리스트는 T0.7 보고에 — 태우 "PC-0 통과" 대기
+- 커밋: 316ac4f, 82feeb0, f02a27d, 84a027b / 이 항목의 커밋
