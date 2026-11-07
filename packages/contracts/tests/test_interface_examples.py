@@ -1,4 +1,4 @@
-"""T2.1 — docs/INTERFACE.md v0.5 의 예시와 표를 naru_contracts 코드로 고정한다.
+"""T2.1 — docs/INTERFACE.md v0.6 의 예시와 표를 naru_contracts 코드로 고정한다 (ADR-008 반영).
 
 문서의 ```json 블록을 그대로 model_validate 한다. 문서가 바뀌면(블록 수·예시·enum 표) 여기가 깨진다.
 §3 `/closures` 예시는 자리표시자(`...`)가 있어 JSON이 아니다 — 2026-11-07 태우에게 보고, 검증 안 함.
@@ -25,6 +25,7 @@ from naru_contracts import (
     EvidenceKind,
     Geometry,
     GeometryKind,
+    Impact,
     LegKind,
     LineGeom,
     PlacePoint,
@@ -80,6 +81,7 @@ def test_closure_candidate_example() -> None:  # §1
     assert c.evidence[0].kind is EvidenceKind.notice and c.evidence[0].detail is None
     assert c.notice_ref is not None and c.notice_ref.sentence_id == "s_000412"
     assert c.confidence == 0.72 and c.review_required is False
+    assert c.impact is Impact.blocks and c.toward is None and c.approx is False  # v0.6
     assert ClosureCandidate.model_validate(c.model_dump(mode="json")) == c
 
 
@@ -150,6 +152,7 @@ def test_enum_table_matches_code() -> None:  # §4
         "`geometry.road_class`": RoadClass,
         "`evidence[].kind`": EvidenceKind,
         "`legs[].kind`": LegKind,
+        "`impact`": Impact,
     }
     assert set(rows) == set(expect)
     for label, enum in expect.items():
@@ -218,3 +221,21 @@ def test_time_needs_offset_and_window_needs_a_bound() -> None:
     assert q.from_ == "37.5658,126.9751" and q.mode == "walk"
     with pytest.raises(ValidationError, match="오프셋"):
         RouteQuery.model_validate({"from": "a", "to": "b", "depart_at": "2026-11-07T15:00:00"})
+
+
+def test_adr_008_impact_toward_approx() -> None:
+    raw = _json(0)
+    with pytest.raises(ValidationError, match="impact"):
+        ClosureCandidate.model_validate({k: v for k, v in raw.items() if k != "impact"})  # 필수
+    with pytest.raises(ValidationError, match="ADR-008"):
+        ClosureCandidate.model_validate({**raw, "impact": "unknown"})  # 0.72 > 0.65
+    unknown = {**raw, "impact": "unknown", "confidence": 0.45, "review_required": True}
+    assert ClosureCandidate.model_validate(unknown).impact is Impact.unknown
+    with pytest.raises(ValidationError):
+        ClosureCandidate.model_validate({**raw, "impact": "none"})  # none 은 BE로 오지 않는다
+    line = {"kind": "line", "coordinates": [[126.9751, 37.5658], [126.9769, 37.5725]]}
+    with pytest.raises(ValidationError, match="toward"):
+        ClosureCandidate.model_validate({**raw, "geometry": line, "toward": "을지로입구역"})
+    seg = ClosureCandidate.model_validate({**raw, "toward": "을지로입구역", "approx": True})
+    assert seg.toward == "을지로입구역" and seg.approx is True
+    assert RouteResponse.model_validate(_json(3)).avoided[0].approx is False

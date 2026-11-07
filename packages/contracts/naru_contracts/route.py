@@ -35,6 +35,7 @@ class Avoided(Contract):
     reason: str
     until: datetime | None = None
     evidence: list[Evidence]
+    approx: bool = False  # ADR-008: 후보의 approx 그대로
 
     _tz = field_validator("until")(_require_offset)
 

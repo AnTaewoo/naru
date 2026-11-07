@@ -20,7 +20,16 @@ from naru_contracts.closure import (
     ZoneGeom,
 )
 from naru_contracts.closures_api import ClosuresQuery, FeatureCollection
-from naru_contracts.enums import EvidenceKind, GeometryKind, LegKind, RoadClass, Source, Status
+from naru_contracts.enums import (
+    ClosureType,
+    EvidenceKind,
+    GeometryKind,
+    Impact,
+    LegKind,
+    RoadClass,
+    Source,
+    Status,
+)
 from naru_contracts.errors import ErrorBody
 from naru_contracts.route import Avoided, Baseline, Leg, RouteQuery, RouteResponse
 
@@ -31,6 +40,7 @@ __all__ = [
     "CandidateBatchResponse",
     "ClosureCandidate",
     "ClosureState",
+    "ClosureType",
     "ClosuresQuery",
     "ErrorBody",
     "Evidence",
@@ -38,6 +48,7 @@ __all__ = [
     "FeatureCollection",
     "Geometry",
     "GeometryKind",
+    "Impact",
     "Leg",
     "LegKind",
     "LineGeom",

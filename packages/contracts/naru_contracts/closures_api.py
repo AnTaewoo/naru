@@ -7,7 +7,7 @@ from pydantic import field_validator
 
 from naru_contracts._base import Contract
 from naru_contracts.closure import LngLat, _require_offset
-from naru_contracts.enums import Status
+from naru_contracts.enums import Impact, Status
 
 
 class ClosuresQuery(Contract):
@@ -35,6 +35,8 @@ class FeatureProperties(Contract):
     crosswalk_id: str | None = None
     zone_name: str | None = None
     evidence: list[dict[str, object]] | None = None
+    impact: Impact = Impact.blocks  # ADR-008
+    approx: bool = False
 
 
 class Feature(Contract):

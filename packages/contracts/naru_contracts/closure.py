@@ -6,9 +6,12 @@ from typing import Annotated, Literal
 from pydantic import Field, field_validator, model_validator
 
 from naru_contracts._base import Contract
-from naru_contracts.enums import ClosureType, EvidenceKind, RoadClass, Source, Status
+from naru_contracts.enums import ClosureType, EvidenceKind, Impact, RoadClass, Source, Status
 
 LngLat = tuple[float, float]  # [lng, lat] 순서 (INTERFACE 표기 규칙)
+UNKNOWN_IMPACT_MAX_CONFIDENCE = (
+    0.65  # ADR-008: review 임계값(0.7) 바로 아래 — 자동 라우팅에 안 들어간다
+)
 
 
 def _require_offset(v: datetime | None) -> datetime | None:
@@ -94,11 +97,14 @@ class ClosureCandidate(Contract):
     source: Source
     type: ClosureType
     status_hint: Status
+    impact: Impact  # ADR-008: 필수. unknown 이면 confidence <= UNKNOWN_IMPACT_MAX_CONFIDENCE
     geometry: Geometry
     window: Window
     confidence: float = Field(ge=0.0, le=1.0)
     evidence: list[Evidence] = Field(min_length=1)
     notice_ref: NoticeRef | None = None
+    toward: str | None = None  # 종료 없는 행진의 방향 표현 그대로. point·segment 에만
+    approx: bool = False  # 파서가 근사 시간을 ±10분 넓혔음
     review_required: bool = False
 
     @model_validator(mode="after")
@@ -107,6 +113,12 @@ class ClosureCandidate(Contract):
         # 임계값은 BE config와 같아야 한다 (T2.1 테스트가 대조)
         if self.confidence < 0.7 and not self.review_required:
             raise ValueError("confidence < 0.7 이면 review_required=True 여야 한다")
+        if self.impact is Impact.unknown and self.confidence > UNKNOWN_IMPACT_MAX_CONFIDENCE:
+            raise ValueError(
+                f"impact=unknown 이면 confidence <= {UNKNOWN_IMPACT_MAX_CONFIDENCE} (ADR-008)"
+            )
+        if self.toward is not None and self.geometry.kind not in ("point", "segment"):
+            raise ValueError("toward 는 geometry.kind 가 point·segment 일 때만 (ADR-008)")
         return self
 
 
@@ -137,3 +149,5 @@ class ClosureState(Contract):
     evidence: list[Evidence]
     lng: float
     lat: float
+    impact: Impact = Impact.blocks  # ADR-008
+    approx: bool = False

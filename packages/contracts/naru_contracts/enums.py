@@ -29,6 +29,13 @@ class ClosureType(StrEnum):
     incident = "incident"
 
 
+class Impact(StrEnum):
+    """횡단보도 통행을 막는 재료인가 (ADR-008). 파서의 none 은 BE로 오지 않는다."""
+
+    blocks = "blocks"
+    unknown = "unknown"
+
+
 class GeometryKind(StrEnum):
     point = "point"
     line = "line"
