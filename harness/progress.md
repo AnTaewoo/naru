@@ -111,3 +111,9 @@
 - 정한 것: 예정-구역 Polygon Feature는 ZoneMatcher(v1) 폴리곤이 생기면(실데이터 없이 분기 안 만듦). 뷰 테스트는 맨 Flask() 앱 컨텍스트. 한글 이스케이프(ensure_ascii)는 T3.4 create_app에서 끔. 404·401·500은 app factory가 render_code로
 - 막힌 것 / 태우 대기: 없음
 - 커밋: 5d69f69, c4d60a9 / 이 항목의 커밋
+
+## 2026-11-07 · T3.4 DONE · PC-3 통과
+- 한 것: `app.py` create_app(실데이터 Model 싱글턴·Blueprint·§6 에러 핸들러·ensure_ascii=False), `controllers/{_deps, route, closure, candidate}` 3줄 핸들러(토큰은 /internal before_request), `candidate_intake.py`(batch_id 멱등 — candidate_batches/Alembic 0002, kind별 CrosswalkIndex, unknown 30 m 승격, zone 로그만), `parsing.py`, `log.py`, `RoadGraph.nearest_link_distance_m`, `ClosureEngine.restate`, `candidate_view`, `scripts/record_naru_api.py` → recorded/naru_api 10건. 테스트 6개(실제 앱 인프로세스 + naru_test). `make dev` = flask run
+- 정한 것: 적재가 창 뒤여도 status_of_state 가 창으로 재판정(실측 bus_return 해제만 고정). **/closures 도 /route 와 같은 +60분 지평(태우 "+60분으로 하자")** → `ClosureRepository.active_horizon`, ARCHITECTURE 표·INTERFACE §3 보강. 405·415 → not_found·invalid_query. zone 후보는 ZoneMatcher v1 뒤, unknown 승격은 함수 단위 검증(실제 unknown 후보는 T4)
+- 막힌 것 / 태우 대기: 없음
+- 커밋: a7ea670 3211a25 ee79e6a e236c5f 29b9ed4 65d1d3c 25bdfa4 40973d8 + MANIFEST 재기록 / 이 항목의 커밋

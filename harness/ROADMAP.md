@@ -167,22 +167,22 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 테스트: 실제 RouteResult → render → `RouteResponse.model_validate` 통과, `+09:00`. `views-no-db` KEPT
 
 ### T3.4 Controller · app factory · candidate_controller ★
-- status: DOING
+- status: DONE
 - depends: T3.3
 - 산출: `app.py`(`create_app`), `controllers/{_deps, route_controller, closure_controller, candidate_controller}.py`, `models/domain/candidate_intake.py`(batch_id 멱등, geometry kind별 CrosswalkIndex 분기)
 - 테스트: `test_client()`로 실제 그래프·실제 폐쇄 호출 → contracts 검증. 오프셋 없는 `depart_at` → 400. recorded course batch POST → 202, 재전송 → 변화 없음, 토큰 없음 → 401
 - 추가: `scripts/record_naru_api.py` → `data/recorded/naru_api/` (FE 테스트 입력)
 - 쪼개기: T3.4a(route·closures) / T3.4b(candidates)
 
-### PC-3 (태우)
-- [ ] 로컬 API 띄우고 curl로 `/route` 통제 전·후 두 응답을 지도에 — 이 그림이 포스터에 들어간다
+### PC-3 (태우) — 통과 2026-11-07 ("다음", data/recorded/naru_api/route_0745·route_1330)
+- [x] 로컬 API 띄우고 curl로 `/route` 통제 전·후 두 응답을 지도에 — 이 그림이 포스터에 들어간다
 
 ---
 
 ## P4 — 공지 파서 (Claude API) ★ (AI 레인 — P1~P3과 병행 가능, 담당이 다르면)
 
 ### T4.1 AnthropicClient · recorder · 프롬프트 v1 ★
-- status: TODO
+- status: DOING
 - depends: T0.5, T2.1
 - 산출: `naru_ai/llm/client.py`(tool use, `input_schema`·`tool_choice` — 쓰는 SDK 문서를 열어 파라미터명 확인·주석), `naru_ai/llm/recorder.py`, `llm/prompts/notice_v1.md`(few-shot 8문장은 `sentences.jsonl`의 id로. **`prompts/notice_v1.md`는 규칙서 `docs/data/notice_parser_rules_v2.md` §1~§5·§9에서 생성하고, 출력은 §9.1의 `items[] / impact / impact_reason / toward / approx` 스키마**. 기대값은 `data/raw/notices/cases_v1.jsonl`(T0.6) 기준), `scripts/record_llm.py`(`make record-llm`)
 - 실데이터: live 3문장 → recorded. 비용 예상을 시작 메모에
