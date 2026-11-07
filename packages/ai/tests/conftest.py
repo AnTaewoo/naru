@@ -59,3 +59,19 @@ def course_dir() -> Path:
     d = DATA / "raw" / "course"
     assert (d / "seoul_marathon_2026.gpx").exists(), "실데이터 없음: make fetch SRC=course 먼저"
     return d
+
+
+@pytest.fixture(scope="session")
+def seoul_spatial_dir() -> Path:
+    """가장 최근 `data/raw/seoul_spatial_<YYYYMMDD>/` — OA-23081.xlsx (교차로 지명사전)."""
+    dirs = sorted((DATA / "raw").glob("seoul_spatial_*"))
+    assert dirs, "실데이터 없음: make fetch SRC=seoul_spatial 먼저"
+    return dirs[-1]
+
+
+@pytest.fixture(scope="session")
+def nodelink_seoul_dir() -> Path:
+    """가장 최근 `data/raw/nodelink_seoul_<YYYYMMDD>/` — link.gpkg ROAD_NAME (도로명 사전)."""
+    dirs = sorted((DATA / "raw").glob("nodelink_seoul_*"))
+    assert dirs, "실데이터 없음: make fetch SRC=nodelink 먼저"
+    return dirs[-1]

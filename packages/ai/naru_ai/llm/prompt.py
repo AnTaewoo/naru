@@ -27,6 +27,8 @@ class NoticeEnvelope:
     event_date: str | None
     published_at: str
     fetched_at: str
+    notice_id: str = ""  # 아래 둘은 후보의 notice_ref 용 — 프롬프트 입력(as_json)엔 안 들어간다
+    source_url: str = ""
 
     @classmethod
     def from_sentence(cls, row: dict[str, object]) -> NoticeEnvelope:
@@ -37,6 +39,8 @@ class NoticeEnvelope:
             event_date=None if row.get("event_date") is None else str(row["event_date"]),
             published_at=str(row["published_at"]),
             fetched_at=str(row["fetched_at"]),
+            notice_id=str(row.get("notice_id", "")),
+            source_url=str(row.get("source_url", "")),
         )
 
     def as_json(self) -> str:
