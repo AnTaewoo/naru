@@ -91,7 +91,25 @@
 
 | api | 최초 기록 | 파일 수 | 비고 |
 |---|---|---|---|
-| | | | |
+| topis_notice | 2026-11-07 | 1 | TOPIS 공지 NoticeList 최신 300건 (xml). 아래 "recorded/topis_notice" |
+| incident | 2026-11-07 | 3 | TOPIS 돌발 — AccMainCode 13 · AccSubCode 43 · AccInfo 53행 (`make record API=incident`) |
+| links | 2026-11-07 | 8 | 돌발 링크 4개의 LinkInfo + LinkVerInfo (`make record API=links --limit 4`) |
+| rtd | 2026-11-07 | 1 | 실시간 도시데이터 citydata 광화문·덕수궁 (json, 175 KB) |
+| kakao | — | 0 | `KAKAO_REST_KEY`가 "wrong appKey format"(401) — REST API 키가 아니다. 재발급 후 `make record API=kakao` |
+| bus | — | 0 | `DATA_GO_KR_KEY` 없음 — 넣은 뒤 `make record API=bus` |
+
+### recorded/incident · links (TOPIS 돌발, `scripts/record_api.py`)
+- 출처: 서울 열린데이터광장 OA-13312 돌발 유형 코드(`AccMainCode`) · OA-13313 세부유형(`AccSubCode`) · OA-13315 실시간 돌발(`AccInfo`) · OA-13310 링크정보(`LinkInfo`, LINK_ID 필수) · OA-13311 링크 Vertex(`LinkVerInfo`, LINK_ID 필수). 전부 **xml만**. 공공누리 1유형
+- 파일: `data/recorded/incident/20261107T154053_{AccMainCode,AccSubCode,AccInfo}.json`, `data/recorded/links/20261107T154055_{LinkInfo,LinkVerInfo}_<link_id>.json` (1010011000 덕수궁길, 1000003700 청계천로, 1000003000 청계천로, 1210020200 서초대로)
+- 유형 코드(실제): A01 교통사고 · A02 차량고장 · A03 보행사고 · A04 공사 · A05 낙하물 · A06 버스사고 · A07 지하철사고 · A08 화재 · A09 기상/재난 · **A10 집회및행사** · A11 기타 · A12 제보 · A13 단순정보. 세부 10B02 집회 · 10B03 행사
+- AccInfo 필드(실제): `acc_id, occr_date(YYYYMMDD), occr_time(HHMM 또는 HHMMSS), exp_clr_date, exp_clr_time, acc_type, acc_dtype, link_id, grs80tm_x, grs80tm_y, acc_info(통제 문장, \r 줄바꿈), acc_road_code`. 2026-11-07 15:40 기준 53건: 공사 27 · 집회및행사 15 · 기타 6 · 교통사고 4 · 차량고장 1. 집회및행사 예: 1108984 "세종대로 (시청역 → 숭례문) 집회관련 무대설치로 진행방향 전차로 통제" link 1010005900 07:00~16:00
+- **좌표계: `grs80tm_x/y`는 EPSG:5181** (중부원점, 북 500,000) — 봉은교 vertex (206174, 446261) → (127.0698, 37.5158). 5186으로 읽으면 위도 36.6으로 튄다
+- 링크 ID ↔ 표준노드링크: 4개 중 2개(1000003700 청계천로, 1010011000 덕수궁길)는 nodelink_seoul에 같은 ID가 있고 양 끝 좌표가 10 m 안에서 같다. 2개(1000003000, 1210020200)는 없다 → 좌표는 LinkVerInfo로 받는 게 안전. `make record API=links`는 집회및행사 → 공사 → 기타 순으로 링크를 고른다(`--limit`)
+
+### recorded/rtd (서울 실시간 도시데이터)
+- 출처: 열린데이터광장 `citydata` (json), AREA_NM=광화문·덕수궁(AREA_CD POI009). 파일 `data/recorded/rtd/20261107T154125_citydata.json`
+- 필드(실제): `CITYDATA.{AREA_NM, AREA_CD, LIVE_PPLTN_STTS[{AREA_CONGEST_LVL, AREA_CONGEST_MSG, AREA_PPLTN_MIN, AREA_PPLTN_MAX, PPLTN_TIME, FCST_PPLTN[]}], ROAD_TRAFFIC_STTS, PRK_STTS, SUB_STTS, LIVE_SUB_PPLTN, BUS_STN_STTS, LIVE_BUS_PPLTN, ACDNT_CNTRL_STTS, SBIKE_STTS, WEATHER_STTS}`. 2026-11-07 15:10 "약간 붐빔" 48,000~50,000명
+- 기록 형식: `api, endpoint(키는 <키>), params, called_at(+09:00), status, raw`. 응답 본문의 키도 `<키>`로 가린다
 
 ## field (현장 테스트 묶음)
 

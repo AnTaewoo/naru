@@ -46,6 +46,14 @@ def topis_recorded() -> list[tuple[str, datetime]]:
 
 
 @pytest.fixture(scope="session")
+def recorded_dir() -> Path:
+    """`data/recorded/` — scripts/record_api.py 기록 (incident·links·rtd)."""
+    d = DATA / "recorded"
+    assert (d / "incident").is_dir(), "기록 없음: make record API=incident 먼저"
+    return d
+
+
+@pytest.fixture(scope="session")
 def course_dir() -> Path:
     """`data/raw/course/` (MANIFEST: course) — 2026 서울마라톤 GPX·시각표."""
     d = DATA / "raw" / "course"
