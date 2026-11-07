@@ -1,5 +1,7 @@
-"""TimeDependentRouter — 폐쇄 상태를 도착 시각으로 판정하는 A* (ARCHITECTURE BE Model, T3.1).
+"""TimeDependentRouter · BaselineRouter — PedGraph 위 A* (ARCHITECTURE BE Model, T3.1·T3.2).
 
+BaselineRouter 는 같은 그래프에서 통제를 보지 않는다 (INTERFACE §2 baseline). 둘은 _AStarRouter 를
+공유하고 간선 가중(_edge_factor)만 다르다.
 비용 = 거리 + 수직 이동 패널티(stairs·elevator 연결 간선) + 통제 가중.
   confirmed(도착 시각 기준) → 간선 제외 · scheduled 이고 confidence >= review_confidence → 거리 x3
   scheduled 인데 confidence < 0.7, zone_scheduled, released → 보통 간선 (INTERFACE §5, 상태기계 표)
@@ -17,72 +19,31 @@ from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime, timedelta
 
 from naru_be.config import Settings
+from naru_be.errors import NoRouteError
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.ped_graph import EdgeKind, PedEdge, PedGraph
 from naru_be.models.domain.types import AvoidedCrosswalk, LngLat, Path, RouteLeg
 from naru_contracts import ClosureState, Status
 
+ByCrosswalk = dict[str, list[ClosureState]]
+EPOCH = datetime(2000, 1, 1, tzinfo=UTC)  # 통제를 안 볼 때의 시각 — 쓰이지 않는다
 
-class NoRouteError(Exception):
-    pass
 
+class _AStarRouter:
+    """공통 A*. 서브클래스가 _edge_factor 로 통제 가중을 정한다."""
 
-class TimeDependentRouter:
-    def __init__(
-        self, ped: PedGraph, engine: ClosureEngine, settings: Settings | None = None
-    ) -> None:
+    def __init__(self, ped: PedGraph, settings: Settings | None = None) -> None:
         self.ped = ped
-        self.engine = engine
         self.settings = settings or Settings()
 
-    # --- 공개 -----------------------------------------------------------------------
-    def route(
-        self, src: LngLat, dst: LngLat, t: datetime, closures: Sequence[ClosureState]
-    ) -> Path:
-        if t.tzinfo is None:
-            raise ValueError("t 는 tz-aware 여야 한다")
-        by_crosswalk = self._by_crosswalk(closures)
-        a, b, snap_in, snap_out = self._snap(src, dst)
-        baseline = self._search(a, b, t, {})
-        path = self._search(a, b, t, by_crosswalk)
-        avoided = self._avoided(baseline, path, t, by_crosswalk)
-        return self._build(path, src, dst, snap_in, snap_out, avoided)
+    def _edge_factor(self, edge: PedEdge, at: datetime, by_crosswalk: ByCrosswalk) -> float | None:
+        """None = 제외. 1.0 보통."""
+        return 1.0
 
-    def route_free(self, src: LngLat, dst: LngLat) -> Path:
-        """통제를 전혀 안 본 경로 (BaselineRouter 가 쓴다)."""
-        a, b, snap_in, snap_out = self._snap(src, dst)
-        epoch = datetime(2000, 1, 1, tzinfo=UTC)  # 통제 없음 — 시각은 쓰이지 않는다
-        return self._build(self._search(a, b, epoch, {}), src, dst, snap_in, snap_out, ())
-
-    # --- 내부 -----------------------------------------------------------------------
     def _snap(self, src: LngLat, dst: LngLat) -> tuple[str, str, float, float]:
         a, da = self.ped.nearest_node(*src)
         b, db = self.ped.nearest_node(*dst)
         return a, b, da, db
-
-    @staticmethod
-    def _by_crosswalk(closures: Iterable[ClosureState]) -> dict[str, list[ClosureState]]:
-        out: dict[str, list[ClosureState]] = {}
-        for c in closures:
-            out.setdefault(c.crosswalk_id, []).append(c)
-        return out
-
-    def _edge_factor(
-        self, edge: PedEdge, at: datetime, by_crosswalk: dict[str, list[ClosureState]]
-    ) -> float | None:
-        """None = 제외. 1.0 보통, scheduled_cost_factor 예정."""
-        factor = 1.0
-        for cid in edge.crosswalk_ids:
-            for state in by_crosswalk.get(cid, ()):
-                status = self.engine.status_of_state(state, at)
-                if status is Status.confirmed:
-                    return None
-                if (
-                    status is Status.scheduled
-                    and state.confidence >= self.settings.review_confidence
-                ):
-                    factor = self.settings.scheduled_cost_factor
-        return factor
 
     def _edge_cost(self, edge: PedEdge, factor: float) -> float:
         penalty = {
@@ -91,9 +52,7 @@ class TimeDependentRouter:
         }.get(edge.kind, 0.0)
         return edge.length_m * factor + penalty
 
-    def _search(
-        self, a: str, b: str, t: datetime, by_crosswalk: dict[str, list[ClosureState]]
-    ) -> list[str]:
+    def _search(self, a: str, b: str, t: datetime, by_crosswalk: ByCrosswalk) -> list[str]:
         g = self.ped.graph
         bx, by = g.nodes[b]["x"], g.nodes[b]["y"]
 
@@ -135,46 +94,6 @@ class TimeDependentRouter:
             path.append(prev[path[-1]])
         path.reverse()
         return path
-
-    def _avoided(
-        self,
-        baseline: list[str],
-        path: list[str],
-        t: datetime,
-        by_crosswalk: dict[str, list[ClosureState]],
-    ) -> tuple[AvoidedCrosswalk, ...]:
-        g = self.ped.graph
-        used = {cid for u, v in itertools.pairwise(path) for cid in g[u][v]["edge"].crosswalk_ids}
-        out: list[AvoidedCrosswalk] = []
-        seen: set[str] = set()
-        walked = 0.0
-        for u, v in itertools.pairwise(baseline):
-            edge: PedEdge = g[u][v]["edge"]
-            at = t + timedelta(seconds=walked / self.settings.walk_speed_mps)
-            walked += edge.length_m
-            for cid in edge.crosswalk_ids:
-                if cid in seen or cid in used:
-                    continue
-                for state in by_crosswalk.get(cid, ()):
-                    status = self.engine.status_of_state(state, at)
-                    penalized = (
-                        status is Status.scheduled
-                        and state.confidence >= self.settings.review_confidence
-                    )
-                    if status is Status.confirmed or penalized:
-                        seen.add(cid)
-                        out.append(
-                            AvoidedCrosswalk(
-                                cid,
-                                status,
-                                state.reason,
-                                state.window.end,
-                                tuple(state.evidence),
-                                state.approx,
-                            )
-                        )
-                        break
-        return tuple(out)
 
     def _build(
         self,
@@ -218,3 +137,93 @@ class TimeDependentRouter:
             avoided=avoided,
             node_ids=tuple(path),
         )
+
+
+class BaselineRouter(_AStarRouter):
+    """같은 PedGraph, 통제 미적용 (INTERFACE §2 baseline)."""
+
+    def route(self, src: LngLat, dst: LngLat) -> Path:
+        a, b, snap_in, snap_out = self._snap(src, dst)
+        return self._build(self._search(a, b, EPOCH, {}), src, dst, snap_in, snap_out, ())
+
+
+class TimeDependentRouter(_AStarRouter):
+    def __init__(
+        self, ped: PedGraph, engine: ClosureEngine, settings: Settings | None = None
+    ) -> None:
+        super().__init__(ped, settings)
+        self.engine = engine
+
+    def route(
+        self, src: LngLat, dst: LngLat, t: datetime, closures: Sequence[ClosureState]
+    ) -> Path:
+        if t.tzinfo is None:
+            raise ValueError("t 는 tz-aware 여야 한다")
+        by_crosswalk = self._by_crosswalk(closures)
+        a, b, snap_in, snap_out = self._snap(src, dst)
+        baseline = self._search(a, b, t, {})
+        path = self._search(a, b, t, by_crosswalk)
+        avoided = self._avoided(baseline, path, t, by_crosswalk)
+        return self._build(path, src, dst, snap_in, snap_out, avoided)
+
+    @staticmethod
+    def _by_crosswalk(closures: Iterable[ClosureState]) -> ByCrosswalk:
+        out: ByCrosswalk = {}
+        for c in closures:
+            out.setdefault(c.crosswalk_id, []).append(c)
+        return out
+
+    def _edge_factor(self, edge: PedEdge, at: datetime, by_crosswalk: ByCrosswalk) -> float | None:
+        """None = 제외(confirmed). scheduled_cost_factor = 예정(confidence >= 0.7)."""
+        factor = 1.0
+        for cid in edge.crosswalk_ids:
+            for state in by_crosswalk.get(cid, ()):
+                status = self.engine.status_of_state(state, at)
+                if status is Status.confirmed:
+                    return None
+                if (
+                    status is Status.scheduled
+                    and state.confidence >= self.settings.review_confidence
+                ):
+                    factor = self.settings.scheduled_cost_factor
+        return factor
+
+    def _avoided(
+        self,
+        baseline: list[str],
+        path: list[str],
+        t: datetime,
+        by_crosswalk: ByCrosswalk,
+    ) -> tuple[AvoidedCrosswalk, ...]:
+        g = self.ped.graph
+        used = {cid for u, v in itertools.pairwise(path) for cid in g[u][v]["edge"].crosswalk_ids}
+        out: list[AvoidedCrosswalk] = []
+        seen: set[str] = set()
+        walked = 0.0
+        for u, v in itertools.pairwise(baseline):
+            edge: PedEdge = g[u][v]["edge"]
+            at = t + timedelta(seconds=walked / self.settings.walk_speed_mps)
+            walked += edge.length_m
+            for cid in edge.crosswalk_ids:
+                if cid in seen or cid in used:
+                    continue
+                for state in by_crosswalk.get(cid, ()):
+                    status = self.engine.status_of_state(state, at)
+                    penalized = (
+                        status is Status.scheduled
+                        and state.confidence >= self.settings.review_confidence
+                    )
+                    if status is Status.confirmed or penalized:
+                        seen.add(cid)
+                        out.append(
+                            AvoidedCrosswalk(
+                                cid,
+                                status,
+                                state.reason,
+                                state.window.end,
+                                tuple(state.evidence),
+                                state.approx,
+                            )
+                        )
+                        break
+        return tuple(out)

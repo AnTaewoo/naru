@@ -13,7 +13,7 @@ from naru_be.config import Settings
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
 from naru_be.models.domain.ped_graph import EdgeKind, PedGraph
-from naru_be.models.domain.routers import TimeDependentRouter
+from naru_be.models.domain.routers import BaselineRouter, TimeDependentRouter
 from naru_contracts import CandidateBatch, ClosureState, LineGeom, Status
 
 KST = timezone(timedelta(hours=9))
@@ -61,8 +61,9 @@ def test_no_closure_route_is_short(world: tuple[TimeDependentRouter, list[Closur
     ]
     assert path.coords[0] == KYOBO and path.coords[-1] == DAEHANMUN and len(path.coords) > 10
     assert path.duration_s == round(path.distance_m / 1.2)
-    free = router.route_free(KYOBO, DAEHANMUN)
-    assert free.distance_m == path.distance_m and free.avoided == ()
+    free = BaselineRouter(router.ped, router.settings).route(KYOBO, DAEHANMUN)  # T3.2
+    assert free.coords == path.coords and free.distance_m == path.distance_m
+    assert free.legs == path.legs and free.avoided == ()
 
 
 def test_during_closure_detours_via_underpass(

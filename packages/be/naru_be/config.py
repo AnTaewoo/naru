@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     walk_speed_mps: float = 1.2
     stairs_penalty_m: float = 25.0
     elevator_penalty_m: float = 40.0
+    # RoutePlanner (T3.2) 폐쇄 조회 범위: 출발~도착 bbox 여유 m, 출발 뒤 이 시간 안에 시작하는 것도
+    route_bbox_pad_m: float = 1000.0
+    route_horizon_min: int = 60
 
     # CrosswalkIndex (T1.2)
     point_radius_m: float = 30.0
