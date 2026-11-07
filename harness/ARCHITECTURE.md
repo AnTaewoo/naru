@@ -122,7 +122,7 @@
 | `scheduled` (conf < 0.7) | 예정 | 〃 | 무시 | 노랑 점만 |
 | `confirmed` (conf ≥ 0.8) | 확인 | 버스 이탈 ≥2대, 돌발 발생, 코스 시각표 시작 | 제외 | 빨강 점, 자동 우회 |
 | `released` | 해제 | 버스 복귀, 시각표 종료+30분 | 정상 | 회색 점, 30분 후 제거 |
-| `zone_scheduled` | 예정 구역 | 지역명만 있는 공지 (ZoneMatcher) | 무시 | 보라 빗금만 |
+| `zone_scheduled` | 예정 구역 | 지역명만 있는 공지 (ZoneMatcher), `impact: unknown` 후보가 도로 30 m 규칙으로 승격되지 않은 경우 (ADR-008) | 무시 | 보라 빗금만 |
 
 전이: `scheduled → confirmed → released`. `zone_scheduled`는 라우팅과 무관. 혼잡 급등은 `scheduled`의 confidence만 올린다. 전이 로직은 Model(`ClosureEngine`)에만 있다. 임계값은 `naru_be/config.py`.
 

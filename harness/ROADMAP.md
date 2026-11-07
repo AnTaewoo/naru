@@ -130,7 +130,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 테스트(실데이터): 후보 수 == 시각표 구간 수, window 일치. `scripts/record_candidates.py --source course` → `data/recorded/candidates/course/<ts>.json`
 
 ### T2.3 ClosureEngine ★
-- status: DOING
+- status: DONE
 - depends: T2.1
 - 산출: `naru_be/models/domain/closure_engine.py` — `apply(candidate, crosswalk_ids) -> list[ClosureState]`, 전이는 ARCHITECTURE 표. 임계값 config
 - 테스트(실데이터): T2.2 recorded 후보 → scheduled; 시각표 시작 시각 경과 → confirmed(코스는 시각표가 실측 증거); window 종료+30분 → released. BE 테스트는 naru_ai를 import하지 않는다

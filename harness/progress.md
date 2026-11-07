@@ -81,3 +81,9 @@
 - 정한 것: 11~15구간 매핑(11 풀코스 잠실역→동문, 12 송파대로 바깥, 13 안쪽, 14 동문→잠실역, 15 종합운동장교차로→동문 285 m). 웨이포인트는 GPX 순서대로 트랙에 붙임(왕복 구간). candidate_id course-20260315-segNN
 - 막힌 것 / 태우 대기: 조각이 겹친 첫 기록(20261107T185022.json) 삭제 요청. b92c481은 빨간 테스트로 커밋됨(파이프 종료코드 미확인) → 22bc972로 고침. develop 46커밋 GitHub 푸시(태우 요청)
 - 커밋: c3f7a14, 9e77011, b92c481, 22bc972 / 이 항목의 커밋
+
+## 2026-11-07 · T2.3 DONE · ADR-008 승인 반영
+- 한 것: `closure_engine.py` ClosureEngine(apply/status_at/effective_window/bump_confidence/release_by_evidence — scheduled→confirmed(실측 증거+시작)→released(종료+30분), end 없으면 +6h, 전이마다 evidence). 테스트 6개. ADR-008 승인 반영: INTERFACE v0.6(impact 필수·toward·approx), naru_contracts+테스트 13개, contracts.d.ts 재생성, CourseIngestor impact=blocks, 엔진 unknown→zone_scheduled, config 상수 2개, course 후보 재기록
+- 정한 것: confirmed 조건 = confidence ≥ 0.8 + 실측 증거(timetable·topis_incident·bus_skip) + start 경과. 공지만으론 시간이 지나도 scheduled. review_required 후보도 상태는 만듦(라우터가 제외). reason = evidence detail 구간명
+- 막힌 것 / 태우 대기: 규칙서 파일을 `notice_parser_rules_v2.md`로 개명(원래 naru_parser_spec_v2.md). T0.6의 "30개"는 34건과 다름(미수정). recorded/candidates/course 옛 파일 2개 삭제 요청. 해제 공지(none/released) 전달은 후속 ADR
+- 커밋: 227a6ec, c8a6b5f, 42399e8, 4265ffb + ADR-008 반영 4개 / 이 항목의 커밋
