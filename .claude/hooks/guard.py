@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 # 태우가 바꿀 수 있음
-MD_ALLOWED_PREFIXES = ("harness/", "docs/decisions/", "packages/fe/", "docs/data/")
+MD_ALLOWED_PREFIXES = ("harness/", "docs/decisions/", "packages/fe/", "docs/data/", "packages/ai/naru_ai/llm/prompts/")
 HARNESS_PREFIXES = (".claude/", "harness/")
 DATA_RE = re.compile(r"(^|[\s'\"/])data/(raw|recorded)/")
 DATA_WRITE_CMD = re.compile(r"(>|>>|\btee\b|\bsed\s+-i|\bperl\s+-pi|\bcp\b|\bmv\b|\brm\b|\btruncate\b|open\([^)]*['\"]w)")
