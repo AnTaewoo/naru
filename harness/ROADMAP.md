@@ -124,7 +124,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 주의: 코드는 이미 있다. 이 Task는 읽기 + 테스트. 문서와 코드가 다르면 **문서를 고치지 말고** 태우에게
 
 ### T2.2 CourseIngestor (AI) ★
-- status: TODO
+- status: DONE
 - depends: T2.1
 - 산출: `naru_ai/ingest/course.py` — GPX + 시각표 → `list[ClosureCandidate]`(geometry=line 구간별, status_hint=scheduled, confidence 0.9, evidence timetable)
 - 테스트(실데이터): 후보 수 == 시각표 구간 수, window 일치. `scripts/record_candidates.py --source course` → `data/recorded/candidates/course/<ts>.json`

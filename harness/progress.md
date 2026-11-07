@@ -75,3 +75,9 @@
 - 정한 것: 생성물 d.ts 커밋. §1.1 요청 예시는 자리표시자를 §1 후보로 치환해 검증
 - 막힌 것 / 태우 대기: 문서≠코드 4건 보고 — §3 예시가 JSON 아님(검증 못 함), §1.1 요청 예시 자리표시자, CandidateBatch.producer 제한 없음, FeatureProperties.window가 dict. 결정 대기
 - 커밋: 2df20d6, 9f28618 / 이 항목의 커밋
+
+## 2026-11-07 · T2.2 DONE
+- 한 것: `naru_ai/ingest/course.py` CourseIngestor(시각표 16구간 + 풀·10 km GPX 조각 → ClosureCandidate 16, line·scheduled·0.9·timetable evidence), `fetch_course.py`에 10 km 코스 디지타이즈(11.44 km, 반환점 가락시장역사거리), `scripts/record_candidates.py --source course` → recorded/candidates/course. 테스트 3개
+- 정한 것: 11~15구간 매핑(11 풀코스 잠실역→동문, 12 송파대로 바깥, 13 안쪽, 14 동문→잠실역, 15 종합운동장교차로→동문 285 m). 웨이포인트는 GPX 순서대로 트랙에 붙임(왕복 구간). candidate_id course-20260315-segNN
+- 막힌 것 / 태우 대기: 조각이 겹친 첫 기록(20261107T185022.json) 삭제 요청. b92c481은 빨간 테스트로 커밋됨(파이프 종료코드 미확인) → 22bc972로 고침. develop 46커밋 GitHub 푸시(태우 요청)
+- 커밋: c3f7a14, 9e77011, b92c481, 22bc972 / 이 항목의 커밋
