@@ -54,7 +54,7 @@ Task 하나를 끝까지 하고, **보고하고, 멈춘다.** 태우가 "다음"
 5. 공간 연산은 Python에서. MySQL은 결과 저장소. `ST_*` 안 씀
 6. FE 타입은 `make schema`로 생성. 손으로 안 씀
 7. 시간은 tz-aware, DB UTC. 좌표는 `[lng, lat]`, 미터 계산은 EPSG:5179. enum 코드값 영어, 한국어는 FE `i18n/ko.ts`에서만
-8. LLM 응답은 전부 `data/recorded/llm/`에 기록하고 테스트·시연은 재생. 프롬프트는 `naru_ai/llm/prompts/notice_v<n>.md`로 버전 관리. `temperature=0`
+8. LLM 응답은 전부 `data/recorded/llm/`에 기록하고 테스트·시연은 재생. 프롬프트는 `naru_ai/llm/prompts/notice_v<n>.md`로 버전 관리. 출력은 strict tool schema + 규칙 기반 confidence로 고정(샘플링 파라미터 없음 — claude-haiku-5-5는 temperature에 400)
 
 ## 4. 명령
 ```

@@ -68,8 +68,8 @@ naru_ai/
 
 ### 3.2 LLM — Claude API (ADR-007)
 - 공지 파서는 **Claude API** 하나다. 기본 `NARU_LLM_MODEL=claude-haiku-5-5`, 평가 비교용 `claude-sonnet-5-5`. 모델 ID는 실행 시점 Anthropic 문서에서 확인.
-- `naru_ai/llm/client.py`의 `AnthropicClient.complete_tool(system, messages, input_schema)` — tool use로 출력 스키마를 고정하고 `tool_choice`로 강제. 파라미터명은 쓰는 SDK 버전 문서를 열어 확인하고 주석. `temperature=0`, `max_tokens=1024`.
-- 출력 스키마(`notice/parser.py`): `spans[{text, tag ∈ 5종, canonical}]`, `segments[{road, from, to, via[], window{start,end}, kind ∈ closure|march, scope}]`. **좌표 필드 없음.**
+- `naru_ai/llm/client.py`의 `AnthropicClient.complete_tool(system, messages, tool)` — strict tool schema + `tool_choice` 강제로 출력을 고정하고, confidence는 규칙(규칙서 §3.8)으로 정한다. 샘플링 파라미터는 보내지 않는다(`claude-haiku-5-5`는 `temperature` 등에 400, SDK 2.6.0엔 키도 없음). `max_tokens=4096`(`NARU_LLM_MAX_TOKENS`). 파라미터명은 설치된 SDK 타입에서 확인하고 주석.
+- 출력 스키마(`llm/notice_schema.py`, 규칙서 v2 §9.1): `items[{window{start,end}, approx, kind, impact ∈ blocks|none|unknown, impact_reason, segments[{order, from, to, via[], road, direction, lanes{count, scope}, length_km}], points[{name, road_hint}], toward, road_hints[], reported_people, police_stations[], spans[{text, tag ∈ 6종, canonical}], confidence, notes}]`. **좌표 필드 없음.** strict JSON Schema는 이 pydantic 모델에서 생성(참조 인라인, 전부 required, number의 minimum/maximum 제거 — API가 거부).
 - 프롬프트는 `llm/prompts/notice_v<n>.md`. few-shot 예시는 `data/raw/notices/`의 실제 문장 id를 적는다. 바꾸면 버전을 올리고 기록을 새로 만든다.
 - 정렬기: `span.text`를 문장에서 문자열 검색해 start/end. 못 찾으면 버리고 개수를 로그. `segments.from/to`는 spans의 canonical과 일치해야 하고, 아니면 segment를 버린다.
 - 가짜 클라이언트(`FakeLLM`, `EchoClient`) 금지. 테스트·시연은 `llm/recorder.py` 재생.
