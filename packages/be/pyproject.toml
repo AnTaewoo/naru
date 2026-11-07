@@ -16,6 +16,7 @@ dependencies = [
   "shapely>=2.0",
   "pyproj>=3.6",
   "geopandas>=1.0",
+  "openpyxl>=3.1",
 ]
 
 [tool.uv.sources]
