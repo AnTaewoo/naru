@@ -147,12 +147,12 @@
 - 출처: `make record-llm NOTICES=<sentences.jsonl> LIMIT=3` → `scripts/record_llm.py`. 모델 `claude-haiku-5-5`, 프롬프트 `notice_v1`(`packages/ai/naru_ai/llm/prompts/notice_v1.md`, 규칙서 v2 §0~§5·§9 + few-shot 8문장). 경로 `data/recorded/llm/anthropic/claude-haiku-5-5@api/notice_v1/<sentence_id>.json`. 기록일 2026-11-07, 호출 3회
 - 입력: `sentences.jsonl` 의 경찰청 3행(few-shot 에 없는 것) — smpa-20261107-r06(出 약칭), smpa-20261109-r01(`·` 연속 지점), smpa-20261109-r02(방향어). strict tool `parse_notice`, tool_choice 강제, temperature 없음(Haiku 5.5 는 400)
 - 파일 형식: `api, model, prompt_version, sentence_id, called_at, request{system, messages, tool}, response(Message 원문), usage, elapsed_ms`. 키 없음. 시스템 프롬프트 11,072 토큰이 캐시됨(2·3번째 호출 cache_read)
-- 파일 200개 (2026-11-07~08): sentences.jsonl 문장 3건(T4.1), 라벨 케이스 K-001~K-034 34건 + 합성 C-* 163건(T4.3 평가, `scripts/record_llm.py --ids all --max-calls`, 합성 봉투는 source news·published_at 2026-11-07T00:00+09:00 고정). 호출 합계 200회, 캐시 제외 입력 ≈ 94k·출력 ≈ 109k 토큰(≈ $0.09)
+- 파일 202개 (2026-11-07~08): sentences.jsonl 문장 5건(T4.1 3 + T4.4 r01·r04 — few-shot 에 있는 문장, 워커 e2e 용), 라벨 케이스 K-001~K-034 34건 + 합성 C-* 163건(T4.3 평가, `scripts/record_llm.py --ids all --max-calls`, 합성 봉투는 source news·published_at 2026-11-07T00:00+09:00 고정). 호출 합계 202회, 캐시 제외 입력 ≈ 95k·출력 ≈ 110k 토큰(≈ $0.09)
 
 ### recorded/candidates/notice (공지 → ClosureCandidate, T4.2)
 - 출처: `make record-candidates SOURCE=notice` → `scripts/record_candidates.py`. 기록된 LLM 응답 3건(recorded/llm) 재생 → 정렬기 → 리졸버(OA-23081 교차로명 + 카카오 기록 재생) → CandidateBuilder. live 호출 없음. 파일 `data/recorded/candidates/notice/20261107T211233.json` sha256 2a3d3a74b3ab…, 후보 3개
 - 내용: segment 2(의사당역 5번출구→민주당사, 하나증권 앞→금감원→여의도역), point 1(국회의사당역 2번출구 — '사랑채 동측 건너편'은 여의도 힌트로 못 풀어 출발지만). 좌표는 전부 카카오 기록 documents 또는 교차로 평균점
-- 카카오 기록 추가 9건(2026-11-07, `scripts/record_api.py --api kakao --queries ...`): 의사당역 5번출구·의사당역·민주당사·하나증권·금감원·여의도역·국회의사당역 2번출구·국회의사당역·사랑채
+- 카카오 기록 추가 12건(`scripts/record_api.py --api kakao --queries ...`): 2026-11-07 의사당역 5번출구·의사당역·민주당사·하나증권·금감원·여의도역·국회의사당역 2번출구·국회의사당역·사랑채, 2026-11-08 동화면세점·서울시의회·고용노동청(T4.4 워커 e2e 용)
 
 ### notices/cases_v1 (공지 파서 라벨 — 정확도 평가, T0.6·T4.3)
 - 출처: 실제 공지(서울경찰청 「오늘의 주요집회」 smpa 22 · TOPIS 돌발 6 · TOPIS 공지 1 · 보도 3 · 서울시 보도자료 2)에서 뽑은 34건. 라벨(`expected.items`, 규칙서 v2 §9.1 스키마)은 태우가 직접 달았다(Syntitan 케이스 초안 검토 후 확정). 2026-11-07 수령

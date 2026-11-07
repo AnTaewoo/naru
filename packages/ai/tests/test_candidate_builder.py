@@ -105,4 +105,4 @@ def test_unresolved_end_falls_back_to_point(
         candidates=[x for p in parsed.values() for x in builder.build(p)],
     )  # fmt: skip
     again = CandidateBatch.model_validate_json(batch.model_dump_json())
-    assert len(again.candidates) == 3
+    assert len(again.candidates) == 6  # 문장 5건: r01 1 + r04 2 + r06·1109-r01·1109-r02 각 1

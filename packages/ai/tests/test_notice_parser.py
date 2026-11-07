@@ -41,7 +41,7 @@ def test_replay_aligns_every_span(
         assert parsed.model == "claude-haiku-5-5" and parsed.prompt_version == "notice_v1"
         assert len(parsed.items) == 1 and parsed.dropped_spans == 0
         (pi,) = parsed.items
-        assert pi.dropped_segments == 0 and len(pi.segments) == len(pi.item.segments) == 1
+        assert pi.dropped_segments == 0 and len(pi.segments) == len(pi.item.segments) >= 1
         for span in pi.spans:
             assert env.text[span.start : span.end] == span.text
         assert pi.tag_of(pi.segments[0].from_) == "POI"
@@ -64,4 +64,4 @@ def test_replay_values(parser: NoticeParser, sentences: dict[str, dict[str, obje
     assert pi.area_hint() == "여의도" and pi.segments[0].via == ["금감원"]
     # 기록 없는 문장 + client 없음 → 실패 (가짜 응답 없음)
     with pytest.raises(RecordingMissingError):
-        parser.parse(NoticeEnvelope.from_sentence(sentences["smpa-20261107-r01"]))
+        parser.parse(NoticeEnvelope.from_sentence(sentences["smpa-20261107-r02"]))  # 기록 없음
