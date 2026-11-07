@@ -104,14 +104,14 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 쪼개기: 200줄 넘으면 T1.2a(point·line) / T1.2b(RoadGraph·segment)
 
 ### T1.3 횡단보도 ↔ 교차로 매핑 ★
-- status: TODO
+- status: DONE
 - depends: T1.2
 - 산출: `naru_be/models/domain/intersection_map.py` — 교차로명 → 관리번호 → 횡단보도 ID (정확 일치만. AI 리졸버가 같은 파일을 읽는다 — 공유 데이터, 코드는 각자)
 - 테스트: 데이터에 있는 교차로명 하나 → 횡단보도 ≥ 2
 
-### PC-1 (태우)
-- [ ] 그래프를 folium으로 그려 광화문 일대 횡단보도 엣지 확인
-- [ ] `from_segment` 결과 선과 버퍼, 걸린 횡단보도를 같은 지도에
+### PC-1 (태우) — 통과 2026-11-07 ("다음 좋네", scripts/pc1_map.py)
+- [x] 그래프를 folium으로 그려 광화문 일대 횡단보도 엣지 확인
+- [x] `from_segment` 결과 선과 버퍼, 걸린 횡단보도를 같은 지도에
 
 ---
 
