@@ -14,6 +14,9 @@
     "EvidenceKind": {
       "$ref": "#/$defs/EvidenceKind"
     },
+    "Impact": {
+      "$ref": "#/$defs/Impact"
+    },
     "LineGeom": {
       "$ref": "#/$defs/LineGeom"
     },
@@ -173,6 +176,15 @@
         "rtd_spike"
       ],
       "title": "EvidenceKind",
+      "type": "string"
+    },
+    "Impact": {
+      "description": "횡단보도 통행을 막는 재료인가 (ADR-008). 파서의 none 은 BE로 오지 않는다.",
+      "enum": [
+        "blocks",
+        "unknown"
+      ],
+      "title": "Impact",
       "type": "string"
     },
     "LineGeom": {
@@ -487,6 +499,9 @@
         "status_hint": {
           "$ref": "#/$defs/Status"
         },
+        "impact": {
+          "$ref": "#/$defs/Impact"
+        },
         "geometry": {
           "discriminator": {
             "mapping": {
@@ -541,6 +556,23 @@
           ],
           "default": null
         },
+        "toward": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Toward"
+        },
+        "approx": {
+          "default": false,
+          "title": "Approx",
+          "type": "boolean"
+        },
         "review_required": {
           "default": false,
           "title": "Review Required",
@@ -552,6 +584,7 @@
         "source",
         "type",
         "status_hint",
+        "impact",
         "geometry",
         "window",
         "confidence",
@@ -660,6 +693,15 @@
         "lat": {
           "title": "Lat",
           "type": "number"
+        },
+        "impact": {
+          "$ref": "#/$defs/Impact",
+          "default": "blocks"
+        },
+        "approx": {
+          "default": false,
+          "title": "Approx",
+          "type": "boolean"
         }
       },
       "required": [
@@ -738,6 +780,11 @@
           },
           "title": "Evidence",
           "type": "array"
+        },
+        "approx": {
+          "default": false,
+          "title": "Approx",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1015,6 +1062,15 @@
           ],
           "default": null,
           "title": "Evidence"
+        },
+        "impact": {
+          "$ref": "#/$defs/Impact",
+          "default": "blocks"
+        },
+        "approx": {
+          "default": false,
+          "title": "Approx",
+          "type": "boolean"
         }
       },
       "required": [

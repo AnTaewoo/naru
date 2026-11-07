@@ -7,6 +7,10 @@ export type At = string;
 export type Detail = {
   [k: string]: number | string;
 } | null;
+/**
+ * 횡단보도 통행을 막는 재료인가 (ADR-008). 파서의 none 은 BE로 오지 않는다.
+ */
+export type Impact = "blocks" | "unknown";
 export type Kind = "line";
 /**
  * @minItems 2
@@ -49,6 +53,8 @@ export type Confidence = number;
  * @minItems 1
  */
 export type Evidence1 = [Evidence, ...Evidence[]];
+export type Toward = string | null;
+export type Approx = boolean;
 export type ReviewRequired = boolean;
 export type BatchId = string;
 export type ProducedAt = string;
@@ -64,6 +70,11 @@ export type Reason = string;
 export type Evidence2 = Evidence[];
 export type Lng1 = number;
 export type Lat1 = number;
+/**
+ * 횡단보도 통행을 막는 재료인가 (ADR-008). 파서의 none 은 BE로 오지 않는다.
+ */
+export type Impact1 = "blocks" | "unknown";
+export type Approx1 = boolean;
 export type From = string;
 export type To = string;
 export type DepartAt = string;
@@ -72,6 +83,7 @@ export type CrosswalkId1 = string;
 export type Reason1 = string;
 export type Until = string | null;
 export type Evidence3 = Evidence[];
+export type Approx2 = boolean;
 export type Type = string;
 export type Coordinates2 = [unknown, unknown][];
 export type DurationS = number;
@@ -105,6 +117,11 @@ export type Evidence4 =
       [k: string]: unknown;
     }[]
   | null;
+/**
+ * 횡단보도 통행을 막는 재료인가 (ADR-008). 파서의 none 은 BE로 오지 않는다.
+ */
+export type Impact2 = "blocks" | "unknown";
+export type Approx3 = boolean;
 export type Type4 = "FeatureCollection";
 export type Features = Feature[];
 export type Code = "invalid_query" | "unauthorized" | "not_found" | "no_route" | "internal";
@@ -118,6 +135,7 @@ export interface NaruContracts {
   ClosureType?: ClosureType;
   Evidence?: Evidence;
   EvidenceKind?: EvidenceKind;
+  Impact?: Impact;
   LineGeom?: LineGeom;
   NoticeRef?: NoticeRef;
   PlacePoint?: PlacePoint;
@@ -205,11 +223,14 @@ export interface ClosureCandidate {
   source: Source;
   type: ClosureType;
   status_hint: Status;
+  impact: Impact;
   geometry: Geometry;
   window: Window;
   confidence: Confidence;
   evidence: Evidence1;
   notice_ref?: NoticeRef | null;
+  toward?: Toward;
+  approx?: Approx;
   review_required?: ReviewRequired;
 }
 export interface CandidateBatch {
@@ -236,6 +257,8 @@ export interface ClosureState {
   evidence: Evidence2;
   lng: Lng1;
   lat: Lat1;
+  impact?: Impact1;
+  approx?: Approx1;
 }
 export interface RouteQuery {
   from: From;
@@ -249,6 +272,7 @@ export interface Avoided {
   reason: Reason1;
   until?: Until;
   evidence: Evidence3;
+  approx?: Approx2;
 }
 export interface Baseline {
   route: LineString;
@@ -298,6 +322,8 @@ export interface FeatureProperties {
   crosswalk_id?: CrosswalkId2;
   zone_name?: ZoneName1;
   evidence?: Evidence4;
+  impact?: Impact2;
+  approx?: Approx3;
 }
 export interface Window1 {
   [k: string]: string | null;
