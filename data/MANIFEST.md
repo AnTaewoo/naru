@@ -143,6 +143,15 @@
   - `route_0745.json` sha256 ffe303f3fdff…
   - `route_1330.json` sha256 99922d1a7f0a…
 
+### recorded/llm (Claude API 공지 파서 응답 — 재생용, T4.1)
+- 출처: `make record-llm NOTICES=<sentences.jsonl> LIMIT=3` → `scripts/record_llm.py`. 모델 `claude-haiku-5-5`, 프롬프트 `notice_v1`(`packages/ai/naru_ai/llm/prompts/notice_v1.md`, 규칙서 v2 §0~§5·§9 + few-shot 8문장). 경로 `data/recorded/llm/anthropic/claude-haiku-5-5@api/notice_v1/<sentence_id>.json`. 기록일 2026-11-07, 호출 3회
+- 입력: `sentences.jsonl` 의 경찰청 3행(few-shot 에 없는 것) — smpa-20261107-r06(出 약칭), smpa-20261109-r01(`·` 연속 지점), smpa-20261109-r02(방향어). strict tool `parse_notice`, tool_choice 강제, temperature 없음(Haiku 5.5 는 400)
+- 파일 형식: `api, model, prompt_version, sentence_id, called_at, request{system, messages, tool}, response(Message 원문), usage, elapsed_ms`. 키 없음. 시스템 프롬프트 11,072 토큰이 캐시됨(2·3번째 호출 cache_read)
+- 파일 3개:
+  - `smpa-20261107-r06.json` sha256 4695dba18621… (in 374 / out 436, 7121 ms)
+  - `smpa-20261109-r01.json` sha256 cc0df52e9332… (in 374 / out 545, 2514 ms)
+  - `smpa-20261109-r02.json` sha256 33d60b759fba… (in 394 / out 541, 5618 ms)
+
 ## field (현장 테스트 묶음)
 
 | 날짜 | 장소 | 포함 | 비고 |
