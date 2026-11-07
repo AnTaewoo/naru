@@ -20,7 +20,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 목표: 이후 모든 Task가 쓸 실데이터와 툴체인. 여기서 가짜 데이터의 싹을 자른다.
 
 ### T0.1 툴체인·계약 읽기 ★
-- status: DOING
+- status: DONE
 - depends: —
 - 이미 있는 것: `pyproject.toml`(uv 워크스페이스), `packages/{contracts,ai,be}` 뼈대, **`naru_contracts` 코드**(INTERFACE v0.5의 구현), `.importlinter`, `Makefile`, `docker-compose.yml`, `.env.example`, hook·settings
 - 할 일: `uv sync` → `uv.lock` 커밋. `make check`가 "테스트 0개"로 초록, `make layers` 계약 6개 KEPT. `docker compose up -d mysql` 후 `SELECT @@time_zone, @@character_set_server` = `+00:00`, `utf8mb4`
