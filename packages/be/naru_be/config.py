@@ -18,6 +18,15 @@ class Settings(BaseSettings):
     data_dir: Path = Path("data")
     districts: tuple[str, ...] = ("종로구", "중구")  # 데모 범위 (광화문 일대)
 
+    # DB (.env DATABASE_URL / TEST_DATABASE_URL — 접두사 없음, docker compose MySQL 8.4 호스트 3307)
+    database_url: str = Field(
+        default="mysql+pymysql://naru:naru@localhost:3307/naru", validation_alias="DATABASE_URL"
+    )
+    test_database_url: str = Field(
+        default="mysql+pymysql://naru:naru@localhost:3307/naru_test",
+        validation_alias="TEST_DATABASE_URL",
+    )
+
     # 상태기계 (ARCHITECTURE "ClosureState 상태기계", INTERFACE §5)
     review_confidence: float = 0.7  # 미만이면 review_required, 라우팅에 안 씀
     confirmed_confidence: float = 0.8
