@@ -70,6 +70,9 @@ SEGMENT_LINES: dict[str, SegmentLine] = {
 class Track:
     points: tuple[LngLat, ...]
     waypoints: tuple[tuple[str, LngLat], ...]  # (이름, 좌표) GPX 순서
+    indices: tuple[
+        int, ...
+    ]  # 웨이포인트마다 트랙 점 인덱스. GPX 순서대로 단조 증가 (왕복 구간 때문)
 
     @classmethod
     def load(cls, path: Path) -> Track:
@@ -78,27 +81,37 @@ class Track:
             (p.longitude, p.latitude) for t in gpx.tracks for s in t.segments for p in s.points
         )
         waypoints = tuple((w.name or "", (w.longitude, w.latitude)) for w in gpx.waypoints)
-        return cls(points, waypoints)
+        indices: list[int] = []
+        prev = 0
+        for name, xy in waypoints:
+            # 왕복 코스(청계천로·송파대로)는 같은 노드를 여러 번 지난다 → 이전 웨이포인트 뒤의 첫 점
+            hit = next(
+                (i for i in range(prev, len(points)) if _dist_m(points[i], xy) <= WAYPOINT_SNAP_M),
+                None,
+            )
+            if hit is None:
+                raise ValueError(
+                    f"웨이포인트 '{name}'가 트랙에서 {WAYPOINT_SNAP_M} m 밖 (인덱스 {prev} 뒤)"
+                )
+            indices.append(hit)
+            prev = hit
+        return cls(points, waypoints, tuple(indices))
 
-    def index_of(self, name: str, occurrence: int = 1, after: int = 0) -> int:
-        """`occurrence`번째 그 이름 웨이포인트에 가장 가까운 트랙 점 인덱스 (after 이후)."""
+    def position(self, name: str, occurrence: int = 1, after: int = -1) -> int:
+        """이름이 `occurrence`번째로 나오는 웨이포인트의 자리 (after 뒤에서)."""
         seen = 0
-        for wp_name, xy in self.waypoints:
-            if wp_name != name:
+        for k, (wp_name, _) in enumerate(self.waypoints):
+            if k <= after or wp_name != name:
                 continue
             seen += 1
-            if seen < occurrence:
-                continue
-            best = min(range(after, len(self.points)), key=lambda i: _dist_m(self.points[i], xy))
-            if _dist_m(self.points[best], xy) > WAYPOINT_SNAP_M:
-                raise ValueError(f"웨이포인트 '{name}'가 트랙에서 {WAYPOINT_SNAP_M} m 밖")
-            return best
-        raise ValueError(f"웨이포인트 없음: {name} (#{occurrence})")
+            if seen == occurrence:
+                return k
+        raise ValueError(f"웨이포인트 없음: {name} (#{occurrence}, {after} 뒤)")
 
     def slice(self, line: SegmentLine) -> tuple[LngLat, ...]:
-        i = self.index_of(line.start, line.start_occurrence)
-        j = self.index_of(line.end, 1, after=i + 1)
-        return self.points[i : j + 1]
+        a = self.position(line.start, line.start_occurrence)
+        b = self.position(line.end, 1, after=a)
+        return self.points[self.indices[a] : self.indices[b] + 1]
 
 
 def _dist_m(a: LngLat, b: LngLat) -> float:
