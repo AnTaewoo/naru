@@ -47,3 +47,14 @@ class RouteResult:
     baseline: Path  # 같은 그래프, 통제 미적용 (avoided 는 항상 비어 있다)
     depart_at: datetime
     computed_at: datetime
+
+
+@dataclass(frozen=True)
+class IntakeResult:
+    """CandidateIntake.accept 결과 (INTERFACE §1.1 응답). duplicate = 같은 batch_id 재전송."""
+
+    batch_id: str
+    accepted: int
+    review_required: int
+    crosswalks_updated: int
+    duplicate: bool = False

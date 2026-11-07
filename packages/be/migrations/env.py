@@ -9,6 +9,7 @@ from sqlalchemy import engine_from_config, pool
 
 from naru_be.config import Settings
 from naru_be.models.entities.base import Base
+from naru_be.models.entities.candidate_batch import CandidateBatchEntity
 from naru_be.models.entities.closure_state import ClosureStateEntity
 
 config = context.config
@@ -18,7 +19,7 @@ if config.config_file_name is not None:
 url = context.get_x_argument(as_dictionary=True).get("url") or Settings().database_url
 config.set_main_option("sqlalchemy.url", url)
 target_metadata = Base.metadata
-TABLES = (ClosureStateEntity.__tablename__,)  # import 로 metadata 에 등록된 테이블
+TABLES = (ClosureStateEntity.__tablename__, CandidateBatchEntity.__tablename__)  # metadata 등록
 
 
 def run_migrations_offline() -> None:

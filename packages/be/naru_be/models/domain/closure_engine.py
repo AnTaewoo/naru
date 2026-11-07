@@ -87,8 +87,10 @@ class ClosureEngine:
         )
         if end is not None and at >= end + timedelta(minutes=self.settings.released_grace_min):
             return Status.released
-        if state.status is Status.released:
-            return Status.released
+        if state.status is Status.released and any(
+            e.kind is EvidenceKind.bus_return for e in state.evidence
+        ):
+            return Status.released  # 실측 해제만 시각과 무관. 창 종료 released 는 재판정
         if confirmable and start is not None and at >= start:
             return Status.confirmed
         return Status.scheduled

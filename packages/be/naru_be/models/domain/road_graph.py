@@ -54,6 +54,8 @@ class RoadGraph:
         self.node_xy = node_xy
         self._node_ids = list(node_xy)
         self._tree = STRtree([shapely.Point(xy) for xy in node_xy.values()])
+        self._links = [shapely.LineString(d["coords"]) for _, _, d in graph.edges(data=True)]
+        self._link_tree = STRtree(self._links)
 
     @classmethod
     def from_gpkg(cls, link_gpkg: Path) -> RoadGraph:
@@ -98,6 +100,11 @@ class RoadGraph:
                     key=lambda n: (self.node_xy[n][0] - x) ** 2 + (self.node_xy[n][1] - y) ** 2,
                 )
         return self._node_ids[int(self._tree.nearest(shapely.Point(x, y)))]
+
+    def nearest_link_distance_m(self, lng: float, lat: float) -> float:
+        """가장 가까운 도로 링크까지 거리 (ADR-008: impact unknown 지점의 30 m 승격 규칙)."""
+        pt = shapely.Point(_4326_TO_5179.transform(lng, lat))
+        return float(self._links[int(self._link_tree.nearest(pt))].distance(pt))
 
     def shortest_path(self, points: Sequence[LngLat], road: str | None = None) -> RoadPath:
         if len(points) < 2:

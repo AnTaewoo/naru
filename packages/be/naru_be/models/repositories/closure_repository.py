@@ -17,6 +17,8 @@ from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.orm import Session, sessionmaker
 
 from naru_be.config import Settings
+from naru_be.models.domain.types import IntakeResult
+from naru_be.models.entities.candidate_batch import CandidateBatchEntity
 from naru_be.models.entities.closure_state import ClosureStateEntity
 from naru_contracts import ClosureState, Evidence, Impact, Status, Window
 
@@ -83,10 +85,37 @@ class ClosureRepository:
         with self._sessions.begin() as s:
             return int(s.scalar(select(func.count()).select_from(ClosureStateEntity)) or 0)
 
+    def batch_result(self, batch_id: str) -> IntakeResult | None:
+        """이미 처리한 배치면 그때의 결과 (INTERFACE §1.1 멱등). 아니면 None."""
+        with self._sessions.begin() as s:
+            row = s.get(CandidateBatchEntity, batch_id)
+            if row is None:
+                return None
+            return IntakeResult(
+                row.batch_id, row.accepted, row.review_required, row.crosswalks_updated, True
+            )
+
+    def save_batch(self, result: IntakeResult, producer: str, produced_at: datetime) -> None:
+        produced = to_utc_naive(produced_at)
+        assert produced is not None
+        with self._sessions.begin() as s:
+            s.add(
+                CandidateBatchEntity(
+                    batch_id=result.batch_id,
+                    producer=producer,
+                    produced_at=produced,
+                    received_at=datetime.now(UTC).replace(tzinfo=None, microsecond=0),
+                    accepted=result.accepted,
+                    review_required=result.review_required,
+                    crosswalks_updated=result.crosswalks_updated,
+                )
+            )
+
     def truncate(self) -> None:
         """테스트용. 운영 코드에서 부르지 않는다."""
         with self._sessions.begin() as s:
             s.query(ClosureStateEntity).delete()
+            s.query(CandidateBatchEntity).delete()
 
     @staticmethod
     def _row(state: ClosureState, candidate_id: str) -> dict[str, object]:
