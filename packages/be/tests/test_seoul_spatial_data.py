@@ -122,3 +122,22 @@ def test_walk_net_type_codes(seoul_spatial_dir: Path) -> None:
     assert ((link_codes[1] == "1000") & (link_codes[3] == "보행자")).any()
     node_codes = sheets["노드유형코드"].astype(str)
     assert (node_codes[1] == "3").any() and node_codes[3].str.contains("지하보도 출입구").any()
+
+
+def test_walk_net_seoul_is_complete(seoul_spatial_dir: Path) -> None:
+    # SGG_NM 필터 페이지는 서로 겹쳐 유일 행이 종로 14,221 / 중구 8,748 뿐이었다 (T1.1에서 발견).
+    # 전체 조회(492페이지)는 겹치지 않는다: list_total_count 491,082 == 유일 ID 수
+    rows, total = _load_pages(seoul_spatial_dir / "TbTraficWlkNet_seoul")
+    assert total == 491082 and len(rows) == total
+    keys = {
+        (r["NODE_TYPE"], r["NODE_ID"] if r["NODE_TYPE"] == "NODE" else r["LNKG_ID"]) for r in rows
+    }
+    assert len(keys) == total
+    by_sgg: dict[object, int] = {}
+    for r in rows:
+        by_sgg[r["SGG_NM"]] = by_sgg.get(r["SGG_NM"], 0) + 1
+    assert len(by_sgg) == 25 and by_sgg["종로구"] == 19266 and by_sgg["중구"] == 13622
+    # 종로구 19,266 = NODE 8,552 + LINK 10,714 (SGG 필터 중복 행에서 센 9,055/10,211은 틀린 값)
+    jongno = [r for r in rows if r["SGG_NM"] == "종로구"]
+    assert sum(1 for r in jongno if r["NODE_TYPE"] == "NODE") == 8552
+    assert sum(1 for r in jongno if r["NODE_TYPE"] == "LINK") == 10714

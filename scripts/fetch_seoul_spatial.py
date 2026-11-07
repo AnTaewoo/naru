@@ -55,6 +55,9 @@ class ApiDataset:
 API_DATASETS = (
     ApiDataset("TbTraficWlkNet", "TbTraficWlkNet_jongno", "OA-21208", ("종로구",)),
     ApiDataset("TbTraficWlkNet", "TbTraficWlkNet_junggu", "OA-21208", ("중구",)),
+    # SGG_NM 필터 페이지는 서로 겹쳐 유일 행이 64~74%뿐 (2026-11-07 확인).
+    # 전체 조회는 안 겹친다 → 서울 전체를 받아 로컬에서 거른다
+    ApiDataset("TbTraficWlkNet", "TbTraficWlkNet_seoul", "OA-21208"),
     ApiDataset("tbTraficUndpass", "tbTraficUndpass", "OA-21213"),
     ApiDataset("tbTraficBrdge", "tbTraficBrdge", "OA-21210"),
     ApiDataset("tbTraficElvtr", "tbTraficElvtr", "OA-21212"),
@@ -175,6 +178,9 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="서울 열린데이터광장 공간 데이터 수집 (T0.2)")
     ap.add_argument("--date", default=datetime.now(KST).strftime("%Y%m%d"), help="산출 폴더 날짜")
     ap.add_argument("--out", default=Path("data/raw"), type=Path)
+    ap.add_argument(
+        "--only", default=None, help="이 폴더 이름의 데이터셋만 (예: TbTraficWlkNet_seoul)"
+    )
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)  # httpx INFO는 URL(인증키)을 찍는다
@@ -190,10 +196,14 @@ def main(argv: list[str] | None = None) -> int:
     calls = 0
     with httpx.Client(timeout=60.0, headers={"User-Agent": "naru-fetch/0.5"}) as client:
         for ds in API_DATASETS:
+            if args.only and ds.dir_name != args.only:
+                continue
             info = fetch_dataset(client, key, ds, out_dir)
             datasets.append(info)
             calls += int(str(info["calls"]))
         for name, form in FILES:
+            if args.only:
+                break
             files.append(download_file(client, name, form, out_dir))
 
     meta = {

@@ -14,8 +14,9 @@
 
 | 폴더 | 서비스 · 데이터셋 | 건수 (2026-11-07, `list_total_count`) | 비고 |
 |---|---|---|---|
-| `TbTraficWlkNet_jongno/` | `TbTraficWlkNet` SGG_NM=종로구 — OA-21208 서울시 자치구별 도보 네트워크 공간정보 (갱신 2026-11-07, 매일) | 19,266 (NODE 9,055 / LINK 10,211 / CRSWK=1 링크 963) | 20 페이지 |
-| `TbTraficWlkNet_junggu/` | 〃 SGG_NM=중구 | 13,622 (NODE 6,272 / LINK 7,350 / CRSWK=1 링크 1,056) | 14 페이지 |
+| `TbTraficWlkNet_seoul/` | `TbTraficWlkNet` 필터 없음 — OA-21208 서울시 자치구별 도보 네트워크 공간정보 (갱신 2026-11-07, 매일). **이걸 쓴다** | 491,082 (유일 ID 491,082 = 완전. 종로구 19,266 = NODE 8,552 / LINK 10,714, 중구 13,622) | 492 페이지, 492회 호출 (16:04~16:14) |
+| `TbTraficWlkNet_jongno/` | `TbTraficWlkNet` SGG_NM=종로구 | 19,266행이지만 **페이지가 서로 겹쳐 유일 행 14,221(74%)뿐** — SGG_NM 필터 API의 결함(T1.1에서 발견). 원본은 두되 쓰지 않는다 | 20 페이지 |
+| `TbTraficWlkNet_junggu/` | 〃 SGG_NM=중구 | 13,622행, 유일 8,748(64%). 같은 결함 | 14 페이지 |
 | `tbTraficUndpass/` | OA-21213 서울시 지하철역 연계 지하도 공간정보 (서울 전체) | 6,563 (종로 366 / 중구 469) | `SBWY_STN_NM`·`LIFT`·`ELVT` 포함 |
 | `tbTraficBrdge/` | OA-21210 서울시 육교 공간정보 (전체) | 2,967 (종로 106 / 중구 115) | |
 | `tbTraficElvtr/` | OA-21212 서울시 지하철역 엘리베이터 위치정보 (전체) | 552 (종로 16 / 중구 30) | NODE만 |
