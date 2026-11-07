@@ -321,7 +321,7 @@ TOPIS는 같은 집회를 행진 번호마다 한 건씩 올린다. **통제 구
 
 ---
 
-## 9. v2 변경 (2026-11-07, Syntitan 148건 검토 후 태우 결정)
+## 9. v2 변경 (2026-11-07, Syntitan 148건 검토 후 태우 결정 · 11/8 T4.3 1차 결과로 규칙 15~17 추가)
 
 v1의 `scope`·`reject_reason`은 이름이 헷갈려서(`sidewalk_only`가 "사람만 다닌다"로 읽힘) 바꾼다. **출력은 한 입력에 여러 건이 있을 수 있으므로 `items` 배열**이다.
 
@@ -331,13 +331,13 @@ v1의 `scope`·`reject_reason`은 이름이 헷갈려서(`sidewalk_only`가 "사
     "window": {"start": "...", "end": "..."}, "approx": false,
     "kind": "march | rally_point | rally_stretch | closure | marathon | unknown",
     "impact": "blocks | none | unknown",
-    "impact_reason": null | "motorway | car_free | sidewalk | vehicle_measure | released | info_only | unconfirmed",
+    "impact_reason": null | "motorway | car_free | sidewalk | vehicle_measure | construction | released | info_only | unconfirmed",
     "segments": [...], "points": [...], "toward": null | "을지로입구역",
     "road_hints": [], "reported_people": null, "police_stations": [], "spans": [], "confidence": 0.0, "notes": null
 } ] }
 ```
 - `impact` = 이 건이 **횡단보도 통행을 막는 재료인가**. `blocks` 차도 점유·통제 있음 / `none` 사람 통행과 무관 / `unknown` 문장만으론 모름.
-- `impact_reason` = `none`일 때 왜. `motorway` 자동차전용도로·터널·램프·고가·IC / `car_free` 차 없는 거리(차만 막고 사람은 다님) / `sidewalk` 보도·광장 집회, '차도 점유 없음' 메모 / `vehicle_measure` 가변차로·우회·버스 조치만 / `released` 해제·종료·해산 / `info_only` 경찰 배치·안내·사후 서술 / `unconfirmed` "통제될 수 있다"·"검토 중".
+- `impact_reason` = `none`일 때 왜. `motorway` 자동차전용도로·터널·램프·고가·IC / `car_free` 차 없는 거리(차만 막고 사람은 다님) / `sidewalk` 보도·광장 집회, '차도 점유 없음' 메모 / `vehicle_measure` 가변차로·우회·버스 조치만 / `construction` 공사 N차로 부분통제(차로만, 횡단보도 무관) / `released` 해제·종료·해산 / `info_only` 경찰 배치·안내·사후 서술 / `unconfirmed` "통제될 수 있다"·"검토 중".
 - v1 대응: `pedestrian`→`blocks`, `vehicle_only`·`sidewalk_only`→`none`+reason.
 
 ### 9.2 규칙 추가·변경
@@ -355,9 +355,14 @@ v1의 `scope`·`reject_reason`은 이름이 헷갈려서(`sidewalk_only`가 "사
 12. **점유 표현이 없는 지점 집회는 `impact: unknown`, 거절 아님.** `points`는 반드시 채운다. 뒤 단계가 지점이 도로 30m 안이거나 지점들이 도로를 감싸면 막는 것으로 본다 (BE 규칙, ADR 필요). confidence 0.45.
 13. 시작=종료 시각: 그대로 두고 `approx true`, −0.15. 넓히지 않는다.
 14. 게시 시각이 통제 시작 이후여도 그대로 낸다. released 판단은 뒤 단계.
+15. **`impact: none`이어도 `window`·`segments`·`points`는 문장에 있는 만큼 채운다.** none은 "후보 아님"이지 "비움"이 아니다. `released`는 BE가 해제 처리에 쓰고, `car_free`·`construction`은 구간이 있어야 뒤에서 겹침을 확인한다. §4의 "segments 비움"은 v1 문구 — v2에서는 이 규칙이 우선.
+16. **`items: []`(빈 배열)은 장소가 전혀 없는 문장뿐이다.** 경찰 배치·앱 안내·사후 서술("186명 배치")처럼 장소도 시간도 없으면 빈 배열. 장소가 있으면 `none/info_only`로 낸다.
+17. 공사 차로 부분통제(`N차로 시설물보수 부분통제`)는 `none/construction`, `kind closure`, segment 채움, confidence 0.
 
 ### 9.3 평가 통과 기준 변경
 - `impact` 일치 (v1의 scope 대신). `impact_reason`은 `none`일 때만 비교.
 - `items` 개수 일치. item 짝은 window 시작 시각으로 맞춘다.
 - `toward`: 기대가 값이면 값 일치, 기대가 null인데 값이 있으면 실패(지어냄).
 - `approx` 케이스는 window ±10분 허용.
+- `impact: none`은 segments·points도 비교한다 (규칙 15). `items: []`는 규칙 16에 해당할 때만 정답.
+- few-shot에 쓴 문장은 정확도 분모에서 뺀다. 평가셋 34건과 few-shot 9건은 겹치지 않게 뽑았다 (`notice_v2.md` 참조).
