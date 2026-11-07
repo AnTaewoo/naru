@@ -69,3 +69,9 @@
 - 정한 것: 교차로 좌표 = 소속 횡단보도 평균. 괄호 변형('(연등)')은 다른 교차로. 별칭은 T4.2 리졸버 몫
 - 막힌 것 / 태우 대기: 없음
 - 커밋: d5545fe, 0fd4f25, 177340f / 이 항목의 커밋
+
+## 2026-11-07 · T2.1 DONE
+- 한 것: `packages/contracts/tests/test_interface_examples.py`(INTERFACE json 블록 6개·§4 enum 표 대조, extra=forbid, review 규칙, geometry 4종 왕복, 오프셋 필수) 12개, `scripts/export_schema.py` + `make schema` → `packages/fe/src/types/contracts.schema.json`·`contracts.d.ts`(인터페이스 28개, json-schema-to-typescript@15)
+- 정한 것: 생성물 d.ts 커밋. §1.1 요청 예시는 자리표시자를 §1 후보로 치환해 검증
+- 막힌 것 / 태우 대기: 문서≠코드 4건 보고 — §3 예시가 JSON 아님(검증 못 함), §1.1 요청 예시 자리표시자, CandidateBatch.producer 제한 없음, FeatureProperties.window가 dict. 결정 대기
+- 커밋: 2df20d6, 9f28618 / 이 항목의 커밋

@@ -118,7 +118,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 ## P2 — 계약 테스트 · 상태기계 · 저장소 ★
 
 ### T2.1 naru_contracts 테스트로 고정 ★
-- status: TODO
+- status: DONE
 - depends: PC-1
 - 산출: `packages/contracts/tests/test_interface_examples.py` — INTERFACE.md의 json 블록을 전부 뽑아 `model_validate`, `extra=forbid`, review 규칙(confidence<0.7), geometry 4종 왕복. `scripts/export_schema.py` + `make schema`
 - 주의: 코드는 이미 있다. 이 Task는 읽기 + 테스트. 문서와 코드가 다르면 **문서를 고치지 말고** 태우에게
