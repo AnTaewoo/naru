@@ -19,14 +19,14 @@ Claude는 코드를 쓰기 전에 해당 레인 섹션을 읽는다. 여기 없�
 - **좌표**: 저장·전송은 WGS84, 순서는 GeoJSON대로 `[lng, lat]`. 거리·버퍼 계산은 **EPSG:5179로 투영한 뒤 미터**로. 도(degree)에 미터를 더하지 않는다.
 - **enum 코드값은 영어 snake_case.** 한국어는 FE 라벨에서만. (`scheduled` → "예정")
 - **버전 고정**: `uv.lock`, `pnpm-lock.yaml` 커밋. 실제 설치된 버전은 ADR-006 "버전" 표에 기록한다.
-- **파일 400줄 넘으면 쪼갠다.** 함수 50줄 넘으면 쪼갤지 PLAN에서 묻는다.
+- **파일 400줄 넘으면 쪼갠다.** 함수 50줄 넘으면 쪼갠다.
 
 ## 1. Python 공통 (contracts · ai · be)
 
 - Python 3.12, uv 워크스페이스. 패키지 셋: `packages/contracts`(`naru_contracts`), `packages/ai`(`naru_ai`), `packages/be`(`naru_be`).
 - **이름**: 모듈·함수·변수 `snake_case`, 클래스 `PascalCase`, 상수 `UPPER_SNAKE`. 메서드도 snake_case — `from_segment`, `active_at`.
 - **ruff**: `select = ["E","F","I","B","UP","SIM","N","RUF"]`, `line-length = 100`, `ruff format`.
-- **mypy `--strict` 전 패키지.** `Any` 반환 금지. 외부 라이브러리 타입 stub이 필요하면 PLAN에서 묻는다.
+- **mypy `--strict` 전 패키지.** `Any` 반환 금지. 외부 라이브러리 타입 stub이 필요하면 추가하고 보고의 "정한 것"에 적는다.
 - **docstring**: Google 스타일. 공개 함수·클래스만. "무엇을"보다 "왜"를.
 - **예외**: 패키지별 `errors.py`에 도메인 예외. `except Exception:` 금지. 잡으면 로그 남기고 다시 던지거나 명시적으로 변환.
 - **로깅**: 표준 `logging` + JSON 한 줄 포맷 (`naru_*/log.py` 하나). `print` 금지. 외부 호출은 `api`, `params`(키 제거), `status`, `elapsed_ms`를 남긴다.
@@ -246,3 +246,11 @@ packages/fe/
 ### 5.8 라벨·표기
 - enum → 한국어는 `i18n/ko.ts` 한 곳: `scheduled: "예정"`, `confirmed: "확인"`, `released: "해제"`, `zone_scheduled: "예정 구역"`.
 - 상태 색: scheduled 노랑, confirmed 빨강, released 회색, zone_scheduled 주황 음영. 색 상수는 `map/colors.ts`.
+
+### 5.9 화면 목업 — `docs/mockups/`
+- `01_home.html`(지도 홈: 통제 레이어·오늘의 통제 시간표·시간 슬라이더) · `02_route.html`(길찾기: 가장 빠른 길 / 원래 길(막힘·해제) / 계단 없는 길 카드, LegList) · `03_closure.html`(통제 상세: 해제 시각·근거·확신도·가까운 지하보도). 카카오맵 UI 톤.
+- **따르는 것**: 화면 구성, 카드·탭·바텀시트 구조, 라벨 문구, 색(목업 CSS 변수 → `map/colors.ts`·CSS Modules로 옮긴다), 범례.
+- **가져오지 않는 것**: 목업 안의 숫자·좌표·공지 문장·시각은 전부 예시다. 코드·테스트에 한 글자도 복사하지 않는다. 화면 데이터는 `/closures`·`/route`의 recorded 응답에서만.
+- 목업의 지도는 모식도 SVG다. 실제는 maplibre + VWorld 타일. SVG를 옮기지 않는다.
+- 목업과 계약(`contracts.d.ts`)이 다르면 계약이 맞다. 목업에 있는데 계약에 없는 필드(예: 혼잡도)는 화면에서 뺀다.
+- 시작 메모에 "어느 목업의 어느 영역을 어느 컴포넌트로"를 한 줄씩 적고 시작한다.

@@ -17,7 +17,3 @@ data/recorded/*
 data/raw/notices/smpa/*.pdf
 data/raw/notices/smpa/*.hwp
 data/raw/notices/smpa/*.jpg
-
-# 하네스 — 로컬 전용 (Claude Code 설정·작업 기록)
-.claude/
-harness/

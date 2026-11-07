@@ -8,20 +8,21 @@
 ```
 naru/
 ├── .claude/                 ── 하네스 (Claude Code)
-│   ├── CLAUDE.md            원칙 + 지도 (약 80줄)
+│   ├── CLAUDE.md            원칙 + 지도 (약 90줄)
 │   ├── settings.json        권한 거부(.env, data/raw·recorded, 게이트) + PreToolUse hook
-│   ├── hooks/guard.py       harness 밖 새 문서·실데이터 수정·섞인 커밋 차단
-│   └── skills/              task-cycle, real-data-testing, walkthrough
+│   ├── hooks/guard.py       harness 밖 새 문서·실데이터 수정·섞인 커밋·main 커밋·새 브랜치 차단
+│   └── skills/              task-cycle, real-data-testing
 ├── harness/                 ── 하네스 (작업 기록)
 │   ├── ARCHITECTURE.md      레인·클래스·흐름·상태기계 (설계의 진실)
 │   ├── ROADMAP.md           P0~P7 Task·PC, ★ = 11/16 경로
-│   ├── plans/active|completed/   Task별 PLAN·READ-ALONG
+│   ├── plans/active|completed/   Task별 시작 메모 (3줄)
 │   ├── progress.md          세션 로그
 │   └── gates/check_no_fakes.sh
 ├── docs/                    ── 프로젝트 문서 (하네스를 지워도 남는다)
 │   ├── INTERFACE.md v0.5    AI→BE ClosureCandidate(point/line/segment/zone), BE→FE /route /closures
 │   ├── CONVENTIONS.md       레인별 규약 (AI §3 = Claude API 파서·리졸버)
 │   ├── decisions/           ADR-001~007 (007 = 공지 파서는 Claude API)
+│   ├── mockups/             FE 화면 목업 3장 (html, 데이터는 예시)
 │   └── architecture.png
 ├── packages/
 │   ├── contracts/naru_contracts/   pydantic 계약 — 코드 있음, INTERFACE 예시로 검증됨
@@ -34,9 +35,14 @@ naru/
 ```
 
 ## 시작
-1. 압축을 풀고 `git init`. `cp .env.example .env`
+1. `develop` 브랜치에서 압축을 풀어 덮어쓴다. `cp .env.example .env` 후 키 채우기
 2. 저장소 루트에서 `claude` 실행. `/hooks`로 guard 등록 확인
-3. `harness/ROADMAP.md`의 T0.1을 `GO`로 → **"T0.1 PLAN 써줘"**
+3. 하네스가 git에 없으면 `git add .claude harness docs && git commit -m "harness: 하네스 v1"`
+4. **"T0.1 시작"** — 끝나면 보고가 오고, **"다음"** 하면 다음 Task로
+
+## 진행 방식
+Task 하나 끝 → 보고(한 것 / 파일 / 확인한 방법 / 직접 확인 명령 / 정한 것) → 멈춤 → 태우 "다음" → 다음 Task.
+중간 승인·퀴즈 없음. 되돌리기 어려운 결정(계약 변경, 유료 호출, 데이터 삭제)만 묻는다. 멈추고 싶으면 "잠깐", 바꾸고 싶으면 "고쳐 …", 순서 바꾸려면 "T2.3 먼저".
 
 ## 11/16까지의 경로 (★)
 P0 데이터·툴체인 → P1 그래프·인덱스(`from_segment` 포함) → P2 계약 테스트·상태기계·DB → P3 라우팅·API → P4 공지 파서(Claude API)·평가(규칙 vs Claude) → P5 FE·배포. P4는 AI 담당이 P1~P3과 병행할 수 있다.
@@ -47,7 +53,7 @@ P0 데이터·툴체인 → P1 그래프·인덱스(`from_segment` 포함) → P
 | 가짜·모킹·건너뛰기 테스트 | `harness/gates/check_no_fakes.sh` → `make check` 실패 |
 | AI↔BE import, BE 계층 위반 | `.importlinter` → `make layers` 실패 (6 계약) |
 | 실데이터·기록 손 편집, `.env` 열람, 게이트 수정 | `.claude/settings.json` 거부 + hook(Bash 리다이렉션까지) |
-| harness 밖 하네스 문서, 코드·하네스 섞인 커밋 | `.claude/hooks/guard.py` |
+| harness 밖 하네스 문서, 코드·하네스 섞인 커밋, main 커밋·push, 새 브랜치 | `.claude/hooks/guard.py` |
 | 모델이 만든 좌표 | 계약: `PlacePoint`는 리졸버 출력만. Claude 스키마에 좌표 필드 없음 |
 
 ## 지우기
