@@ -49,7 +49,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 용도: `SegmentGeom` → 선. 도로명 링크 제한과 등급(대로/로/길)은 도로명 문자열 접미사로
 
 ### T0.4 마라톤 코스·시각표 ★
-- status: TODO
+- status: DONE
 - depends: T0.1
 - 실데이터: 2026 서울마라톤 코스(공식 GPX 없으면 지도에서 디지타이즈 — 방법을 MANIFEST에), 구간별 통제·해제 시각표(서울시·경찰 공지)
 - 산출: `data/raw/course/seoul_marathon_2026.gpx`, `..._timetable.json`
