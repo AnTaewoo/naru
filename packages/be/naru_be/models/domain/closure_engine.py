@@ -18,7 +18,15 @@ from datetime import UTC, datetime, timedelta
 
 from naru_be.config import Settings
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
-from naru_contracts import ClosureCandidate, ClosureState, Evidence, EvidenceKind, Status, Window
+from naru_contracts import (
+    ClosureCandidate,
+    ClosureState,
+    Evidence,
+    EvidenceKind,
+    Impact,
+    Status,
+    Window,
+)
 
 CONFIRMING_EVIDENCE = frozenset(
     {EvidenceKind.timetable, EvidenceKind.topis_incident, EvidenceKind.bus_skip}
@@ -48,7 +56,8 @@ class ClosureEngine:
         self, candidate: ClosureCandidate, at: datetime
     ) -> tuple[Status, Evidence | None]:
         """시각 `at` 의 상태와, 전이가 있었으면 그 evidence."""
-        if candidate.status_hint is Status.zone_scheduled:
+        if candidate.status_hint is Status.zone_scheduled or candidate.impact is Impact.unknown:
+            # impact unknown 은 CandidateIntake 가 blocks 로 올리지 않는 한 표시만 (ADR-008)
             return Status.zone_scheduled, None
         window, _ = self.effective_window(candidate)
         start, end = window.start, window.end
@@ -95,6 +104,8 @@ class ClosureEngine:
                     evidence=evidence,
                     lng=c.lng,
                     lat=c.lat,
+                    impact=candidate.impact,
+                    approx=candidate.approx,
                 )
             )
         return states

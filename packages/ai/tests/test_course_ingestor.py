@@ -54,6 +54,7 @@ def test_one_candidate_per_timetable_segment(
             c.source is Source.course and c.status_hint is Status.scheduled and c.type == "marathon"
         )
         assert c.confidence == 0.9 and c.review_required is False
+        assert c.impact == "blocks" and c.toward is None and c.approx is False  # ADR-008
         assert c.window.start == datetime.fromisoformat(
             seg["control_start"]
         )  # ROADMAP: window 일치

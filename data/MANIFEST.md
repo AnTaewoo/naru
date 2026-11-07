@@ -99,7 +99,7 @@
 | rtd | 2026-11-07 | 1 | 실시간 도시데이터 citydata 광화문·덕수궁 (json, 175 KB) |
 | kakao | 2026-11-07 | 2 | 로컬 키워드 검색 숭례문·덕수궁 (`kakao/keyword/<sha1(검색어)>.json`, 리졸버 재생용). 아래 "recorded/kakao" |
 | bus | 2026-11-07 | 1 | 버스위치 getBusPosByRtid 노선 100100118, 차량 12대 (json). 아래 "recorded/bus" |
-| candidates/course | 2026-11-07 | 1 | `make record-candidates SOURCE=course` — CourseIngestor(T2.2) 출력 `CandidateBatch` 그대로: 후보 16개(시각표 16구간, geometry line, scheduled, confidence 0.9, evidence timetable). BE 테스트(T2.3)가 naru_ai 없이 읽는다 |
+| candidates/course | 2026-11-07 | 1 | `make record-candidates SOURCE=course` — CourseIngestor(T2.2) 출력 `CandidateBatch` 그대로: 후보 16개(시각표 16구간, geometry line, scheduled, confidence 0.9, evidence timetable, v0.6 `impact: blocks`·`toward: null`·`approx: false`). BE 테스트(T2.3)가 naru_ai 없이 최신 파일을 읽는다. 유효본은 `20261107T194153.json`(ADR-008 반영 재기록). 그 전 둘(185022 조각 겹침, 185247 impact 없음)은 삭제 대상 |
 
 ### recorded/bus (서울 버스위치정보, data.go.kr)
 - 출처: http://ws.bus.go.kr/api/rest/buspos/getBusPosByRtid (`serviceKey`=data.go.kr 일반 인증키, `busRouteId`, `resultType=json`). 개발계정 일 1,000회

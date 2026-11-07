@@ -23,6 +23,7 @@ from naru_contracts import (
     ClosureCandidate,
     Evidence,
     EvidenceKind,
+    Impact,
     LineGeom,
     Source,
     Status,
@@ -148,6 +149,7 @@ class CourseIngestor:
                     source=Source.course,
                     type=ClosureType.marathon,
                     status_hint=Status.scheduled,
+                    impact=Impact.blocks,  # 코스는 항상 차도 점유 (ADR-008)
                     geometry=LineGeom(coordinates=list(coords)),
                     window=Window(
                         start=datetime.fromisoformat(seg["control_start"]),

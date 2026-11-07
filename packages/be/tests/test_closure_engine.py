@@ -18,6 +18,7 @@ from naru_contracts import (
     ClosureCandidate,
     Evidence,
     EvidenceKind,
+    Impact,
     LineGeom,
     Status,
     Window,
@@ -189,4 +190,30 @@ def test_bus_evidence_transitions(engine: ClosureEngine, course_batch: Candidate
         bumped.status is Status.scheduled
         and bumped.confidence == 0.7
         and bumped.evidence[-1] == spike
+    )
+
+
+def test_unknown_impact_stays_zone_scheduled_and_approx_passes_through(
+    engine: ClosureEngine, course_batch: CandidateBatch
+) -> None:
+    # ADR-008: impact unknown 은 승격 전까지 zone_scheduled, approx 는 상태에 그대로
+    seg1 = _seg(course_batch, 1)
+    start = seg1.window.start
+    assert start is not None
+    unknown = seg1.model_copy(
+        update={
+            "impact": Impact.unknown,
+            "confidence": 0.45,
+            "review_required": True,
+            "approx": True,
+        }
+    )
+    states = engine.apply(unknown, ["06-0000023206"], at=start + timedelta(minutes=1))
+    assert states[0].status is Status.zone_scheduled and states[0].impact is Impact.unknown
+    assert states[0].approx is True and states[0].window == seg1.window
+    blocks = engine.apply(seg1, ["06-0000023206"], at=start + timedelta(minutes=1))[0]
+    assert (
+        blocks.impact is Impact.blocks
+        and blocks.approx is False
+        and blocks.status is Status.confirmed
     )

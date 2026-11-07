@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     scheduled_cost_factor: float = 3.0  # scheduled 간선 비용 x3
     released_grace_min: int = 30  # 시각표 종료 + 30분 → released
     unknown_end_hours: int = 6  # window.end 없으면 시작 + 6시간을 임시 end 로 (INTERFACE §1)
+    # ADR-008: unknown 지점이 도로 30 m 안이면 blocks 승격(CandidateIntake). toward 선 확신 상한
+    unknown_impact_road_m: float = 30.0
+    toward_confidence_cap: float = 0.65
 
     # CrosswalkIndex (T1.2)
     point_radius_m: float = 30.0
