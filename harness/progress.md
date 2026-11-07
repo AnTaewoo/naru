@@ -135,3 +135,9 @@
 - 정한 것: 두 숫자 따로(태우). Task당 10회 규칙은 평가 세트 1회 기록으로 넘김(--max-calls 명시). 합성 봉투 source news·published_at 고정. docs/eval 은 스크립트가 씀. 정규형 F1·Jaccard 는 라벨에 spans·좌표가 없어 제외
 - 막힌 것 / 태우 대기: 라벨↔규칙서 불일치 10건 결정 — 지점 집회 impact(K-012~015·020 blocks vs §9.2-12 unknown), K-016 items 1 vs 2, K-026 잠수교 blocks vs §9.2-3 car_free, K-031 impact_reason construction(스키마 밖), K-033 none 에 segment 요구, K-027 라벨이 문장과 불일치. 진짜 모델 오류 5건(K-010·011·019·028·008/032)
 - 커밋: 58850c5, 691385b, 77d42bf, 1d907a3, 2b62d92 / 이 항목의 커밋
+
+## 2026-11-08 · T4.3 재평가 (라벨 교체 + 프롬프트 notice_v2, 태우 지시)
+- 한 것: 태우가 cases_v1.jsonl·규칙서·prompts/notice_v2.md 교체 → impact_reason construction 추가, 기본 프롬프트 v2(v1 삭제), few-shot 11문장을 sentences.jsonl 에 추가(`scripts/append_fewshot_sentences.py`, N001…N100), 34 라벨 + 5 문장 live 39회 재기록(≈$0.01), 규칙 기준선도 재실행 → `docs/eval/notice_20261108_v2.md`. 전부 일치 Claude 23/34(68%, CI 53~82) vs 규칙 19/34(56%, CI 38~74). type 별 none 4/6 vs 0/6, unknown 5/5 vs 5/5, 정상 10/16 vs 10/16, 놓치기쉬움 3/6 vs 3/6
+- 정한 것: 합성 163건은 v2 로 재기록 안 함(허용 34회 밖) → 표에서 Claude 견고성 행 생략, v1 표 참조. 워커 e2e 핀은 v2 값(공지 후보 7·횡단보도 37 — r04 를 v2 가 segment 3개로 냄)
+- 막힌 것 / 태우 대기: ① `.env` NARU_PROMPT_VERSION 이 아직 notice_v1 (코드 기본값은 v2, 이번엔 환경변수로 덮어 실행) ② `docs/data/naru_parser_spec_v2.md` → `notice_parser_rules_v2.md` 덮어쓰기는 분류기가 막아 태우가 ③ few-shot news 2행(N099·N100) 출처 URL 미상 ④ guard.py 변경 커밋
+- 커밋: 이 항목 직전 2개 / 이 항목의 커밋
