@@ -1,0 +1,20 @@
+# MySQL 8.4 — CONVENTIONS §4.3 (utf8mb4, UTC). 테스트 DB naru_test는 init 스크립트가 만든다
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: naru-root
+      MYSQL_DATABASE: naru
+      MYSQL_USER: naru
+      MYSQL_PASSWORD: naru
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+    ports: ["3307:3306"]  # 호스트 3307 — 로컬 MariaDB가 3306을 쓴다
+    volumes:
+      - mysqldata:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+volumes:
+  mysqldata:

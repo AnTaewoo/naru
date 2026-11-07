@@ -1,0 +1,13 @@
+[project]
+name = "naru-contracts"
+version = "0.5.0"
+description = "Naru 파트 간 계약 (docs/INTERFACE.md의 코드 구현)"
+requires-python = ">=3.12"
+dependencies = ["pydantic>=2.9"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["naru_contracts"]

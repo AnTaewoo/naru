@@ -1,0 +1,23 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.claude/settings.local.json
+node_modules/
+packages/fe/.next/
+packages/fe/.env.local
+data/raw/*
+data/recorded/*
+!data/raw/.gitkeep
+!data/recorded/.gitkeep
+!data/raw/notices/
+data/raw/notices/smpa/*.pdf
+data/raw/notices/smpa/*.hwp
+data/raw/notices/smpa/*.jpg
+
+# 하네스 — 로컬 전용 (Claude Code 설정·작업 기록)
+.claude/
+harness/
