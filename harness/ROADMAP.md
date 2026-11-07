@@ -34,7 +34,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 기록: 실제 설치 버전 → ADR-006 버전 표. 브랜치 develop. 하네스 파일이 git에 없으면 먼저 `harness: 하네스 v1` 커밋, 그다음 `T0.1: 툴체인`
 
 ### T0.2 서울시 공간 데이터 ★
-- status: TODO
+- status: DONE
 - depends: T0.1
 - 실데이터: 서울 열린데이터광장 — 도보 네트워크(노드·링크), 교차로·횡단보도 위치, 지하도·육교·엘리베이터. **종로구·중구만** (광화문 데모 범위)
 - 산출: `scripts/fetch_seoul_spatial.py`(`make fetch SRC=seoul_spatial`), `data/MANIFEST.md` 항목
