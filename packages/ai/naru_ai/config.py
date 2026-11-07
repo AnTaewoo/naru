@@ -24,6 +24,13 @@ class Settings(BaseSettings):
 
     data_dir: Path = Field(default=Path("data"), validation_alias="NARU_DATA_DIR")
 
+    # 워커 → BE (T4.4). 토큰은 BE 의 NARU_INTERNAL_TOKEN 과 같은 값
+    be_url: str = Field(default="http://localhost:5000", validation_alias="NARU_BE_URL")
+    internal_token: str = Field(default="", validation_alias="NARU_INTERNAL_TOKEN")
+    notice_interval_s: int = Field(
+        default=300, validation_alias="NARU_NOTICE_INTERVAL_S"
+    )  # 공지 5분
+
     @property
     def recorded_llm_dir(self) -> Path:
         """data/recorded/llm/anthropic/<model>@api/<prompt_version>/ 의 루트 (CONVENTIONS §3.3)."""
