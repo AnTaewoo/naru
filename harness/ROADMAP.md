@@ -149,13 +149,13 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 ## P3 — 라우팅 · API ★ (Model → View → Controller 순서)
 
 ### T3.1 TimeDependentRouter ★
-- status: TODO
+- status: DONE
 - depends: PC-2
 - 산출: `naru_be/models/domain/routers.py` — A*, 비용 = 거리 + 수직이동 패널티, confirmed 간선 제외, scheduled ×3, 간선 도착 시각으로 상태 판정
 - 테스트(실데이터): 교보빌딩 앞 → 덕수궁 대한문, (a) 통제 없는 시각 경로 < 1.5km (b) 통제 중 `avoided`에 폐쇄 횡단보도, `legs.kind`에 underpass/overpass
 
 ### T3.2 BaselineRouter · RoutePlanner ★
-- status: TODO
+- status: DOING
 - depends: T3.1, T2.4
 - 산출: `BaselineRouter`(같은 그래프, 통제 미적용), `route_planner.py` — `plan(query) -> RouteResult`(frozen dataclass)
 - 테스트: baseline은 통제 전 경로와 동일, avoided에 Repository의 confirmed가 있다. Flask import 없음

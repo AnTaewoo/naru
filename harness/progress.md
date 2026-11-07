@@ -93,3 +93,9 @@
 - 정한 것: upsert 키 (candidate_id, crosswalk_id). active_at은 저장된 status 그대로(시각별 재계산은 라우터·컨트롤러). 테스트 정리는 DELETE
 - 막힌 것 / 태우 대기: 없음
 - 커밋: 55dc207, 60747dd, d866624 / 이 항목의 커밋
+
+## 2026-11-07 · T3.1 DONE
+- 한 것: `models/domain/routers.py` TimeDependentRouter(heapq A*, 비용 = 거리 + 계단 25 m·엘리베이터 40 m, 간선 도착 시각(출발 + 거리/1.2 m/s)으로 상태 재판정 → confirmed 제외·scheduled x3·confidence<0.7 무시, avoided = 기준 경로의 막힌 횡단보도), `types.py`(Path·RouteLeg·AvoidedCrosswalk), PedGraph.nearest_node·간선 이름, ClosureEngine.status_of_state, 라우터 설정 3개. 실데이터 테스트 3개(교보빌딩→대한문: 13:30 808 m 기준, 07:45 지하보도 840 m + avoided confirmed 2, 04:30 scheduled). 카카오 교보빌딩 1회 기록
+- 정한 것: 도착 시각 판정은 라벨 하나짜리 A*(엄밀한 시간의존 최단경로 아님, 도보 10분엔 충분). 저장 status 대신 status_of_state로 매번 재판정. 접근 구간(출발·도착 ↔ 최근접 노드)은 직선으로 거리·좌표에 포함
+- 막힌 것 / 태우 대기: 카카오 '교보빌딩' 1순위가 서초 교보타워(3순위가 광화문) — T4.2 리졸버가 범위 힌트로 골라야 함(MANIFEST 기록)
+- 커밋: 383e569, 6634752, 1adcecf / 이 항목의 커밋
