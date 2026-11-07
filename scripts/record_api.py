@@ -38,7 +38,7 @@ INCIDENT_SERVICES = (("AccMainCode", 100), ("AccSubCode", 300), ("AccInfo", 1000
 LINK_TYPES = ("집회및행사", "공사", "기타")  # 태우 지시 — confirmed 신호로 쓸 돌발 유형
 RTD_AREA = "광화문·덕수궁"  # citydata AREA_NM (sample 응답에서 확인: AREA_CD POI009)
 BUS_ROUTE_ID = "100100118"  # data.go.kr 활용가이드 예시 노선 (응답 headerCd=0 이어야 유효)
-KAKAO_QUERIES = ("숭례문", "덕수궁")
+KAKAO_QUERIES = ("숭례문", "덕수궁", "교보빌딩")  # 교보빌딩은 T3.1 라우터 테스트 출발점
 SECRETS: list[str] = []  # 응답 본문에 키가 섞여 와도(카카오 401이 그랬다) 기록에는 남기지 않는다
 
 

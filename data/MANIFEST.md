@@ -97,7 +97,7 @@
 | incident | 2026-11-07 | 3 | TOPIS 돌발 — AccMainCode 13 · AccSubCode 43 · AccInfo 53행 (`make record API=incident`) |
 | links | 2026-11-07 | 8 | 돌발 링크 4개의 LinkInfo + LinkVerInfo (`make record API=links --limit 4`) |
 | rtd | 2026-11-07 | 1 | 실시간 도시데이터 citydata 광화문·덕수궁 (json, 175 KB) |
-| kakao | 2026-11-07 | 2 | 로컬 키워드 검색 숭례문·덕수궁 (`kakao/keyword/<sha1(검색어)>.json`, 리졸버 재생용). 아래 "recorded/kakao" |
+| kakao | 2026-11-07 | 3 | 로컬 키워드 검색 숭례문·덕수궁·교보빌딩 (`kakao/keyword/<sha1(검색어)>.json`, 리졸버 재생용). 아래 "recorded/kakao" |
 | bus | 2026-11-07 | 1 | 버스위치 getBusPosByRtid 노선 100100118, 차량 12대 (json). 아래 "recorded/bus" |
 | candidates/course | 2026-11-07 | 1 | `make record-candidates SOURCE=course` — CourseIngestor(T2.2) 출력 `CandidateBatch` 그대로: 후보 16개(시각표 16구간, geometry line, scheduled, confidence 0.9, evidence timetable, v0.6 `impact: blocks`·`toward: null`·`approx: false`). BE 테스트(T2.3)가 naru_ai 없이 최신 파일을 읽는다. 유효본은 `20261107T194153.json`(ADR-008 반영 재기록). 그 전 둘(185022 조각 겹침, 185247 impact 없음)은 삭제 대상 |
 
@@ -112,6 +112,7 @@
 - 파일: `data/recorded/kakao/keyword/765cd74f…9fc45.json`(숭례문), `18b733ab…f40f.json`(덕수궁) — 파일명은 sha1(검색어)
 - 필드(실제): `meta{total_count, pageable_count, is_end, same_name}`, `documents[]{id, place_name, category_group_code, category_group_name, category_name, address_name, road_address_name, phone, place_url, distance, x(경도), y(위도)}` — 좌표는 WGS84 문자열
 - 1순위 결과: 숭례문 id 7813430 (126.975313, 37.560003, 세종대로 40) · 덕수궁 id 10305191 (126.974895, 37.565564, 세종대로 99)
+- `교보빌딩`(b8e23419…d65f.json, T3.1 라우터 출발점): 1순위는 **서초 교보타워**(7996006), 2순위 안양 교보빌딩, **3순위 광화문교보빌딩 id 24020019 (126.977904, 37.570969, 종로 1)**. 리졸버(T4.2)는 서울 범위·관할서 힌트로 골라야 한다 — 1순위 맹신 금지의 실례
 
 ### recorded/incident · links (TOPIS 돌발, `scripts/record_api.py`)
 - 출처: 서울 열린데이터광장 OA-13312 돌발 유형 코드(`AccMainCode`) · OA-13313 세부유형(`AccSubCode`) · OA-13315 실시간 돌발(`AccInfo`) · OA-13310 링크정보(`LinkInfo`, LINK_ID 필수) · OA-13311 링크 Vertex(`LinkVerInfo`, LINK_ID 필수). 전부 **xml만**. 공공누리 1유형
