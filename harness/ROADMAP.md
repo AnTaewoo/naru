@@ -97,7 +97,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 주의: 링크 유형코드 → kind 매핑은 코드표 파일을 열어 만든다
 
 ### T1.2 CrosswalkIndex — from_point · from_line · from_segment ★
-- status: TODO
+- status: DONE
 - depends: T1.1, T0.3
 - 산출: `naru_be/models/domain/crosswalk_index.py`(STRtree, EPSG:5179), `naru_be/models/domain/road_graph.py`(표준노드링크 NetworkX, `shortest_path(points, road=None) -> LineString`), `naru_be/config.py` 상수: 점 반경 30m, 선 버퍼 15m, 등급별 버퍼 대로 25/로 15/길 8m
 - 테스트(실데이터): (a) 코스 폴리라인 세종대로 구간 → 교차로명에 '세종대로' 포함 관리번호 ≥ 1 (b) `from_point(광화문광장 좌표, 30)` ≠ ∅ (c) `from_segment(숭례문 → 시청교차로, road=세종대로)` 결과에 세종대로 횡단보도가 있고 종로 횡단보도는 없다 — 좌표는 데이터에서 뽑고 주석

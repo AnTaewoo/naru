@@ -57,3 +57,9 @@
 - 정한 것: 횡단보도 = 양끝 CRSWK 노드 링크 ∪ 대로변 오버레이 + 관리번호 점이 얹힌 ≤60 m sidewalk 승격(링크 CRSWK 플래그는 횡단보도 아님). crosswalk_ids 튜플. 지하도는 별도 망 → 출입구를 30 m 안 도보망 노드에 stairs/elevator로 연결. 엘리베이터·리프트 오버레이 미사용. 타입 스텁 3개 추가
 - 막힌 것 / 태우 대기: T0.2 결함 발견·고침 — SGG_NM 필터 페이지 겹침(유일 64~74%) → 서울 전체 492페이지 재수집(316ac4f). PC-0 체크리스트는 T0.7 보고에 — 태우 "PC-0 통과" 대기
 - 커밋: 316ac4f, 82feeb0, f02a27d, 84a027b / 이 항목의 커밋
+
+## 2026-11-07 · T1.2 DONE
+- 한 것: `road_graph.py` RoadGraph(link.gpkg를 sqlite로 → NetworkX 46,273/63,341, shortest_path(points, road): 도로명 링크 strict → 끊기면 x4 패널티 폴백), `crosswalk_index.py` CrosswalkIndex(OA-23081 1,211점 STRtree, from_point 30 m·from_line 15 m·from_segment 등급별 버퍼). 테스트 6개 — (a)(b)(c) 전부 실데이터 좌표
+- 정한 것: "그 도로명 링크만"은 우선 시도 후 폴백(세종대로가 노드링크에서 5조각). road 지정 시 끝점은 그 도로 노드에. road_class 없으면 접미사 → 없으면 15 m. 도로 그래프 무방향. BE 런타임에 geopandas 안 씀(gpkg sqlite 직접)
+- 막힌 것 / 태우 대기: ARCHITECTURE 문구("그 도로명 링크만") 한 줄 보정 여부
+- 커밋: 60fa6e0, 8b2d0d0, 163b684 / 이 항목의 커밋
