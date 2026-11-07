@@ -1,7 +1,7 @@
 """RoutePlanner — 활성 폐쇄 조회 → 두 라우터 → RouteResult (ARCHITECTURE BE Model, T3.2).
 
-입력은 contracts RouteQuery(from/to 는 "lat,lng" 문자열, 파싱은 여기). 폐쇄는 출발~도착 bbox 에
-여유(route_bbox_pad_m)를 두고, 출발 시각부터 route_horizon_min 안에 시작하는 것까지
+입력은 contracts RouteQuery(from/to 는 "lat,lng", 파싱은 parsing.parse_latlng). 폐쇄는 출발~도착
+bbox 에 여유(route_bbox_pad_m)를 두고, 출발 시각부터 route_horizon_min 안에 시작하는 것까지
 (Repository.active_between) — 걷는 동안 시작하는 통제도 라우터가 도착 시각으로 판정해야 하므로.
 Flask 를 모른다. 잘못된 좌표는 InvalidQueryError(INTERFACE §6 invalid_query).
 """
@@ -13,26 +13,13 @@ from datetime import UTC, datetime, timedelta
 
 from naru_be.config import Settings
 from naru_be.errors import InvalidQueryError
+from naru_be.models.domain.parsing import parse_latlng
 from naru_be.models.domain.routers import BaselineRouter, TimeDependentRouter
 from naru_be.models.domain.types import LngLat, RouteResult
 from naru_be.models.repositories.closure_repository import Bbox, ClosureRepository
 from naru_contracts import RouteQuery
 
 M_PER_DEG_LAT = 111_320.0  # WGS84 위도 1도 (근사). 경도는 cos(lat) 배
-
-
-def parse_latlng(value: str, field: str) -> LngLat:
-    """INTERFACE §2 `lat,lng` → (lng, lat). 범위 밖·형식 오류는 invalid_query."""
-    parts = value.split(",")
-    if len(parts) != 2:
-        raise InvalidQueryError(f"{field}: 'lat,lng' 형식이어야 한다", field)
-    try:
-        lat, lng = (float(p.strip()) for p in parts)
-    except ValueError:
-        raise InvalidQueryError(f"{field}: 숫자가 아니다", field) from None
-    if not (-90.0 <= lat <= 90.0 and -180.0 <= lng <= 180.0):
-        raise InvalidQueryError(f"{field}: 위경도 범위 밖 (lat,lng 순서인지 확인)", field)
-    return (lng, lat)
 
 
 class RoutePlanner:

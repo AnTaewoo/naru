@@ -26,6 +26,7 @@ class CourseWorld(NamedTuple):
     index: CrosswalkIndex
     engine: ClosureEngine
     states: list[ClosureState]  # 기록된 코스 후보 16건 → 04:00 KST 기준(전부 scheduled)
+    by_candidate: dict[str, list[ClosureState]]  # candidate_id → 상태 (upsert 용)
 
 
 @pytest.fixture(scope="session")
@@ -69,11 +70,12 @@ def course_world(seoul_spatial_dir: Path, recorded_dir: Path) -> CourseWorld:
     engine = ClosureEngine(index, settings)
     files = sorted((recorded_dir / "candidates" / "course").glob("*.json"))
     batch = CandidateBatch.model_validate(json.loads(files[-1].read_text("utf-8")))
-    states: list[ClosureState] = []
+    by_candidate: dict[str, list[ClosureState]] = {}
     at = datetime(2026, 3, 15, 4, 0, tzinfo=KST)  # 첫 통제 전 — 라우터가 도착 시각으로 다시 판정
     for c in batch.candidates:
         assert isinstance(c.geometry, LineGeom)
         ids = index.from_line(c.geometry.coordinates)
-        states += engine.apply(c, ids, at=at)
+        by_candidate[c.candidate_id] = engine.apply(c, ids, at=at)
+    states = [s for group in by_candidate.values() for s in group]
     assert len(states) > 100 and {s.status for s in states} == {Status.scheduled}
-    return CourseWorld(settings, ped, index, engine, states)
+    return CourseWorld(settings, ped, index, engine, states, by_candidate)

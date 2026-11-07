@@ -93,6 +93,12 @@ class ClosureEngine:
             return Status.confirmed
         return Status.scheduled
 
+    def restate(self, states: Iterable[ClosureState], at: datetime) -> list[ClosureState]:
+        """저장된 상태들의 status 를 시각 at 로 다시 판정해 돌려준다 (GET /closures, T3.4)."""
+        if at.tzinfo is None:
+            raise ValueError("at 은 tz-aware 여야 한다")
+        return [s.model_copy(update={"status": self.status_of_state(s, at)}) for s in states]
+
     def apply(
         self, candidate: ClosureCandidate, crosswalk_ids: Iterable[str], at: datetime | None = None
     ) -> list[ClosureState]:

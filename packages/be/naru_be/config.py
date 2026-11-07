@@ -27,6 +27,9 @@ class Settings(BaseSettings):
         validation_alias="TEST_DATABASE_URL",
     )
 
+    # POST /internal/candidates 헤더 X-Naru-Internal-Token (.env NARU_INTERNAL_TOKEN). 비면 전부 401
+    internal_token: str = ""
+
     # 상태기계 (ARCHITECTURE "ClosureState 상태기계", INTERFACE §5)
     review_confidence: float = 0.7  # 미만이면 review_required, 라우팅에 안 씀
     confirmed_confidence: float = 0.8
