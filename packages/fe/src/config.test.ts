@@ -24,8 +24,8 @@ describe("apiRewrites", () => {
     expect(sourceMatches(rule?.source ?? "", "/api/internals")).toBe(true); // 접두사가 아니라 경로 단위
   });
 
-  it("기본 오리진은 localhost:5000", () => {
+  it("기본 오리진은 127.0.0.1:5000 (localhost 는 Node 18 에서 ::1)", () => {
     const [rule] = apiRewrites();
-    expect(rule?.destination.startsWith("http://localhost:5000/")).toBe(true);
+    expect(rule?.destination.startsWith("http://127.0.0.1:5000/")).toBe(true);
   });
 });

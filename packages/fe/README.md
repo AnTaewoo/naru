@@ -12,4 +12,4 @@ pnpm e2e                # Playwright. make dev 가 떠 있어야 한다
 - 타입 `src/types/contracts.d.ts` 는 `make schema` 생성물. 손으로 고치지 않는다
 - 테스트 입력은 `data/recorded/naru_api/` (실제 Flask 응답). fetch 를 가로채지 않는다
 - `'use client'` 는 `app/providers.tsx` 와 `components/NaruApp.tsx` 둘뿐. `@` 별칭 없이 상대 경로
-- 환경변수: `NARU_API_ORIGIN`(서버 전용, 기본 http://localhost:5000), `NEXT_PUBLIC_VWORLD_KEY`(T5.1)
+- 환경변수: `NARU_API_ORIGIN`(서버 전용, 기본 http://127.0.0.1:5000 — localhost 는 Node 18 에서 ::1 이라 Flask 에 안 닿는다), `NEXT_PUBLIC_VWORLD_KEY`(T5.1)

@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
-/** BE(Flask) 오리진. 서버 전용 — 브라우저는 같은 오리진 `/api/*` 만 안다 (CONVENTIONS §5.2). */
-export const API_ORIGIN = process.env.NARU_API_ORIGIN ?? "http://localhost:5000";
+/**
+ * BE(Flask) 오리진. 서버 전용 — 브라우저는 같은 오리진 `/api/*` 만 안다 (CONVENTIONS §5.2).
+ * 기본은 127.0.0.1 — Node 18 은 localhost 를 ::1 로 풀어 IPv4 만 듣는 Flask 에 닿지 못한다 (2026-11-08 확인).
+ */
+export const API_ORIGIN = process.env.NARU_API_ORIGIN ?? "http://127.0.0.1:5000";
 
 /**
  * `/api/:path*` → Flask. `/api/internal/*` 는 AI 워커 전용이라 프록시하지 않는다 (INTERFACE §1.1).
