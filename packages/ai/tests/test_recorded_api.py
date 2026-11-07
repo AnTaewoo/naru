@@ -96,3 +96,27 @@ def test_citydata_gwanghwamun(recorded_dir: Path) -> None:
     assert live["AREA_CONGEST_LVL"] in ("여유", "보통", "약간 붐빔", "붐빔")
     assert live["PPLTN_TIME"].startswith("2026-11-07 ")
     assert int(live["AREA_PPLTN_MIN"]) <= int(live["AREA_PPLTN_MAX"])
+
+
+def test_kakao_keyword_records(recorded_dir: Path) -> None:
+    # 리졸버 재생 규칙: kakao/keyword/<sha1(검색어)>.json (real-data-testing §4.3)
+    import hashlib
+
+    expected = {
+        # 검색어: (1순위 place_name, id, x, y) — 기록 파일 documents[0]
+        "숭례문": ("숭례문", "7813430", "126.975313124237", "37.5600030088843"),
+        "덕수궁": ("덕수궁", "10305191", "126.974894754989", "37.5655638710672"),
+    }
+    for query, (name, doc_id, x, y) in expected.items():
+        path = (
+            recorded_dir / "kakao" / "keyword" / f"{hashlib.sha1(query.encode()).hexdigest()}.json"
+        )
+        rec = json.loads(path.read_text("utf-8"))
+        assert rec["status"] == 200 and rec["params"] == {"query": query}
+        assert rec["endpoint"] == "https://dapi.kakao.com/v2/local/search/keyword.json"
+        body = json.loads(rec["raw"])
+        assert body["meta"]["total_count"] > 0
+        top = body["documents"][0]
+        assert {"id", "place_name", "x", "y", "address_name", "road_address_name"} <= set(top)
+        assert (top["place_name"], top["id"], top["x"], top["y"]) == (name, doc_id, x, y)
+        assert SEOUL[0] < float(top["x"]) < SEOUL[2] and SEOUL[1] < float(top["y"]) < SEOUL[3]

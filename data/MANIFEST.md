@@ -95,8 +95,14 @@
 | incident | 2026-11-07 | 3 | TOPIS 돌발 — AccMainCode 13 · AccSubCode 43 · AccInfo 53행 (`make record API=incident`) |
 | links | 2026-11-07 | 8 | 돌발 링크 4개의 LinkInfo + LinkVerInfo (`make record API=links --limit 4`) |
 | rtd | 2026-11-07 | 1 | 실시간 도시데이터 citydata 광화문·덕수궁 (json, 175 KB) |
-| kakao | — | 0 | `KAKAO_REST_KEY`가 "wrong appKey format"(401) — REST API 키가 아니다. 재발급 후 `make record API=kakao` |
+| kakao | 2026-11-07 | 2 | 로컬 키워드 검색 숭례문·덕수궁 (`kakao/keyword/<sha1(검색어)>.json`, 리졸버 재생용). 아래 "recorded/kakao" |
 | bus | — | 0 | `DATA_GO_KR_KEY` 없음 — 넣은 뒤 `make record API=bus` |
+
+### recorded/kakao (카카오 로컬 키워드 검색)
+- 출처: https://dapi.kakao.com/v2/local/search/keyword.json (`Authorization: KakaoAK <REST 키>`). 앱 `naru`에 카카오맵(로컬) API 사용 설정 필요(꺼져 있으면 403 "disabled OPEN_MAP_AND_LOCAL service"). 이용약관상 결과 저장은 서비스 내부 캐시 용도
+- 파일: `data/recorded/kakao/keyword/765cd74f…9fc45.json`(숭례문), `18b733ab…f40f.json`(덕수궁) — 파일명은 sha1(검색어)
+- 필드(실제): `meta{total_count, pageable_count, is_end, same_name}`, `documents[]{id, place_name, category_group_code, category_group_name, category_name, address_name, road_address_name, phone, place_url, distance, x(경도), y(위도)}` — 좌표는 WGS84 문자열
+- 1순위 결과: 숭례문 id 7813430 (126.975313, 37.560003, 세종대로 40) · 덕수궁 id 10305191 (126.974895, 37.565564, 세종대로 99)
 
 ### recorded/incident · links (TOPIS 돌발, `scripts/record_api.py`)
 - 출처: 서울 열린데이터광장 OA-13312 돌발 유형 코드(`AccMainCode`) · OA-13313 세부유형(`AccSubCode`) · OA-13315 실시간 돌발(`AccInfo`) · OA-13310 링크정보(`LinkInfo`, LINK_ID 필수) · OA-13311 링크 Vertex(`LinkVerInfo`, LINK_ID 필수). 전부 **xml만**. 공공누리 1유형
