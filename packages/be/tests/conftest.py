@@ -16,3 +16,11 @@ def seoul_spatial_dir() -> Path:
     dirs = sorted((DATA / "raw").glob("seoul_spatial_*"))
     assert dirs, "실데이터 없음: data/raw/seoul_spatial_<date>/ — make fetch SRC=seoul_spatial 먼저"
     return dirs[-1]
+
+
+@pytest.fixture(scope="session")
+def nodelink_seoul_dir() -> Path:
+    """가장 최근 `data/raw/nodelink_seoul_<YYYYMMDD>/` (MANIFEST: nodelink_seoul)."""
+    dirs = sorted((DATA / "raw").glob("nodelink_seoul_*"))
+    assert dirs, "실데이터 없음: data/raw/nodelink_seoul_<date>/ — make fetch SRC=nodelink 먼저"
+    return dirs[-1]

@@ -35,6 +35,25 @@
   - sha256: `c718a21352d91b2a9be50e8c52ed886d92a495adb14070995b487b0ca5ab4e4f`
 - 안 받은 것: OA-22906 서울특별시 자치구 횡단보도 정보 (API `crossRoadNOWON`, 40,282행, 경위도·관리번호 있으나 교차로명 없음 — OA-23081로 충분)
 
+### nodelink (전국 원본, 수동 다운로드)
+- 폴더: `data/raw/nodelink_20261014/` (820 MB — `MOCT_NODE.shp/.dbf/.shx/.prj`, `MOCT_LINK.*`, `MULTILINK.dbf`, `TURNINFO.dbf`, `내역서.csv`)
+- 출처: 공공데이터포털 `국토교통부_표준노드링크` https://www.data.go.kr/data/15025526/fileData.do (기관 자체 다운로드 → 국가교통정보센터 https://www.its.go.kr/nodelink/nodelinkRef)
+- 수집일: 2026-11-07 (태우가 로그인 뒤 zip을 받아 풀어 둠. 폴더명 20261014 = 배포본 날짜, 파일 수정시각 2026-10-13 08:44). `내역서.csv`는 이번 배포에서 추가된 노선 8건(김해·대구·충주·천안·영천·세종·대구 톨게이트)
+- 라이선스: 이용허락범위 제한 없음 (포털 표기)
+- 건수(원본, pyogrio `read_info`): 노드 1,184,340 / 링크 1,564,022 / MULTILINK 19,576
+- 좌표계(.prj): `ITRF2000_Central_Belt_60` — TM, 중앙경선 127, 원점위도 38, FE 200000, FN 600000, GRS80. EPSG:5186과 변환 결과가 수치상 동일(최대 차 0.0°). dbf 인코딩 cp949
+- sha256 (전체는 `nodelink_seoul_20261014/_meta.json` `source_sha256`): `MOCT_NODE.shp` `b2bb99ec…e4c9`, `MOCT_NODE.dbf` `cb3123c3…1de`, `MOCT_LINK.shp` `d9758a1e…e478`, `MOCT_LINK.dbf` `327fada1…28b1`
+- 컬럼(실제): 노드 `NODE_ID, NODE_TYPE, NODE_NAME, TURN_P, UPDATEDATE, REMARK, HIST_TYPE, HISTREMARK` · 링크 `LINK_ID, F_NODE, T_NODE, LANES, ROAD_RANK, ROAD_TYPE, ROAD_NO, ROAD_NAME, ROAD_USE, MULTI_LINK, CONNECT, MAX_SPD, REST_VEH, REST_W, REST_H, C-ITS, LENGTH, UPDATEDATE, REMARK, HIST_TYPE, HISTREMARK`
+- ID 체계(확인): 10자리. 앞 4자리 = 시군구(서울은 행정코드 순 1000 종로구, 1010 중구, 1020 용산구 … 1180 영등포구 … 1240/1249 강동구). 16xx 인천, 2xxx 경기. 확인 방법: 서울 bbox 안 노드를 prefix별로 중심 좌표·노드명(경복궁, 서울역, 당산역·여의도동)으로 대조
+
+### nodelink_seoul (위 원본에서 추출, `make fetch SRC=nodelink`)
+- 폴더: `data/raw/nodelink_seoul_20261014/` — `node.gpkg`(6.7 MB), `link.gpkg`(17.3 MB), `_meta.json`
+- 스크립트: `scripts/fetch_nodelink.py` — OGR where `NODE_ID LIKE '10%' OR '11%' OR '12%'`(링크도 같음)로 읽어 GPKG로 저장. 좌표계는 .prj 그대로. 원본 수정 없음
+- 건수: 노드 46,085 / 링크 63,383 (종로구 1,348/1,944 · 중구 1,212/1,696 · 영등포구 2,640/3,796). F·T 노드가 서울 밖인 링크 291
+- 범위(WGS84): 126.7674~127.1829, 37.4305~37.6937 — 전부 서울 bbox 안 (스크립트가 검사)
+- 확인: `ROAD_NAME == '세종대로'` 링크 59개(원본 전국에서도 59) — 광화문~서울역 126.9726~126.9773 / 37.5566~37.5753. 노드 `1000018200` = '경복궁'
+- sha256: `node.gpkg` `4d2d3306…5b20`, `link.gpkg` `25f4adf5…7817` (GPKG는 쓸 때마다 타임스탬프가 들어가 재생성하면 값이 바뀐다)
+
 ## recorded
 
 | api | 최초 기록 | 파일 수 | 비고 |
