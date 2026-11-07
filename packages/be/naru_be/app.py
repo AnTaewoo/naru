@@ -16,11 +16,12 @@ from pydantic import ValidationError
 from werkzeug.exceptions import HTTPException
 
 from naru_be.config import Settings
-from naru_be.controllers import closure_controller, route_controller
+from naru_be.controllers import candidate_controller, closure_controller, route_controller
 from naru_be.controllers._deps import NaruModels
 from naru_be.db import make_engine, make_sessions
 from naru_be.errors import NaruError
 from naru_be.log import configure_logging
+from naru_be.models.domain.candidate_intake import CandidateIntake
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
 from naru_be.models.domain.ped_graph import PedGraph
@@ -59,7 +60,8 @@ def build_models(settings: Settings) -> NaruModels:
             "crosswalks": len(index),
         },
     )
-    return NaruModels(settings, ped, index, engine, repo, planner)
+    intake = CandidateIntake(index, engine, repo, road_graph, settings)
+    return NaruModels(settings, ped, road_graph, index, engine, repo, planner, intake)
 
 
 def create_app(settings: Settings | None = None, models: NaruModels | None = None) -> Flask:
@@ -71,6 +73,7 @@ def create_app(settings: Settings | None = None, models: NaruModels | None = Non
     app.extensions["naru"] = models or build_models(settings)
     app.register_blueprint(route_controller.bp)
     app.register_blueprint(closure_controller.bp)
+    app.register_blueprint(candidate_controller.bp)
     _register_errors(app)
     return app
 
@@ -87,7 +90,13 @@ def _register_errors(app: Flask) -> None:
     @app.errorhandler(HTTPException)
     def on_http(exc: HTTPException) -> tuple[Response, int]:
         status = exc.code or 500
-        code = {401: "unauthorized", 404: "not_found", 405: "not_found"}.get(status, "internal")
+        code = {
+            400: "invalid_query",
+            401: "unauthorized",
+            404: "not_found",
+            405: "not_found",
+            415: "invalid_query",
+        }.get(status, "internal")
         return error_view.render_code(code, exc.description or exc.name, status)
 
     @app.errorhandler(Exception)
