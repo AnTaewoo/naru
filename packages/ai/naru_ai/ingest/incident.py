@@ -39,6 +39,7 @@ from naru_contracts import (
 log = logging.getLogger(__name__)
 
 RALLY = "10B02"  # AccSubCode 10B02 집회 (MANIFEST recorded/incident)
+EVENT_TYPE = "A10"  # AccMainCode A10 집회및행사 — 버스 2순위 기준 데이터(T6.2)
 CONFIDENCE = 0.9  # TOPIS 가 실제로 등록한 통제 — 규칙서의 TOPIS 통제 공지(시간·구간 다 있음)와 같게
 SIDEWALK = re.compile(r"\((?:인도|보도)\)")
 
