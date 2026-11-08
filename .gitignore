@@ -17,6 +17,9 @@ data/recorded/*
 data/raw/notices/smpa/*.pdf
 data/raw/notices/smpa/*.hwp
 data/raw/notices/smpa/*.jpg
+# T6.6 경찰청 PDF inbox — 태우가 넣는 PDF·처리 기록 (원문 규칙: git 밖)
+data/raw/notices/smpa/inbox/
+data/raw/notices/smpa/inbox_manifest.jsonl
 data/raw/notices/*.jsonl
 data/raw/notices/*.json
 /pc1_map.html
