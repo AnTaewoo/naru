@@ -6,6 +6,8 @@
 - points: 풀리면 PointGeom. toward 가 있고 풀리면 출발지 → toward SegmentGeom, confidence 0.65 상한
 - confidence 는 파서의 규칙 값(규칙서 §3.8)에 위 상한만 적용. 0.7 미만이면 review_required
 - 못 푼 정규형은 후보를 만들지 않는다 (추측 좌표 0)
+- summary(ADR-012): item 의 구간·지점 이름(spans 정규 이름)·reported_people·roads 를 구조화
+  칸 그대로. 좌표가 안 풀린 이름도 남는다. 같은 item 의 후보는 같은 summary. Claude 스키마는 그대로
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ from datetime import datetime
 from naru_ai.notice.parser import ParsedItem, ParsedNotice
 from naru_ai.notice.resolver import Resolver
 from naru_contracts import (
+    CandidateSummary,
     ClosureCandidate,
     ClosureType,
     Evidence,
@@ -28,6 +31,7 @@ from naru_contracts import (
     SegmentGeom,
     Source,
     Status,
+    SummarySegment,
     Window,
 )
 
@@ -57,6 +61,7 @@ class _Base:
     evidence: Evidence
     notice_ref: NoticeRef
     approx: bool
+    summary: CandidateSummary
 
 
 class CandidateBuilder:
@@ -82,6 +87,7 @@ class CandidateBuilder:
                 evidence=_evidence(parsed),
                 notice_ref=_notice_ref(parsed),
                 approx=item.approx,
+                summary=_summary(pi),
             )
             prefix = f"{parsed.envelope.sentence_id}-i{i}"
             for k, seg in enumerate(pi.segments, start=1):
@@ -154,7 +160,26 @@ class CandidateBuilder:
             toward=toward,
             approx=base.approx,
             review_required=confidence < REVIEW_CONFIDENCE,
+            summary=base.summary,
         )
+
+
+def _summary(pi: ParsedItem) -> CandidateSummary:
+    """item 의 구조화 칸 (ADR-012) — 이름은 spans 정규 이름, roads 는 road_hints 와 구간 road."""
+    name = pi.canonical_of
+    roads: list[str] = []
+    for r in [*pi.item.road_hints, *(s.road for s in pi.segments if s.road)]:
+        if r and name(r) not in roads:
+            roads.append(name(r))
+    return CandidateSummary(
+        segments=[
+            SummarySegment(from_=name(s.from_), to=name(s.to), via=[name(v) for v in s.via])
+            for s in pi.segments
+        ],
+        points=[name(p.name) for p in pi.item.points],
+        reported_people=pi.item.reported_people,
+        roads=roads,
+    )
 
 
 def _window(start: str | None, end: str | None) -> Window | None:

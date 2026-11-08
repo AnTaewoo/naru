@@ -106,3 +106,27 @@ def test_unresolved_end_falls_back_to_point(
     )  # fmt: skip
     again = CandidateBatch.model_validate_json(batch.model_dump_json())
     assert len(again.candidates) == 7  # v2: r01 1 + r04 3(시의회 미해결 point 1 + seg 2) + 3
+
+
+def test_summary_is_structured_parser_fields(
+    builder: CandidateBuilder, parsed: dict[str, ParsedNotice]
+) -> None:
+    # ADR-012: 같은 item 의 후보는 같은 summary — 파서 spans 정규 이름·인원·도로 그대로, 문장 없음.
+    # 기대값은 recorded notice_v2 응답(smpa-20261107-r04·r01)을 열어 확인: "숭례문R" → 숭례문오거리,
+    # "종로1R" → 종로1가사거리. 좌표가 안 풀린 "시의회"도 이름은 남는다
+    r04 = [c.summary for c in builder.build(parsed["smpa-20261107-r04"])]
+    first = r04[0]
+    assert first is not None and all(s == first for s in r04)
+    assert [(x.from_, x.to, x.via) for x in first.segments] == [
+        ("시의회", "숭례문오거리", []),
+        ("숭례문오거리", "광화문", []),
+        ("숭례문오거리", "고용노동청", []),
+    ]
+    assert (first.points, first.reported_people, first.roads) == ([], 50000, ["태평로"])
+    r01 = [c.summary for c in builder.build(parsed["smpa-20261107-r01"])]
+    loop = r01[0]
+    assert loop is not None
+    assert [(x.from_, x.to, x.via) for x in loop.segments] == [
+        ("동화면세점 앞", "동화면세점 앞", ["종로1가사거리"])
+    ]
+    assert (loop.reported_people, loop.roads) == (50000, ["세종대로"])

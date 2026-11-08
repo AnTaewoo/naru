@@ -54,6 +54,13 @@ class ParsedItem:
                 return s.tag
         return None
 
+    def canonical_of(self, name: str) -> str:
+        """spans 의 정규 이름 — 원문 표현("숭례문R")이면 그 span 의 canonical, 없으면 그대로."""
+        for s in self.spans:
+            if name in (s.canonical, s.text):
+                return s.canonical
+        return name
+
     def area_hint(self) -> str | None:
         for s in self.spans:
             if s.tag == "AREA":
