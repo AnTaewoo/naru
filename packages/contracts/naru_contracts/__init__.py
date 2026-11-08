@@ -7,6 +7,7 @@ FE 타입은 `make schema`로 여기서 생성한다. 문서와 코드가 다르
 from naru_contracts.closure import (
     CandidateBatch,
     CandidateBatchResponse,
+    CandidateSummary,
     ClosureCandidate,
     ClosureState,
     Evidence,
@@ -16,6 +17,7 @@ from naru_contracts.closure import (
     PlacePoint,
     PointGeom,
     SegmentGeom,
+    SummarySegment,
     Window,
     ZoneGeom,
 )
@@ -24,6 +26,7 @@ from naru_contracts.closures_api import (
     ClosureEventsQuery,
     ClosureEventsResponse,
     ClosuresQuery,
+    DataAsOf,
     FeatureCollection,
 )
 from naru_contracts.enums import (
@@ -51,6 +54,7 @@ __all__ = [
     "Baseline",
     "CandidateBatch",
     "CandidateBatchResponse",
+    "CandidateSummary",
     "ClosureCandidate",
     "ClosureEvent",
     "ClosureEventsQuery",
@@ -58,6 +62,7 @@ __all__ = [
     "ClosureState",
     "ClosureType",
     "ClosuresQuery",
+    "DataAsOf",
     "ErrorBody",
     "Evidence",
     "EvidenceKind",
@@ -82,6 +87,7 @@ __all__ = [
     "SegmentGeom",
     "Source",
     "Status",
+    "SummarySegment",
     "Window",
     "ZoneGeom",
 ]

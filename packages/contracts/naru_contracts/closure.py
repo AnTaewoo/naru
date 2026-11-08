@@ -92,6 +92,23 @@ class NoticeRef(Contract):
     _tz = field_validator("published_at")(_require_offset)
 
 
+class SummarySegment(Contract):
+    """공지 구간 이름 (v0.12, ADR-012) — 파서 spans 정규 이름 그대로, 좌표가 안 풀려도 남는다."""
+
+    from_: str
+    to: str
+    via: list[str] = Field(default_factory=list)
+
+
+class CandidateSummary(Contract):
+    """공지 item 의 구조화 칸 (v0.12, ADR-012). 문장은 없다 — 화면 문장은 FE i18n 이 만든다."""
+
+    segments: list[SummarySegment] = Field(default_factory=list)
+    points: list[str] = Field(default_factory=list)
+    reported_people: int | None = Field(default=None, ge=0)
+    roads: list[str] = Field(default_factory=list)
+
+
 class ClosureCandidate(Contract):
     candidate_id: str
     source: Source
@@ -106,6 +123,7 @@ class ClosureCandidate(Contract):
     toward: str | None = None  # 종료 없는 행진의 방향 표현 그대로. point·segment 에만
     approx: bool = False  # 파서가 근사 시간을 ±10분 넓혔음
     review_required: bool = False
+    summary: CandidateSummary | None = None  # v0.12 (ADR-012) 공지 item 의 구조화 칸, 코스는 null
 
     @model_validator(mode="after")
     def _review_rule(self) -> "ClosureCandidate":

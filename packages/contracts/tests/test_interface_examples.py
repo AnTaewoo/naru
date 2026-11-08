@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -91,6 +91,11 @@ def test_closure_candidate_example() -> None:  # §1
     assert c.evidence[0].kind is EvidenceKind.notice and c.evidence[0].detail is None
     assert c.notice_ref is not None and c.notice_ref.sentence_id == "s_000412"
     assert c.confidence == 0.72 and c.review_required is False
+    # v0.12 summary — 구조화 칸만 (ADR-012)
+    assert c.summary is not None
+    seg = c.summary.segments[0]
+    assert (seg.from_, seg.to, seg.via) == ("KB금융지주", "KB증권", ["여의도역"])
+    assert c.summary.points == [] and c.summary.reported_people is None and c.summary.roads == []
     assert c.impact is Impact.blocks and c.toward is None and c.approx is False  # v0.6
     assert ClosureCandidate.model_validate(c.model_dump(mode="json")) == c
 
@@ -292,38 +297,85 @@ def test_closure_events_example() -> None:  # §3.1 v0.8, ADR-010
     assert seg1.bbox == (126.9757, 37.5608, 126.9772, 37.5701) and seg1.approx is False
     # v0.10 — 보행망 bbox (2026-11-08 종로·중구 그래프 노드 15,183개의 경위도 범위)
     assert r.coverage == (126.948108, 37.54265, 127.026684, 37.631483)
+    # v0.12 (ADR-012) — 공지 사건: 종류·출처·파서 요약(recorded LLM smpa-20261107-r04)·공지 원문
+    assert (rally.type, rally.source) == (ClosureType.march, Source.smpa)
+    assert rally.summary is not None and rally.summary.reported_people == 50000
+    assert [(x.from_, x.to) for x in rally.summary.segments] == [
+        ("시의회", "숭례문오거리"),
+        ("숭례문오거리", "광화문"),
+        ("숭례문오거리", "고용노동청"),
+    ]
+    assert rally.summary.roads == ["태평로"]
+    assert rally.notice is not None and rally.notice.sentence_id == "smpa-20261107-r04"
+    assert rally.notice.excerpt == rally.reason
+    assert (seg1.type, seg1.source, seg1.summary, seg1.notice) == (
+        ClosureType.marathon,
+        Source.course,
+        None,
+        None,
+    )
+    # data_as_of — 2026-11-08 개발 DB: 서울경찰청 11/6 18:00 공지, 서울마라톤 3/12 16:07 시각표
+    kst = timezone(timedelta(hours=9))
+    assert r.data_as_of.smpa == datetime(2026, 11, 6, 18, 0, tzinfo=kst)
+    assert r.data_as_of.course == datetime(2026, 3, 12, 16, 7, tzinfo=kst)
+    assert r.data_as_of.topis_incident is None and r.data_as_of.topis_notice is None
     assert ClosureEventsResponse.model_validate(r.model_dump(mode="json")) == r
 
 
 def test_closure_events_rules() -> None:  # §3.1 — 순서·bbox·개수, 질의 bbox 는 선택
     data = _json(5)
     cov = data["coverage"]
-    swapped = {"events": [data["events"][1], data["events"][0]], "coverage": cov}
+    asof = data["data_as_of"]
+    swapped = {
+        "events": [data["events"][1], data["events"][0]],
+        "coverage": cov,
+        "data_as_of": asof,
+    }
     with pytest.raises(ValidationError, match="늦은 것 먼저"):
         ClosureEventsResponse.model_validate(swapped)
     no_start = {**data["events"][1], "window": {"end": data["events"][1]["window"]["end"]}}
     ClosureEventsResponse.model_validate(
-        {"events": [data["events"][0], no_start], "coverage": cov}
+        {"events": [data["events"][0], no_start], "coverage": cov, "data_as_of": asof}
     )  # start 없으면 끝
     with pytest.raises(ValidationError, match="늦은 것 먼저"):
         ClosureEventsResponse.model_validate(
-            {"events": [no_start, data["events"][0]], "coverage": cov}
+            {"events": [no_start, data["events"][0]], "coverage": cov, "data_as_of": asof}
         )
     bad_bbox = {**data["events"][1], "bbox": [126.9772, 37.5608, 126.9757, 37.5701]}
     with pytest.raises(ValidationError, match="bbox"):
-        ClosureEventsResponse.model_validate({"events": [bad_bbox], "coverage": cov})
+        ClosureEventsResponse.model_validate(
+            {"events": [bad_bbox], "coverage": cov, "data_as_of": asof}
+        )
     with pytest.raises(ValidationError):
         ClosureEventsResponse.model_validate(
-            {"events": [{**data["events"][1], "crosswalks": 0}], "coverage": cov}
+            {
+                "events": [{**data["events"][1], "crosswalks": 0}],
+                "coverage": cov,
+                "data_as_of": asof,
+            }
         )
     with pytest.raises(ValidationError):
         ClosureEventsResponse.model_validate(
             {"events": [{**data["events"][1], "status": "confirmed"}]}
         )
     with pytest.raises(ValidationError):  # coverage 필수 (v0.10)
-        ClosureEventsResponse.model_validate({"events": []})
+        ClosureEventsResponse.model_validate({"events": [], "data_as_of": asof})
+    with pytest.raises(ValidationError):  # data_as_of 필수 (v0.12)
+        ClosureEventsResponse.model_validate({"events": [], "coverage": cov})
+    with pytest.raises(ValidationError, match="오프셋"):  # 시각은 오프셋 필수
+        ClosureEventsResponse.model_validate(
+            {"events": [], "coverage": cov, "data_as_of": {**asof, "smpa": "2026-11-06T18:00:00"}}
+        )
+    # v0.12 전에 저장된 상태라 type·source·summary·notice 를 모르면 null 그대로
+    legacy = {k: v for k, v in data["events"][1].items() if k not in ("type", "source")}
+    old = ClosureEventsResponse.model_validate(
+        {"events": [legacy], "coverage": cov, "data_as_of": asof}
+    )
+    assert old.events[0].type is None and old.events[0].source is None
     with pytest.raises(ValidationError, match="coverage"):
-        ClosureEventsResponse.model_validate({"events": [], "coverage": [127.0, 37.6, 126.9, 37.5]})
+        ClosureEventsResponse.model_validate(
+            {"events": [], "coverage": [127.0, 37.6, 126.9, 37.5], "data_as_of": asof}
+        )
     assert ClosureEventsQuery().bbox is None
     assert ClosureEventsQuery.model_validate({"bbox": "126.965,37.555,126.990,37.580"}).bbox
 
@@ -367,3 +419,15 @@ def test_geocode_rules() -> None:  # §7 — 검색어 2~50자(앞뒤 공백 뺌
         GeocodeReverseResponse(label="중구", road_address=None, address=None)
     with pytest.raises(ValidationError, match="label"):
         GeocodeReverseResponse(label=None, road_address=None, address="서울 중구 남대문로2가 9-9")
+
+
+def test_candidate_summary_rules() -> None:  # §1 v0.12 — 구조화 칸만, 문장 칸 없음
+    c = _json(0)
+    assert (
+        ClosureCandidate.model_validate({k: v for k, v in c.items() if k != "summary"}).summary
+        is None
+    )
+    with pytest.raises(ValidationError):  # 인원은 0 이상 숫자
+        ClosureCandidate.model_validate({**c, "summary": {**c["summary"], "reported_people": -1}})
+    with pytest.raises(ValidationError):  # 문장 칸(title 등)은 없다
+        ClosureCandidate.model_validate({**c, "summary": {**c["summary"], "title": "행진"}})

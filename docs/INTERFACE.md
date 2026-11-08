@@ -1,4 +1,4 @@
-# INTERFACE.md — 파트 간 계약 v0.11
+# INTERFACE.md — 파트 간 계약 v0.12
 
 파트 경계의 단일 기준. 스키마를 바꾸면 **이 파일 먼저** 고치고, 하위호환이 깨지면 버전을 올린다. 변경은 ADR + 태우 승인.
 코드 구현은 `packages/contracts`(`naru_contracts`, pydantic v2) 하나뿐이다. 테스트가 이 문서의 예시 JSON 블록을 그대로 파싱하므로, 예시를 고치면 코드도 고쳐야 한다. FE 타입은 `make schema`로 생성한다.
@@ -34,7 +34,8 @@ AI 워커가 내놓는 유일한 출력. BE의 `CandidateIntake`(Model)가 `Cros
                  "excerpt": "※행진: KB금융지주→여의도역 5번出→KB증권 본사(19:00出, 0.5km, 2개차로)"},
   "toward": null,
   "approx": false,
-  "review_required": false
+  "review_required": false,
+  "summary": {"segments": [{"from_": "KB금융지주", "to": "KB증권", "via": ["여의도역"]}], "points": [], "reported_people": null, "roads": []}
 }
 ```
 `geometry.kind`별 필드 (kind에 맞는 것만, 나머지는 없음):
@@ -53,7 +54,8 @@ AI 워커가 내놓는 유일한 출력. BE의 `CandidateIntake`(Model)가 `Cros
 - `approx`: 파서가 근사 시간("14시경", "오후")을 양끝 10분씩 넓혔으면 `true`. BE는 window를 넓히지도 좁히지도 않고 상태·응답에 그대로 싣는다. 평가는 ±10분 허용.
 - `window.end`가 null이면 "종료 미정". 엔진은 시작+6시간을 임시 end로 두고 evidence에 남긴다.
 - `evidence[].kind ∈ {notice, timetable, topis_incident, bus_skip, bus_return, rtd_spike}`. `ref`는 데이터·recorded 파일 경로.
-- `notice_ref`는 공지에서 온 후보에만. `excerpt`를 FE `EvidencePopover`에 그대로 보여준다.
+- `notice_ref`는 공지에서 온 후보에만. `excerpt`는 FE 사건 상세의 "공지 원문 보기"에서만 보인다(v0.12, ADR-012 — 목록·통제 근거에는 출처를 쓰지 않는다).
+- `summary` (v0.12, ADR-012, 선택) — 공지 item 의 **구조화 칸만**(문장 없음): `segments[]`{`from_`, `to`, `via[]`}·`points[]` 이름은 파서 spans 의 정규 이름(canonical) 그대로(좌표가 안 풀린 이름도 남는다), `reported_people` 숫자 또는 null, `roads[]` = road_hints·구간 road 의 정규 이름. 같은 item 의 후보는 같은 summary. 코스(시각표) 후보는 null. 화면 문장("…집회 → …행진", "5만 명")은 FE `i18n/ko.ts` 가 만든다.
 
 ### §1.1 전송: `POST /internal/candidates` (AI 워커 → BE)
 AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 넘어간다.
@@ -127,7 +129,7 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 }
 ```
 
-### §3.1 BE → FE: `GET /closures/events` (v0.8, ADR-010)
+### §3.1 BE → FE: `GET /closures/events` (v0.8 ADR-010, v0.12 ADR-012)
 
 **요청** `bbox=minLng,minLat,maxLng,maxLat` (선택 — 없으면 전체)
 
@@ -137,19 +139,32 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
   "events": [
     {"reason": "15:00~16:00 시의회~숭례문R → 광화문·고용노동청 <태평로 등> 50,000명 중부, 종로, 남대문",
      "window": {"start": "2026-11-07T15:00:00+09:00", "end": "2026-11-07T16:00:00+09:00"},
-     "crosswalks": 31, "bbox": [126.9757, 37.5605, 126.9877, 37.5759], "approx": false},
+     "crosswalks": 31, "bbox": [126.9757, 37.5605, 126.9877, 37.5759], "approx": false,
+     "type": "march", "source": "smpa",
+     "summary": {"segments": [{"from_": "시의회", "to": "숭례문오거리", "via": []},
+                              {"from_": "숭례문오거리", "to": "광화문", "via": []},
+                              {"from_": "숭례문오거리", "to": "고용노동청", "via": []}],
+                 "points": [], "reported_people": 50000, "roads": ["태평로"]},
+     "notice": {"notice_id": "smpa-20261107", "sentence_id": "smpa-20261107-r04",
+                "source_url": "https://www.smpa.go.kr/user/nd54515.do", "published_at": "2026-11-06T18:00:00+09:00",
+                "excerpt": "15:00~16:00 시의회~숭례문R → 광화문·고용노동청 <태평로 등> 50,000명 중부, 종로, 남대문"}},
     {"reason": "marathon 1구간 세종대로 사거리~숭례문 오거리",
      "window": {"start": "2026-03-15T07:20:00+09:00", "end": "2026-03-15T08:08:00+09:00"},
-     "crosswalks": 6, "bbox": [126.9757, 37.5608, 126.9772, 37.5701], "approx": false}
+     "crosswalks": 6, "bbox": [126.9757, 37.5608, 126.9772, 37.5701], "approx": false,
+     "type": "marathon", "source": "course", "summary": null, "notice": null}
   ],
-  "coverage": [126.948108, 37.54265, 127.026684, 37.631483]
+  "coverage": [126.948108, 37.54265, 127.026684, 37.631483],
+  "data_as_of": {"topis_incident": null, "topis_notice": null,
+                 "smpa": "2026-11-06T18:00:00+09:00", "course": "2026-03-12T16:07:00+09:00"}
 }
 ```
 - 순서: `window.start` 가 늦은 것 먼저, start 가 없으면 끝.
 - `crosswalks` = 서로 다른 횡단보도 수(1 이상). 같은 공지 문장이 구간 여러 개로 나뉘어도 한 사건이다. `bbox` = 그 횡단보도들의 [minLng, minLat, maxLng, maxLat]. `approx` = 하나라도 근사면 true.
 - 상태(status)는 없다 — 시각마다 다르다. 그 시각의 상태는 §3 `/closures?at=`.
 - FE "통제 불러오기": 누르면 t = `window.start`, 지도 = `bbox`. start 가 없는 사건은 누를 수 없다.
-- `coverage` (v0.10, ADR-011 C) **필수** — 보행망(그래프) 노드의 [minLng, minLat, maxLng, maxLat]. FE 는 내 위치가 이 밖이면 길찾기 범위 밖이라고 안내한다(사각형이라 안쪽이어도 보행망에서 150 m 넘으면 `/route` 가 `out_of_coverage`). `data_as_of` 는 T5.9 에서.
+- `coverage` (v0.10, ADR-011 C) **필수** — 보행망(그래프) 노드의 [minLng, minLat, maxLng, maxLat]. FE 는 내 위치가 이 밖이면 길찾기 범위 밖이라고 안내한다(사각형이라 안쪽이어도 보행망에서 150 m 넘으면 `/route` 가 `out_of_coverage`).
+- `type`·`source` (v0.12, ADR-012) — 사건을 만든 후보의 종류·출처(§4 enum). v0.12 전에 저장된 상태라 모르면 null. `summary` — 후보의 summary(§1) 그대로, 없으면 null(코스 등). `notice` — 후보의 `notice_ref`(§1) 그대로, 공지가 아니면 null. FE 는 summary 로 제목·둘째 줄을 만들고(없으면 `reason`), `notice.excerpt` 는 상세의 "공지 원문 보기"에서만 보인다.
+- `data_as_of` (v0.12, ADR-011 C·ADR-012) **필수** — 출처마다 그 출처로 저장된 통제의 가장 늦은 근거 시각, 없으면 null: 공지(`smpa`, `topis_notice` = source `topis`)는 공지 게시 시각, `course` 는 시각표 게시 시각(상태 전이 근거는 뺀다), `topis_incident`(= source `incident`)는 돌발 수신 시각. 예시는 2026-11-08 개발 DB(서울경찰청 11/6 18:00 공지 · 서울마라톤 3/12 16:07 시각표). FE 는 목록 위에 기준 시각을 쓰고, 실시간 출처(`topis_incident`)가 없거나 30분보다 오래면 회색 경고.
 
 ## §4 enum
 | 필드 | 코드값 | FE 라벨 |
@@ -214,3 +229,4 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 | 2026-11-08 | v0.9 | §5 예정은 공지 창 안에서만 횡단보도당 +300초(×3 폐지), §6 `out_of_coverage`(422, 붙임 150 m 초과) (ADR-011 A) | 태우 승인 |
 | 2026-11-08 | v0.10 | §3.1 응답에 `coverage`(보행망 bbox) 필수 (ADR-011 C 의 앞부분, data_as_of 는 뒤에) | 태우 승인 |
 | 2026-11-08 | v0.11 | §7 지오코딩 `GET /geocode/search`·`GET /geocode/reverse` 추가, §6 `geocode_unavailable`(503) (ADR-011 B) | 태우 승인 |
+| 2026-11-08 | v0.12 | §1 `summary`(구조화 칸: 구간·지점 이름·reported_people·roads), §3.1 사건 `type`·`source`·`summary`·`notice`, 응답 `data_as_of` 필수 (ADR-012, ADR-011 C) | 태우 승인 |

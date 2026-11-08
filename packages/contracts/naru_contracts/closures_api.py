@@ -9,8 +9,8 @@ from typing import Literal
 from pydantic import Field, field_validator, model_validator
 
 from naru_contracts._base import Contract
-from naru_contracts.closure import LngLat, Window, _require_offset
-from naru_contracts.enums import Impact, Status
+from naru_contracts.closure import CandidateSummary, LngLat, NoticeRef, Window, _require_offset
+from naru_contracts.enums import ClosureType, Impact, Source, Status
 
 
 class ClosuresQuery(Contract):
@@ -65,6 +65,11 @@ class ClosureEvent(Contract):
     crosswalks: int = Field(ge=1)  # 서로 다른 횡단보도 수
     bbox: tuple[float, float, float, float]  # minLng, minLat, maxLng, maxLat
     approx: bool = False
+    # v0.12 (ADR-012) — 후보의 종류·출처·summary·notice_ref 그대로. v0.12 전 상태는 null
+    type: ClosureType | None = None
+    source: Source | None = None
+    summary: CandidateSummary | None = None
+    notice: NoticeRef | None = None
 
     @model_validator(mode="after")
     def _bbox_min_max(self) -> "ClosureEvent":
@@ -74,10 +79,22 @@ class ClosureEvent(Contract):
         return self
 
 
+class DataAsOf(Contract):
+    """출처별로 저장된 통제의 가장 늦은 근거 시각 (v0.12, ADR-011 C·ADR-012). 없으면 null."""
+
+    topis_incident: datetime | None
+    topis_notice: datetime | None
+    smpa: datetime | None
+    course: datetime | None
+
+    _tz = field_validator("topis_incident", "topis_notice", "smpa", "course")(_require_offset)
+
+
 class ClosureEventsResponse(Contract):
     events: list[ClosureEvent]
     # v0.10 (ADR-011 C) — 보행망 노드의 minLng, minLat, maxLng, maxLat. 내 위치가 밖이면 FE 가 안내
     coverage: tuple[float, float, float, float]
+    data_as_of: DataAsOf  # v0.12
 
     @model_validator(mode="after")
     def _coverage_min_max(self) -> "ClosureEventsResponse":
