@@ -39,4 +39,6 @@ def _code(code: str) -> ErrorCode:
         return "not_found"
     if code == "no_route":
         return "no_route"
+    if code == "out_of_coverage":
+        return "out_of_coverage"
     return "internal"

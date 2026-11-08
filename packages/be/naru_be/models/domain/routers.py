@@ -2,9 +2,12 @@
 
 BaselineRouter 는 같은 그래프에서 통제를 보지 않는다 (INTERFACE §2 baseline). 둘은 _AStarRouter 를
 공유하고 간선 가중(_edge_factor)만 다르다.
-비용 = 거리 + 수직 이동 패널티(stairs·elevator 연결 간선) + 통제 가중.
-  confirmed(도착 시각 기준) → 간선 제외 · scheduled 이고 confidence >= review_confidence → 거리 x3
+비용(m) = 거리 + 수직 이동 패널티(stairs·elevator 연결 간선) + 통제 비용.
+  confirmed(도착 시각 기준) → 간선 제외
+  scheduled 이고 confidence >= review_confidence 이고 도착 시각이 공지 창 안 → 횡단보도마다
+    scheduled_penalty_s(300초) x walk_speed (ADR-011 A). 창 밖(시작 전·끝난 뒤)은 보통
   scheduled 인데 confidence < 0.7, zone_scheduled, released → 보통 간선 (INTERFACE §5, 상태기계 표)
+출발·도착을 붙일 노드가 max_snap_m(150 m) 보다 멀면 OutOfCoverageError (ADR-011 그래프 밖).
 간선 도착 시각 = 출발 시각 + 지금까지 거리 / walk_speed. 폐쇄 판정은 ClosureEngine.status_of_state.
 avoided = 통제가 없었다면 지났을(기준 경로) 횡단보도 중 도착 시각에 confirmed 이거나 scheduled 라서
 피한 것.
@@ -19,7 +22,7 @@ from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime, timedelta
 
 from naru_be.config import Settings
-from naru_be.errors import NoRouteError
+from naru_be.errors import NoRouteError, OutOfCoverageError
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.ped_graph import EdgeKind, PedEdge, PedGraph
 from naru_be.models.domain.types import AvoidedCrosswalk, LngLat, Path, RouteLeg
@@ -30,27 +33,34 @@ EPOCH = datetime(2000, 1, 1, tzinfo=UTC)  # 통제를 안 볼 때의 시각 — 
 
 
 class _AStarRouter:
-    """공통 A*. 서브클래스가 _edge_factor 로 통제 가중을 정한다."""
+    """공통 A*. 서브클래스가 _closure_cost 로 통제 비용을 정한다."""
 
     def __init__(self, ped: PedGraph, settings: Settings | None = None) -> None:
         self.ped = ped
         self.settings = settings or Settings()
 
-    def _edge_factor(self, edge: PedEdge, at: datetime, by_crosswalk: ByCrosswalk) -> float | None:
-        """None = 제외. 1.0 보통."""
-        return 1.0
+    def _closure_cost(self, edge: PedEdge, at: datetime, by_crosswalk: ByCrosswalk) -> float | None:
+        """통제 때문에 더하는 비용(m). None = 제외. 0 = 보통."""
+        return 0.0
 
     def _snap(self, src: LngLat, dst: LngLat) -> tuple[str, str, float, float]:
         a, da = self.ped.nearest_node(*src)
         b, db = self.ped.nearest_node(*dst)
+        limit = self.settings.max_snap_m
+        for dist, field in ((da, "from"), (db, "to")):
+            if dist > limit:
+                raise OutOfCoverageError(
+                    f"{field}: 보행망에서 {dist:.0f} m 떨어져 있다 ({limit:.0f} m 안이어야 한다)",
+                    field,
+                )
         return a, b, da, db
 
-    def _edge_cost(self, edge: PedEdge, factor: float) -> float:
+    def _edge_cost(self, edge: PedEdge) -> float:
         penalty = {
             EdgeKind.stairs: self.settings.stairs_penalty_m,
             EdgeKind.elevator: self.settings.elevator_penalty_m,
         }.get(edge.kind, 0.0)
-        return edge.length_m * factor + penalty
+        return edge.length_m + penalty
 
     def _search(self, a: str, b: str, t: datetime, by_crosswalk: ByCrosswalk) -> list[str]:
         g = self.ped.graph
@@ -78,10 +88,10 @@ class _AStarRouter:
                 if v in done:
                     continue
                 edge: PedEdge = data["edge"]
-                factor = self._edge_factor(edge, at, by_crosswalk)
-                if factor is None:
+                extra = self._closure_cost(edge, at, by_crosswalk)
+                if extra is None:
                     continue
-                cost = best[u] + self._edge_cost(edge, factor)
+                cost = best[u] + self._edge_cost(edge) + extra
                 if cost < best.get(v, math.inf):
                     best[v] = cost
                     walked[v] = walked[u] + edge.length_m
@@ -183,20 +193,27 @@ class TimeDependentRouter(_AStarRouter):
             out.setdefault(c.crosswalk_id, []).append(c)
         return out
 
-    def _edge_factor(self, edge: PedEdge, at: datetime, by_crosswalk: ByCrosswalk) -> float | None:
-        """None = 제외(confirmed). scheduled_cost_factor = 예정(confidence >= 0.7)."""
-        factor = 1.0
+    def _penalized(self, state: ClosureState, status: Status, at: datetime) -> bool:
+        """예정이고 확신도 ≥ 0.7 이고 at 이 공지 창 안 (ADR-011 A). 끝이 없으면 시작 뒤 전부."""
+        if status is not Status.scheduled or state.confidence < self.settings.review_confidence:
+            return False
+        start, end = state.window.start, state.window.end
+        return (start is None or at >= start) and (end is None or at <= end)
+
+    def _closure_cost(self, edge: PedEdge, at: datetime, by_crosswalk: ByCrosswalk) -> float | None:
+        """None = 제외(confirmed). 창 안 예정 횡단보도마다 scheduled_penalty_s x walk_speed (m)."""
+        penalty_m = self.settings.scheduled_penalty_s * self.settings.walk_speed_mps
+        extra = 0.0
         for cid in edge.crosswalk_ids:
+            penalized = False
             for state in by_crosswalk.get(cid, ()):
                 status = self.engine.status_of_state(state, at)
                 if status is Status.confirmed:
                     return None
-                if (
-                    status is Status.scheduled
-                    and state.confidence >= self.settings.review_confidence
-                ):
-                    factor = self.settings.scheduled_cost_factor
-        return factor
+                penalized = penalized or self._penalized(state, status, at)
+            if penalized:
+                extra += penalty_m
+        return extra
 
     def _avoided(
         self,
@@ -219,11 +236,7 @@ class TimeDependentRouter(_AStarRouter):
                     continue
                 for state in by_crosswalk.get(cid, ()):
                     status = self.engine.status_of_state(state, at)
-                    penalized = (
-                        status is Status.scheduled
-                        and state.confidence >= self.settings.review_confidence
-                    )
-                    if status is Status.confirmed or penalized:
+                    if status is Status.confirmed or self._penalized(state, status, at):
                         seen.add(cid)
                         out.append(
                             AvoidedCrosswalk(

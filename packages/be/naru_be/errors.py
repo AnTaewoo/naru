@@ -1,6 +1,7 @@
 """BE 도메인 예외 — INTERFACE §6 오류 코드와 1:1. Model 이 던지고 error_view 가 응답으로 만든다.
 
-code ∈ {invalid_query, unauthorized, not_found, no_route, internal}. Flask 를 모른다.
+code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, internal}.
+Flask 를 모른다.
 """
 
 from __future__ import annotations
@@ -23,4 +24,11 @@ class InvalidQueryError(NaruError):
 
 class NoRouteError(NaruError):
     code = "no_route"
+    http_status = 422
+
+
+class OutOfCoverageError(NaruError):
+    """출발·도착이 보행망에서 max_snap_m 보다 멀다 (ADR-011 그래프 밖). field = from | to."""
+
+    code = "out_of_coverage"
     http_status = 422

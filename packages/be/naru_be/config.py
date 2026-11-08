@@ -33,7 +33,11 @@ class Settings(BaseSettings):
     # 상태기계 (ARCHITECTURE "ClosureState 상태기계", INTERFACE §5)
     review_confidence: float = 0.7  # 미만이면 review_required, 라우팅에 안 씀
     confirmed_confidence: float = 0.8
-    scheduled_cost_factor: float = 3.0  # scheduled 간선 비용 x3
+    # ADR-011 A — 예정(확신도 ≥ review_confidence)은 횡단보도에 닿는 시각이 공지 창 안일 때만
+    # 횡단보도당 +300초(비용은 m 라 walk_speed 로 환산). 창 밖은 보통 간선. 하드 차단은 confirmed 만
+    scheduled_penalty_s: float = 300.0
+    # ADR-011 그래프 밖 — 출발·도착을 보행망에 붙일 거리 상한, 넘으면 out_of_coverage
+    max_snap_m: float = 150.0
     released_grace_min: int = 30  # 시각표 종료 + 30분 → released
     unknown_end_hours: int = 6  # window.end 없으면 시작 + 6시간을 임시 end 로 (INTERFACE §1)
     # ADR-008: unknown 지점이 도로 30 m 안이면 blocks 승격(CandidateIntake). toward 선 확신 상한
