@@ -207,3 +207,9 @@
 - 정한 것: 원래 길과 가장 빠른 길이 거의 겹치면(07:45) 선으로는 안 갈려서 원으로 막힌 곳을 보인다. 고른 길이 바뀌면 그 길에 맞춘다
 - 커밋: 0c26ceb c7f6dbc 5fba6ee 7cd0b80 190d328 (하네스 6a0b943 3ceb367) / 이 항목의 커밋
 
+## 2026-11-08 · T5.9 DONE
+- 한 것: 통제 목록(ADR-012 승인 — 태우 조건: summary 는 구조화 칸만·파서 정규 이름 그대로·Claude 스키마 그대로, 문장·숫자 표기는 FE ko.ts). 후보 summary(구간 from/to/via·지점 이름·reported_people·roads) → BE closure_states 열 4개(Alembic 0003) → 사건 type·source·summary·notice, 응답 data_as_of(INTERFACE v0.12). FE 제목 "시의회~숭례문오거리 집회 → 광화문·고용노동청 행진" / "5만 명 · 태평로"(두 줄까지), 횡단보도 수는 사건 전체(지도를 옮겨도 31곳, 겹친 피처 38 → 31), 출처 줄(시각표·확신)·타임라인 툴팁 원문 제거, 원문은 "공지 원문 보기"에서만, 목록 위 기준 시각 + 실시간 돌발 회색 경고(30분), "지금" 배지는 실제 지금(±5분)일 때만, 통제 불러오기 다가오는 것 먼저·"지난 통제". e2e 31
+- 정한 것: 제목 규칙(첫 구간 끝에서 갈라지면 "A~B 집회 → C·D 행진"), 인원 "5만 명"/"5,000명", data_as_of 는 출처별 게시·시각표·수신 시각(키 topis_notice=topis, topis_incident=incident), 코스 후보도 새 batch_id 로 재기록(같은 batch_id 는 멱등이라 메타가 안 채워짐), 11/7 15:00 /closures 기록 추가
+- 막힌 것 / 태우 대기: 공개 반영 `sudo systemctl restart naru`. 개발 DB(공개 서비스와 같음)에 Alembic 0003 적용됨(열 추가만). 작업 중 `git pull --rebase --autostash origin develop` 으로 T5.8 고침·T5.11·하네스 커밋 해시가 바뀜(내용 같음) — 앞 항목들의 해시는 rebase 전 값
+- 커밋: 9e5445c b586d12 27718a9 377e52b f497fca e733c03 9a38f75 0b88f05 b7ac2e1 c39cc2b 84729f9 424552b e452b97 af9af62 af873c4 54d00f3 5d02767 / 이 항목의 커밋
+
