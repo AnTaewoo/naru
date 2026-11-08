@@ -101,6 +101,9 @@
 ### bus_routes/<날짜>/path_<노선>.json (노선 경로, 운영 워커)
 - 출처: data.go.kr 15000193 서울특별시_노선정보조회 서비스 `http://ws.bus.go.kr/api/rest/busRouteInfo/getRoutePath` (`busRouteId`, `resultType=json`). 워커가 부른 노선마다 하루 한 번, 받은 그대로(키 가림, 기록 형식 `api, endpoint, params, called_at, status, raw`). 키는 `DATA_GO_KR_ROUTE_KEY`(없으면 `DATA_GO_KR_KEY`)
 - 2026-11-08 18:5x 확인(live 2, 노선 01A 100100001): HTTP 401 `{"error":"Unauthorized","message":"유효하지 않은 서비스키입니다: 등록되지 않은 서비스키","status":401}` — 이 키로는 활용신청이 안 돼 있다(태우 신청). 아직 파일 없음
+- 2026-11-09 07:56 KST `data/raw/bus_routes/20261109/` 8개 (T6.3, 워커와 같은 `RoutePaths.ensure`, live 8) — 기록된 버스 위치(recorded bus 11/8 18:38~18:48)의 노선. 형식(실제): `msgBody.itemList[]` = `no`(정점 순번 = 운행 순서), `gpsX`·`gpsY`(WGS84), `posX`·`posY`(EPSG:5181 — Y 가 45만대). 라이선스: 포털(data.go.kr 15000193) 이용허락범위 표기 아직 확인 안 함
+  - `path_100100001.json` 77,918 B sha256 `ce7c1c0c7cb3…` 정점 599 · `path_100100033.json` 312,864 B `5d63e28d27c3…` 2,406 · `path_100100042.json` 198,233 B `eb9c369e62c3…` 1,528 · `path_100100046.json` 217,342 B `32f90853c746…` 1,680 · `path_100100118.json` 189,073 B `193372278688…` 1,469 · `path_100100185.json` 131,167 B `c1138aa73cf3…` 998 · `path_100900003.json` 46,323 B `ef68f59ba97d…` 349 · `path_100900007.json` 68,848 B `b67c3a108246…` 522
+  - 확인(T6.3 test_bus_correction): 기록된 버스 94대가 경로에서 가운데값 0.49 m·최대 17 m — 노선에 맞춘 좌표로 보인다. 노선 길이는 버스 기록의 `rtDist`(km)와 비슷하다(100100001 경로 15.16 km · rtDist 16)
 
 ## recorded
 
