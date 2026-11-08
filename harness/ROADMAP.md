@@ -10,8 +10,8 @@
 | **M1 데모** | **2026-11-16** 최종 제출 (배포 링크·시연 영상·보고서·포스터), 11-21 본행사 | 광화문 일대, 기록된 공지 1세트(마라톤 코스 + 집회 공지) + 실시간 경로 계산 | P0 → P1 → P2 → P3 → P4 → P5 |
 | M2 현장 실증 | 2027-03 서울국제마라톤 | 예측 통제 vs 현장 관측 | P6 → P7 |
 
-**★ 11/16 경로**에 없는 Task는 하지 않는다. 11/16 전까지의 순서: P0(2일) → P1(2일) → P2(1일) → P3(2일) → P4(2일, P1~P3과 병행 가능 — AI 레인) → P5(3일).
-LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지·현장 데이터는 해커톤 이후(P6·P7).
+**★ 11/16 경로**에 없는 Task는 하지 않는다. 11/16 전까지의 순서: P0(2일) → P1(2일) → P2(1일) → P3(2일) → P4(2일, P1~P3과 병행 가능 — AI 레인) → P5(3일). P5 뒤 P6 은 태우가 당겼다(2026-11-08 실서버 점검).
+LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 해커톤 이후(보류·P7). 버스는 확신도 보정(ADR-013)으로 P6 T6.2·T6.3.
 
 ---
 
@@ -247,7 +247,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 산출: BE `GET /closures/events`(ADR-010, INTERFACE v0.8 §3.1 — DB 통제를 (사유, 창) 사건으로 묶어 창·횡단보도 수·범위), FE 하단 시트 "통제 불러오기"(날짜별 목록 → 누르면 그 시작 시각·그 범위로, 지금 통제가 없으면 빈 칸에 안내 버튼), 슬라이더 "지금", 시트 제목 날짜("3월 15일 통제"). 공개 반영은 태우(tmux `make serve` 재시작)
 - 테스트: naru_test 코스 상태로 사건 API, recorded `closure_events.json` → 날짜 묶음·렌더, e2e 홈(지금, 통제 0) → 불러오기 → 3/15 → 길찾기 지하보도 우회 → 지금
 
-> T5.5~T5.10·T6.1~T6.6 — 태우가 naru.antaewoo.com 을 실제로 눌러 보고 실서버 API 를 직접 불러서 나온 문제(2026-11-08). 결정 A–E 는 ADR-011. 순서대로 Task 하나씩 → 보고(iPhone 13 크기 스크린샷 1장) → "다음". 붙여 준 번호 T5.4~T5.9 는 한 칸씩 밀었다(T5.4 는 통제 불러오기, 태우 결정)
+> T5.5~T5.10·T6.1·T6.4~T6.8(ADR-013 버스 T6.2·T6.3 이 끼어 한 번 더 밀림) — 태우가 naru.antaewoo.com 을 실제로 눌러 보고 실서버 API 를 직접 불러서 나온 문제(2026-11-08). 결정 A–E 는 ADR-011. 순서대로 Task 하나씩 → 보고(iPhone 13 크기 스크린샷 1장) → "다음". 붙여 준 번호 T5.4~T5.9 는 한 칸씩 밀었다(T5.4 는 통제 불러오기, 태우 결정)
 
 ### T5.5 라우터 정확성 ★ (최우선)
 - status: DONE
@@ -309,33 +309,47 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 산출: `naru_ai.worker --loop` — 소스별 주기 실행, 한 소스 실패가 다른 소스를 안 막음, 연속 3회 실패면 ERROR 로그. batch_id 는 원문 해시(같은 내용이면 멱등). 첫 소스: OA-13315 5분마다 → 원문 기록(결정 E) → IncidentIngestor → POST /internal/candidates. 기존 notice 후보와 같은 링크·시간이면 confirmed 증거로 붙는지 확인. `deploy/naru-worker.service`(naru.service 와 같은 형식: User=antaewoo, WorkingDirectory, PATH 에 uv 경로, ExecStart=uv run python -m naru_ai.worker --loop, Restart=on-failure). 설치 명령은 보고에 적는다. `make serve` 에서는 워커를 안 띄운다(서비스 분리)
 - 🧑 태우: 서비스 설치
 
-### T6.2 TOPIS 통제 공지 게시판
+### T6.2 버스 관측 수집 (ADR-013, 태우 2026-11-08)
 - status: TODO
 - depends: T6.1
-- 산출: https://topis.seoul.go.kr/notice/openNoticeList.do 를 10분마다(robots 허용 확인됨: /visit/, /map/openTotalMap.do 만 금지). 새 글만 → 원문 기록 → notice_v2 live 파싱(결정 D) → 후보 발행. 기존 N045·N046 문장이 이 게시판 형식이다 — 파싱 결과가 cases 와 같은 형식인지 확인
+- 계기: 버스 신호를 "2대 이탈 → 통제 중 / 정상 통과 → 해제" 이진 규칙에서 기존 통제의 확신도 보정으로 바꾼다(태우 제안, ADR-013 — T6.1 시작 때 커밋). 테스트는 통제일의 실제 버스 기록이 있어야 하는데 지금은 11/7 예시 노선 스냅샷 1장뿐이고 지난 날 위치는 못 받는다 → 수집부터 당겨 다음 통제일부터 기록
+- 산출: 노선 마스터 — 그래프 범위를 지나는 노선의 경로·정류소 순서(열린데이터광장 파일이 있으면 그것, 없으면 노선정보 API — 시작 때 열어 확인), `make fetch SRC=bus_routes`. 계약 `BusPosition`·`BusPositionBatch`(API 필드 그대로, 판단 없음) INTERFACE v0.13. AI `naru_ai/signal/bus_poller.py` — `/closures/events` 의 창·범위로 겹치는 노선 최대 3개를 시작 1시간 전 ~ 끝+30분 60초마다, 원문 기록, 배치 POST, 일 상한 `NARU_BUS_DAILY_CAP`(기본 900, 개발계정 1,000/일 아래). BE `POST /internal/bus-positions` → `BusIntake` → `bus_positions`·`bus_corrections`(Alembic 0004)
+- 테스트: 평일 실제 기록(Task live ≤10, 광화문 노선)으로 파싱·배치·적재
+- 🧑 태우: 노선정보 API 활용신청(필요하면), 워커 재시작 → 다음 통제일부터 자동 기록. 마라톤·M2 는 운영계정 상향
 
-### T6.3 추가 소스 확인 (구현 말고 보고만)
+### T6.3 버스 확신도 보정 (ADR-013)
 - status: TODO
 - depends: T6.2
-- 산출: 각각 한 번만 호출해서 응답 구조·서울 도심 집회 포함 여부·좌표 유무·라이선스를 표로 보고. 쓸지는 태우가 정한다 — TOPIS 통제지도 https://topis.seoul.go.kr/map/openControlMap.do 가 내부적으로 부르는 AJAX 엔드포인트와 응답(좌표가 있는지), 서울 실시간 도시데이터 OA-21285 의 사고통제현황(OA-13315 와 중복인지), 경찰청_교통돌발정보서비스(data.go.kr 15088841 — 서울 도심 집회가 나오는지, 고속도로·국도뿐인지)
+- 산출: BE `bus_correction.py` — 통제 구간(같은 후보의 횡단보도 묶음)마다 최근 20분 관측으로 항목(서로 다른 2대 이상이 15분 안에 피해 감 +0.20·구간 정류소를 2대 이상 건너뜀 +0.10·통과 시간이 평소 2배 초과 2대 이상 +0.10·1대만 피해 감 +0.05·2대 이상 정상 통과 −0.30) → 합 [−0.30, +0.25] → 최종 clamp(공지 + 보정, 0, 0.95). 보정은 시각의 함수(at 기준, 저장값 = base_confidence), bus_skip 은 20분 안에서만 확인 근거, 정상 통과 −0.30 이 20분 간격으로 2번이면 끝 시각 전 해제(bus_return), impact unknown 승격 후보는 지점 30 m 안 노선에서 2대 이탈일 때만 0.65 위로. /closures `confidence` 는 보정 후, `base_confidence` 추가, EvidenceKind `bus`, INTERFACE v0.14. `/route` 는 depart_at 보정으로(0.7 이상·창 안이면 +300초, 0.8 이상 + bus_skip·시작 뒤면 제외, 0.7 아래·해제면 보통). FE 통제 근거 "버스 2대가 16:02·16:06에 세종대로 구간을 피해 감 +0.20 → 확신도 0.95". README 확신도 절. 규칙서(파서 확신도)는 그대로(태우 결정)
+- 테스트: 순수 함수(합·clamp·20분 창·상한·해제 순서)는 실데이터 상수로, 감지 부품은 평일 기록으로, 통제일 통합은 그날 기록으로 — 없으면 "실측 대기"로 보고하고 멈춘다
 
-### T6.4 경찰청 PDF inbox
+### T6.4 TOPIS 통제 공지 게시판
 - status: TODO
 - depends: T6.3
-- 산출: smpa 는 robots.txt 가 막혀 있어 자동 수집 안 한다. `data/raw/notices/smpa/inbox/` 에 태우가 PDF 를 넣으면 워커가 새 파일을 감지 → 표 추출 → notice_v2 live 파싱 → 후보 발행 → 처리한 파일은 `data/raw/notices/smpa/<날짜>.pdf` 로 옮기고 MANIFEST 갱신
+- 산출: https://topis.seoul.go.kr/notice/openNoticeList.do 를 10분마다(robots 허용 확인됨: /visit/, /map/openTotalMap.do 만 금지). 새 글만 → 원문 기록 → notice_v2 live 파싱(결정 D) → 후보 발행. 기존 N045·N046 문장이 이 게시판 형식이다 — 파싱 결과가 cases 와 같은 형식인지 확인
 
-### T6.5 커버리지 확장 판단 (보고)
+### T6.5 추가 소스 확인 (구현 말고 보고만)
 - status: TODO
 - depends: T6.4
-- 산출: 서울 전체 도보망+노드링크 그래프의 적재 시간·메모리·/route 응답 시간을 실측해서 보고(홈서버 32GB). 적재 60초·4GB 이내면 전체로, 넘으면 도심+마라톤 코스 주변 버퍼 — 숫자 보고 태우가 정한다. 마라톤 15구간 중 5구간만 들어간 것도 이것 때문인지 확인
+- 산출: 각각 한 번만 호출해서 응답 구조·서울 도심 집회 포함 여부·좌표 유무·라이선스를 표로 보고. 쓸지는 태우가 정한다 — TOPIS 통제지도 https://topis.seoul.go.kr/map/openControlMap.do 가 내부적으로 부르는 AJAX 엔드포인트와 응답(좌표가 있는지), 서울 실시간 도시데이터 OA-21285 의 사고통제현황(OA-13315 와 중복인지), 경찰청_교통돌발정보서비스(data.go.kr 15088841 — 서울 도심 집회가 나오는지, 고속도로·국도뿐인지)
 
-### T6.6 마감
+### T6.6 경찰청 PDF inbox
 - status: TODO
 - depends: T6.5
+- 산출: smpa 는 robots.txt 가 막혀 있어 자동 수집 안 한다. `data/raw/notices/smpa/inbox/` 에 태우가 PDF 를 넣으면 워커가 새 파일을 감지 → 표 추출 → notice_v2 live 파싱 → 후보 발행 → 처리한 파일은 `data/raw/notices/smpa/<날짜>.pdf` 로 옮기고 MANIFEST 갱신
+
+### T6.7 커버리지 확장 판단 (보고)
+- status: TODO
+- depends: T6.6
+- 산출: 서울 전체 도보망+노드링크 그래프의 적재 시간·메모리·/route 응답 시간을 실측해서 보고(홈서버 32GB). 적재 60초·4GB 이내면 전체로, 넘으면 도심+마라톤 코스 주변 버퍼 — 숫자 보고 태우가 정한다. 마라톤 15구간 중 5구간만 들어간 것도 이것 때문인지 확인
+
+### T6.8 마감
+- status: TODO
+- depends: T6.7
 - 산출: VWorld 키 넣으면 타일 교체(그 전까진 OSM). docker-compose MySQL 포트 127.0.0.1:3307:3306. 2026 JTBC 서울마라톤(11/1) 교통통제 안내(news.seoul.go.kr)로 코스 시각표 추가 가능한지 보고 — 3/15 보다 최근이라 시연용
 
 ### P6 이후 (해커톤 이후, M2)
-RouteSectionIndex · BusDeviationDetector(집회 당일 기록 필요, 없으면 fail) · 버스 폴링 스케줄·운영계정. 내용은 v0.4 P4 그대로. (IncidentIngestor 는 T6.1 로 당김)
+버스 운영계정 상향(🧑 태우, 마라톤·M2 전). 버스 이진 규칙(RouteSectionIndex·BusDeviationDetector: 2대 이탈 → 통제 중, 복귀 → 해제)은 ADR-013 확신도 보정으로 대체 — T6.2·T6.3. (IncidentIngestor 는 T6.1 로 당김)
 
 ## P7 — 현장 실증 (2027-03)
 현장 데이터 규칙(`data/raw/field/<YYYYMMDD>/`: smpa.pdf, topis_notices.json, track.gpx, photos/<HHMMSS>_*.jpg, notes.md + 같은 시각 recorded)은 v0.4와 같다. 예측 통제 vs 관측 대조 → 보고서.
