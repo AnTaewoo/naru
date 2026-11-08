@@ -1,12 +1,5 @@
 // enum 코드값 → 한국어 라벨. 한국어는 이 파일에만 (INTERFACE §4, CONVENTIONS §5.8)
-import type {
-  ClosureType,
-  Evidence,
-  EvidenceKind,
-  Impact,
-  LegKind,
-  Status,
-} from "../types/contracts";
+import type { ClosureType, EvidenceKind, Impact, LegKind, Status } from "../types/contracts";
 
 export const STATUS_KO: Record<Status, string> = {
   scheduled: "예정",
@@ -100,19 +93,6 @@ export function untilKo(end: string | null | undefined, t: string): string {
   return m ? `${h}시간 ${m}분 뒤 해제` : `${h}시간 뒤 해제`;
 }
 
-/** t 와 같은 날(KST)이면 "HH:MM", 다른 날이면 "M/D HH:MM" — 근거 시각 (시각표 게시일 등) */
-export function whenKo(at: string | null | undefined, t: string): string {
-  if (!at || Number.isNaN(new Date(at).getTime())) return "—";
-  const day = (iso: string) => new Date(new Date(iso).getTime() + KST_OFFSET_MIN * 60_000);
-  const a = day(at);
-  const b = day(t);
-  const sameDay =
-    a.getUTCFullYear() === b.getUTCFullYear() &&
-    a.getUTCMonth() === b.getUTCMonth() &&
-    a.getUTCDate() === b.getUTCDate();
-  return sameDay ? hhmm(at) : `${a.getUTCMonth() + 1}/${a.getUTCDate()} ${hhmm(at)}`;
-}
-
 /** 거리: 1 km 아래는 m 반올림("840m"), 넘으면 km 소수 한 자리("1.7km") */
 export function distanceKo(m: number): string {
   const r = Math.round(m);
@@ -142,37 +122,6 @@ export function routeNoteKo(p: {
     return `횡단보도 ${p.crosswalks}곳이 ${until}공지상 통제 시간(현장 확인 전)이라 ${via ?? "피해 가는"} 길을 골랐어요.`;
   }
   return `횡단보도 ${p.crosswalks}곳이 ${until}막혀 있어 ${via ?? "돌아가는"} 길을 골랐어요.`;
-}
-
-/** 공지 근거의 출처 — 근거 ref 의 문장 id 앞머리(`…#smpa-20261107-r01`). 모르면 "통제 공지" */
-const NOTICE_SOURCE_KO: Record<string, string> = {
-  smpa: "서울경찰청 집회 공지",
-  topis: "TOPIS 통제 공지",
-};
-
-/**
- * 근거 한 줄 (통제 근거, 시간순): 상태 전이는 "해제 예정"·"해제"·"통제 시작", 시각표는 구간 label·section,
- * 공지는 출처("서울경찰청 집회 공지"). 오른쪽 배지가 근거 종류라 같은 말을 두 번 쓰지 않는다
- */
-export function evidenceTextKo(e: Evidence, t: string): string {
-  const d = e.detail ?? {};
-  const future = new Date(e.at).getTime() > new Date(t).getTime();
-  const transition = d["transition"];
-  if (typeof transition === "string") {
-    const to = transition.split("→")[1];
-    if (to === "released") return future ? "해제 예정" : "해제";
-    if (to === "confirmed") return future ? "통제 시작 예정" : "통제 시작";
-  }
-  const parts = [d["label"], d["section"]].filter(
-    (x): x is string => typeof x === "string" && x !== "",
-  );
-  if (parts.length > 0) return parts.join(" ");
-  if (typeof d["excerpt"] === "string") return d["excerpt"];
-  if (e.kind === "notice") {
-    const head = e.ref.split("#")[1]?.split("-")[0] ?? "";
-    return NOTICE_SOURCE_KO[head] ?? "통제 공지";
-  }
-  return EVIDENCE_KO[e.kind];
 }
 
 /** /route 오류 코드(INTERFACE §6) → 화면 문구 */

@@ -154,8 +154,8 @@ describe("카드·레그·근거 (순수)", () => {
     expect(rows.map((r) => r.distance)).toEqual(["53m", "9m", "156m", "22m", "96m", "33m", "470m"]);
   });
 
-  it("근거 07:45 — 사유 2묶음(해제 빠른 순), 시각표 게시·해제 예정, 확신도는 /closures 0.9", () => {
-    const groups = evidenceGroups(r0745.avoided, fc0745, T745);
+  it("근거 07:45 — 사유 2묶음(해제 빠른 순), 해제 시각·확신도(/closures 0.9), 출처 줄은 없다", () => {
+    const groups = evidenceGroups(r0745.avoided, fc0745);
     expect(groups.map((g) => g.reason)).toEqual([
       "marathon 1구간 세종대로 사거리~숭례문 오거리",
       "marathon 출발지 광화문 광장 (미국대사관 앞 세종대로)",
@@ -168,17 +168,8 @@ describe("카드·레그·근거 (순수)", () => {
       confidence: 0.9,
     });
     expect(g1?.until).toBe("2026-03-15T08:08:00+09:00");
-    expect(g1?.evidence.map((e) => [e.when, e.text, e.kind, e.source])).toEqual([
-      ["3/12 16:07", "1구간 세종대로 사거리~숭례문 오거리", "timetable", "시각표"],
-      ["08:08", "해제 예정", "timetable", "시각표"],
-    ]);
-    expect(evidenceGroups(r1330.avoided, fc0745, T1330)).toEqual([]);
-    // 11/7 집회: 공지 줄은 문장이 이미 "…공지" 라 출처 배지를 빼고, 해제 예정 줄만 [공지] (태우 2026-11-08)
-    const [rally] = evidenceGroups(r1107.avoided, fc0745, T1107);
-    expect(rally?.evidence.map((e) => [e.when, e.text, e.source])).toEqual([
-      ["11/6 18:00", "서울경찰청 집회 공지", null],
-      ["16:00", "해제 예정", "공지"],
-    ]);
+    expect(g1 && "evidence" in g1).toBe(false); // 원본 출처(공지·시각표 줄)는 쓰지 않는다 (태우 2026-11-08)
+    expect(evidenceGroups(r1330.avoided, fc0745)).toEqual([]);
   });
 });
 
@@ -217,8 +208,10 @@ describe("RouteCard 렌더", () => {
     expect(ev.textContent).not.toContain("이렇게 판단했어요"); // 머리 없이 근거 줄만 (태우 2026-11-08)
     expect(ev.textContent).toContain("마라톤 1구간 세종대로 사거리~숭례문 오거리");
     expect(ev.textContent).toContain("~08:08 23분 뒤 해제"); // 해제 시각과 남은 시간 사이 띄어쓰기
-    expect(ev.textContent).toContain("3/12 16:07");
-    expect(ev.textContent).toContain("해제 예정");
+    // 원본 출처 줄 없음 — 시각표 게시 시각·구간·[시각표] 칸 (태우 2026-11-08)
+    expect(ev.textContent).not.toContain("3/12 16:07");
+    expect(ev.textContent).not.toContain("시각표");
+    expect(ev.textContent).not.toContain("해제 예정");
     expect(ev.textContent).not.toContain("→");
     expect(ev.textContent).toContain("확신도");
     expect(ev.textContent).toContain("0.90");
@@ -248,9 +241,11 @@ describe("RouteCard 렌더", () => {
     fireEvent.click(screen.getByRole("button", { name: "통제 근거" }));
     const ev = screen.getByRole("region", { name: "통제 근거" }).textContent ?? "";
     expect(ev).toContain("공지상 통제 시간 · 현장 확인 전");
-    // 근거 줄: 11/6 18:00 서울경찰청 집회 공지(공지 문장 id smpa-…) — 뒤에 [공지] 칸 없음, 16:00 해제 예정 [공지]
-    expect(ev).toContain("11/6 18:00서울경찰청 집회 공지16:00해제 예정공지");
-    expect(ev).not.toContain("공지공지");
+    // 원본 출처 줄 없음 — "11/6 18:00 서울경찰청 집회 공지 [공지]"·"16:00 해제 예정 [공지]" (태우 2026-11-08)
+    expect(ev).not.toContain("11/6 18:00");
+    expect(ev).not.toContain("서울경찰청");
+    expect(ev).not.toMatch(/공지$|공지확신|예정공지/);
+    expect(ev).toContain("~16:00 1시간 뒤 해제");
     expect(ev).not.toContain("이렇게 판단했어요");
   });
 

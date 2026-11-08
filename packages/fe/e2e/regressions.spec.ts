@@ -29,13 +29,14 @@ test("② 11/7 15:00 세종대로 건너기 — 예정 집회를 시청 지하�
   ).toBeVisible();
   await page.waitForTimeout(2500); // 화면 맞춤·타일 (스크린샷용)
   await page.screenshot({ path: "test-results/iphone13-t55-sejong-1500.png" });
-  // 통제 근거: 공지 줄 뒤에 [공지] 칸이 또 붙지 않는다 (태우 2026-11-08)
+  // 통제 근거: 원본 출처 줄(공지 게시 시각·"서울경찰청 집회 공지"·[공지] 칸)은 쓰지 않는다 (태우 2026-11-08)
   await expandSheet(page, "길찾기 결과");
   await page.getByRole("button", { name: "통제 근거" }).click();
   const ev = page.getByRole("region", { name: "통제 근거" });
-  await expect(ev).toContainText("서울경찰청 집회 공지");
-  await expect(ev).not.toContainText("공지공지");
-  await ev.getByText("해제 예정").scrollIntoViewIfNeeded();
+  await expect(ev).toContainText("~16:00");
+  await expect(ev).not.toContainText("서울경찰청");
+  await expect(ev).not.toContainText("11/6 18:00");
+  await ev.getByText("확신도").scrollIntoViewIfNeeded();
   await page.screenshot({ path: "test-results/iphone13-t58-evidence.png" });
   expect(ownErrors(errors)).toEqual([]);
 });

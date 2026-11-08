@@ -1,17 +1,14 @@
 "use client";
 
-import { Fragment, useMemo } from "react";
+import { useMemo } from "react";
 import {
   AVOIDED_STATUS_KO,
-  EVIDENCE_KO,
   STATUS_KO,
   TYPE_KO,
-  evidenceTextKo,
   hhmm,
   reasonKo,
   reasonType,
   untilKo,
-  whenKo,
 } from "../i18n/ko";
 import { STATUS_BG, STATUS_COLOR } from "../map/colors";
 import { STATUS_SEVERITY } from "../map/layers/closureLayer";
@@ -20,24 +17,15 @@ import { useTime } from "../state/TimeProvider";
 import type {
   Avoided,
   ClosureType,
-  EvidenceKind,
   FeatureCollection,
   RouteResponse,
   Status,
 } from "../types/contracts";
 import styles from "./EvidencePopover.module.css";
 
-// 통제 근거 (시안 03 구조) — 이 경로가 피한 통제를 사유별로: 해제 시각, 근거 줄(시간순), 확신도.
+// 통제 근거 (시안 03 구조) — 이 경로가 피한 통제를 사유별로: 상태·종류, 해제 시각, 확신도.
+// 원본 출처(공지 게시 시각·"서울경찰청 집회 공지"·[공지]/[시각표] 칸)는 쓰지 않는다 (태우 2026-11-08).
 // 확신도는 /route 의 avoided 에 없어서 같은 시각 /closures 의 같은 횡단보도 값을 쓴다 (없으면 숨김)
-export interface EvidenceRow {
-  key: string;
-  at: string;
-  when: string;
-  text: string;
-  kind: EvidenceKind;
-  /** 출처 배지 — 문장이 이미 그 말을 하면(예: "서울경찰청 집회 공지") 같은 말을 또 쓰지 않는다 */
-  source: string | null;
-}
 
 export interface EvidenceGroup {
   reason: string;
@@ -46,17 +34,12 @@ export interface EvidenceGroup {
   crosswalks: number;
   /** null = 종료 미정 */
   until: string | null;
-  evidence: EvidenceRow[];
   confidence: number | null;
 }
 
 const endMs = (iso: string | null) => (iso ? new Date(iso).getTime() : Number.POSITIVE_INFINITY);
 
-export function evidenceGroups(
-  avoided: Avoided[],
-  closures: FeatureCollection,
-  t: string,
-): EvidenceGroup[] {
+export function evidenceGroups(avoided: Avoided[], closures: FeatureCollection): EvidenceGroup[] {
   const conf = new Map<string, number>();
   for (const f of closures.features) {
     const id = f.properties.crosswalk_id;
@@ -73,7 +56,6 @@ export function evidenceGroups(
         type: reasonType(a.reason),
         crosswalks: 0,
         until,
-        evidence: [],
         confidence: null,
         ids: new Set(),
       };
@@ -85,20 +67,9 @@ export function evidenceGroups(
     g.ids.add(a.crosswalk_id);
     const c = conf.get(a.crosswalk_id);
     if (c !== undefined) g.confidence = Math.max(g.confidence ?? 0, c);
-    for (const e of a.evidence) {
-      const text = evidenceTextKo(e, t);
-      const key = `${e.kind}|${e.at}|${text}`;
-      if (g.evidence.some((r) => r.key === key)) continue;
-      const source = text.includes(EVIDENCE_KO[e.kind]) ? null : EVIDENCE_KO[e.kind];
-      g.evidence.push({ key, at: e.at, when: whenKo(e.at, t), text, kind: e.kind, source });
-    }
   }
   return [...groups.values()]
-    .map(({ ids, ...g }) => ({
-      ...g,
-      crosswalks: ids.size,
-      evidence: [...g.evidence].sort((x, y) => endMs(x.at) - endMs(y.at)),
-    }))
+    .map(({ ids, ...g }) => ({ ...g, crosswalks: ids.size }))
     .sort(
       (a, b) =>
         STATUS_SEVERITY[a.status] - STATUS_SEVERITY[b.status] || endMs(a.until) - endMs(b.until),
@@ -108,7 +79,7 @@ export function evidenceGroups(
 export function EvidencePopover({ route }: { route: RouteResponse }) {
   const { closures } = useClosures();
   const { t } = useTime();
-  const groups = useMemo(() => evidenceGroups(route.avoided, closures, t), [route, closures, t]);
+  const groups = useMemo(() => evidenceGroups(route.avoided, closures), [route, closures]);
   return (
     <section className={styles.pop} aria-label="통제 근거">
       {groups.map((g) => (
@@ -127,19 +98,6 @@ export function EvidencePopover({ route }: { route: RouteResponse }) {
           <div className={styles.big}>
             {g.until ? `~${hhmm(g.until)}` : "종료 미정"}{" "}
             <small style={{ color: STATUS_COLOR[g.status] }}>{untilKo(g.until, t)}</small>
-          </div>
-          <div className={styles.ev}>
-            {g.evidence.map((e) => (
-              <Fragment key={e.key}>
-                <span className={styles.when}>{e.when}</span>
-                <span>{e.text}</span>
-                {e.source ? (
-                  <span className={`${styles.badge} ${styles.gray}`}>{e.source}</span>
-                ) : (
-                  <span aria-hidden /> // 세 칸 격자를 맞춘다
-                )}
-              </Fragment>
-            ))}
           </div>
           {g.confidence !== null && (
             <>

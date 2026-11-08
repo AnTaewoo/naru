@@ -58,21 +58,6 @@
   font-weight: 600;
   margin-left: 2px; /* 앞에 띄어쓰기가 있다 */
 }
-.ev {
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 6px 10px;
-  align-items: center;
-  font-size: 13.5px;
-}
-
-.when {
-  color: #999;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
 .conf {
   position: relative;
   height: 6px;
