@@ -47,6 +47,8 @@ describe("naruApiClient", () => {
     const body: RouteResponse = parseRouteResponse(rec.body);
     expect(body.route.type).toBe("LineString");
     expect(body.legs.map((l) => l.kind)).toContain("underpass");
+    const underpass = body.legs.find((l) => l.kind === "underpass");
+    expect(underpass?.coord_range).toEqual([3, 8]); // INTERFACE v0.7, ADR-009
     expect(body.avoided.length).toBeGreaterThan(0);
     expect(body.baseline.distance_m).toBeLessThan(body.distance_m);
     expect(body.computed_at.endsWith("+09:00")).toBe(true);
