@@ -93,7 +93,11 @@
 - 출처: 서울 열린데이터광장 OA-1095 "서울시 버스노선별 정류소 정보" https://data.seoul.go.kr/dataList/OA-1095/S/1/datasetView.do — 매월 XLSX(키 없음). `make fetch SRC=bus_routes` → `scripts/fetch_bus_routes.py` 가 페이지의 가장 최근 파일(seq)을 읽어 `nio_download.do` 로 한 번 받는다(frmFile infId OA-1095·seq 58·infSeq 2 — 페이지의 다른 폼 infSeq 4 는 HTML 이 온다). robots.txt: data.seoul.go.kr 전부 허용, datafile.seoul.go.kr 없음 (2026-11-08 확인). 공공누리 1유형
 - 파일: `data/raw/bus_routes_20261108/OA-1095.xlsx` (원래 이름 `서울시버스노선별정류소정보(20260902).xlsx`, 3,251,120 B, sha256 `b54816e9…b1df`) + `_meta.json`
 - 칸(실제): `ROUTE_ID, 노선명, 순번, NODE_ID, ARS_ID, 정류소명, X좌표, Y좌표` — **X·Y 는 WGS84 경위도**(126.43~127.19, 37.18~37.83). 41,688행, 노선 718개. 세종대로 일대(126.970~126.981, 37.558~37.575)에 정류소가 있는 노선 98개 — 심야(N)·새벽 노선이 섞여 있어 버스 폴러는 뺀다
-- 노선 경로(폴리라인)는 없다 — 정류소 순서만. T6.3 의 "노선에서 60 m 이탈"에는 경로가 필요하다(도로 그래프로 정류소를 잇거나 노선정보 API getRoutePath, 그때 정한다)
+- 노선 경로(폴리라인)는 없다 — 정류소 순서만. 경로는 아래 `bus_routes/<날짜>/` (getRoutePath, 태우 결정 — 도로 그래프로 정류소를 잇지 않는다)
+
+### bus_routes/<날짜>/path_<노선>.json (노선 경로, 운영 워커)
+- 출처: data.go.kr 15000193 서울특별시_노선정보조회 서비스 `http://ws.bus.go.kr/api/rest/busRouteInfo/getRoutePath` (`busRouteId`, `resultType=json`). 워커가 부른 노선마다 하루 한 번, 받은 그대로(키 가림, 기록 형식 `api, endpoint, params, called_at, status, raw`). 키는 `DATA_GO_KR_ROUTE_KEY`(없으면 `DATA_GO_KR_KEY`)
+- 2026-11-08 18:5x 확인(live 2, 노선 01A 100100001): HTTP 401 `{"error":"Unauthorized","message":"유효하지 않은 서비스키입니다: 등록되지 않은 서비스키","status":401}` — 이 키로는 활용신청이 안 돼 있다(태우 신청). 아직 파일 없음
 
 ## recorded
 
@@ -105,7 +109,7 @@
 | rtd | 2026-11-07 | 1 | 실시간 도시데이터 citydata 광화문·덕수궁 (json, 175 KB) |
 | kakao | 2026-11-07 | 3 | 로컬 키워드 검색 숭례문·덕수궁·교보빌딩 (`kakao/keyword/<sha1(검색어)>.json`, 리졸버 재생용). 아래 "recorded/kakao" |
 | kakao/local | 2026-11-08 | 10 | BE 지오코딩 재생용(T5.8, ADR-011 B) — 역지오코딩 4·키워드 6(쓰는 것 3) (`make record API=geocode`). 아래 "recorded/kakao/local" |
-| bus | 2026-11-07 | 9 | 버스위치 getBusPosByRtid 노선 100100118, 차량 12대 (json) + 2026-11-08 광화문 노선 7개(`--routes`, T6.2) + 워커 live 경로 확인 1(100100118). 운영 워커(`NARU_BUS_SOURCE=live`)가 공지 통제 창에만 60초마다 더한다(하루 900). 아래 "recorded/bus" |
+| bus | 2026-11-07 | 9 | 버스위치 getBusPosByRtid 노선 100100118, 차량 12대 (json) + 2026-11-08 광화문 노선 7개(`--routes`, T6.2) + 워커 live 경로 확인 1(100100118). 운영 워커(`NARU_BUS_SOURCE=live`)가 `bus/notice/`(공지 통제 창, 60초)·`bus/incident/`(TOPIS 집회·행사 돌발 기준 데이터, 120초, 하루 300)에 더한다(전체 하루 900). 나누기 전 9개는 `bus/` 바로 아래 그대로. 아래 "recorded/bus" |
 | candidates/course | 2026-11-07 | 1 | `make record-candidates SOURCE=course` — CourseIngestor(T2.2) 출력 `CandidateBatch` 그대로: 후보 16개(시각표 16구간, geometry line, scheduled, confidence 0.9, evidence timetable, v0.6 `impact: blocks`·`toward: null`·`approx: false`). BE 테스트(T2.3)가 naru_ai 없이 최신 파일을 읽는다. 유효본은 `20261107T194153.json`(ADR-008 반영 재기록). 그 전 둘(185022 조각 겹침, 185247 impact 없음)은 삭제 대상. 2026-11-08 T5.9: 같은 입력으로 `20261108T162816.json`(sha256 54b369cb1c6a…, 후보 16 그대로, summary null) — 새 batch_id 라야 개발 DB 의 기존 행에 v0.12 메타(source·type)가 채워진다 |
 
 ### recorded/bus (서울 버스위치정보, data.go.kr)
