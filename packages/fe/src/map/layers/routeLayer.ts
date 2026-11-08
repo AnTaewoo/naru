@@ -348,8 +348,11 @@ export function avoidedLayers(sourceId: string = ROUTE_AVOIDED_SOURCE_ID): Layer
 
 const DIM = 0.35;
 
+type LinePaint = "line-opacity" | "line-dasharray" | "line-width";
+type LinePaintValue = number | number[] | ExpressionSpecification | undefined;
+
 /** 고른 길에 따른 선 모양 (T5.11) — 원래 길이면 원래 길 실선(대시 없음)·굵게, 가장 빠른 길은 흐리게 */
-export function viewPaint(original: boolean): [string, string, unknown][] {
+export function viewPaint(original: boolean): [string, LinePaint, LinePaintValue][] {
   const opacity = original ? DIM : 1;
   return [
     [ROUTE_LAYER_IDS.casing, "line-opacity", opacity],

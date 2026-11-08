@@ -25,10 +25,14 @@ import {
   closurePoints,
 } from "./layers/closureLayer";
 import {
+  ROUTE_AVOIDED_SOURCE_ID,
   ROUTE_BASELINE_SOURCE_ID,
   ROUTE_CROSSING_SOURCE_ID,
   ROUTE_ENTRANCE_SOURCE_ID,
   ROUTE_LINE_SOURCE_ID,
+  avoidedLayers,
+  avoidedPoints,
+  baselineBounds,
   baselineLayers,
   baselineLine,
   crossingLayers,
@@ -39,6 +43,7 @@ import {
   routeLayers,
   routeLine,
   routeOdKey,
+  viewPaint,
   type LngLat,
 } from "./layers/routeLayer";
 import { ZONE_SOURCE_ID, zoneLayers, zonePolygons } from "./layers/zoneLayer";
@@ -98,6 +103,23 @@ function applyRoute(map: MapLibreMap, route: RouteResponse | null) {
   if (crossings instanceof GeoJSONSource) void crossings.setData(crossingSegments(route));
   const entrances = map.getSource(ROUTE_ENTRANCE_SOURCE_ID);
   if (entrances instanceof GeoJSONSource) void entrances.setData(entranceMarkers(route));
+}
+
+/** 고른 길 (T5.11) — 원래 길이면 원래 길 실선·가장 빠른 길 흐리게·지나는 통제 횡단보도에 원 */
+function applyView(
+  map: MapLibreMap,
+  route: RouteResponse | null,
+  original: boolean,
+  closures: FeatureCollection,
+) {
+  const avoided = map.getSource(ROUTE_AVOIDED_SOURCE_ID);
+  const none: FeatureCollection = { type: "FeatureCollection", features: [] };
+  if (avoided instanceof GeoJSONSource) {
+    void avoided.setData(avoidedPoints(original ? route : null, original ? closures : none));
+  }
+  for (const [id, prop, value] of viewPaint(original)) {
+    if (map.getLayer(id)) map.setPaintProperty(id, prop, value);
+  }
 }
 
 /**
@@ -171,7 +193,10 @@ export function MapView({ visible }: MapViewProps) {
   const loaded = useRef(false);
   const { closures, bbox, focus, coverage } = useClosures();
   const dispatch = useClosureDispatch();
-  const { route, from, to, active } = useRoute();
+  const { route, from, to, active, view } = useRoute();
+  // 원래 길 카드를 골랐나 (T5.11) — 피한 통제가 없으면 원래 길도 없다
+  const original = view === "original" && (route?.avoided.length ?? 0) > 0;
+  const originalRef = useRef(original);
   const routeDispatch = useRouteDispatch();
   const fromPin = useRef<Marker | null>(null);
   const toPin = useRef<Marker | null>(null);
@@ -235,11 +260,16 @@ export function MapView({ visible }: MapViewProps) {
       map.addSource(ROUTE_LINE_SOURCE_ID, { type: "geojson", data: routeLine(null) });
       map.addSource(ROUTE_CROSSING_SOURCE_ID, { type: "geojson", data: crossingSegments(null) });
       map.addSource(ROUTE_ENTRANCE_SOURCE_ID, { type: "geojson", data: entranceMarkers(null) });
-      // 아래부터: 예정 구역 → 원래 길 점선 → 경로 실선 → 터널 → 통제 점 → 입구 마커 (시안 02 순서)
+      map.addSource(ROUTE_AVOIDED_SOURCE_ID, {
+        type: "geojson",
+        data: avoidedPoints(null, { type: "FeatureCollection", features: [] }),
+      });
+      // 아래부터: 예정 구역 → 원래 길 점선 → 경로 실선 → 터널 → (원래 길 보기의 원) → 통제 점 → 입구 마커
       for (const layer of zoneLayers()) map.addLayer(layer);
       for (const layer of baselineLayers()) map.addLayer(layer);
       for (const layer of routeLayers()) map.addLayer(layer);
       for (const layer of crossingLayers()) map.addLayer(layer);
+      for (const layer of avoidedLayers()) map.addLayer(layer);
       for (const layer of closureLayers()) map.addLayer(layer);
       for (const layer of entranceLayers()) map.addLayer(layer);
       loaded.current = true;
@@ -247,6 +277,7 @@ export function MapView({ visible }: MapViewProps) {
       applyClosures(map, closuresRef.current);
       applyFilter(map, visibleRef.current);
       applyRoute(map, routeRef.current);
+      applyView(map, routeRef.current, originalRef.current, closuresRef.current);
       fitRoute(map, routeRef.current, fitted);
     });
     map.on("moveend", () => dispatch({ type: "setBbox", bbox: bboxOf(map) }));
@@ -318,6 +349,24 @@ export function MapView({ visible }: MapViewProps) {
     applyRoute(map, route);
     fitRoute(map, route, fitted);
   }, [route]);
+
+  // 고른 길 (T5.11) — 경로·통제가 바뀌어도 다시 그린다
+  useEffect(() => {
+    originalRef.current = original;
+    const map = mapRef.current;
+    if (map && loaded.current) applyView(map, route, original, closures);
+  }, [route, original, closures]);
+
+  // 카드를 눌러 고른 길이 바뀌면 그 길에 맞춘다 — 원래 길이면 원래 길만, 아니면 둘 다
+  const lastOriginal = useRef(original);
+  useEffect(() => {
+    const changed = lastOriginal.current !== original;
+    lastOriginal.current = original;
+    const map = mapRef.current;
+    const bounds = original ? baselineBounds(route) : routeBounds(route);
+    if (!changed || !map || !loaded.current || !bounds) return;
+    map.fitBounds(bounds, { padding: fitPadding(map), maxZoom: 17 });
+  }, [original, route]);
 
   // 통제 불러오기(T5.4) — 고른 통제의 범위로 지도를 맞춘다. 순번이 바뀔 때마다
   useEffect(() => {
