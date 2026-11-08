@@ -96,26 +96,32 @@ def test_during_closure_avoids_repository_confirmed(planner: RoutePlanner) -> No
 
 
 def test_horizon_catches_closure_starting_after_departure(planner: RoutePlanner) -> None:
-    # 04:45 출발: 출발지 구간(05:00~08:30, 36391 만 포함)은 아직 시작 전이라 active_at 엔 없다.
-    # 지평(60분) 조회로 잡혀 scheduled x3 → 36391 대신 다른 횡단보도로 (846.3 m, 2026-11-07)
-    depart = datetime(2026, 3, 15, 4, 45, tzinfo=KST)
+    # ADR-011 A: 예정은 닿는 시각이 공지 창 안일 때만 친다. 지평(60분) 조회는 "걷는 동안 시작하는"
+    # 통제를 잡는다 — 04:59 출발이면 출발지 구간(05:00~08:30, 36391)은 출발 때 active_at 에 없지만
+    # 36391 에 닿을 때(약 75초 뒤, 첫 보도 89.8 m)는 시작해 confirmed → 막혀서 돌아간다
+    depart = datetime(2026, 3, 15, 4, 59, tzinfo=KST)
     assert planner.repo.active_at(depart, planner.bbox_of(query(depart))) == []
     result = planner.plan(query(depart))
     assert {(a.crosswalk_id, a.status) for a in result.path.avoided} == {
-        ("06-0000036391", Status.scheduled)
+        ("06-0000036391", Status.confirmed)
     }
-    assert 840 < result.path.distance_m < 850 and result.path.coords != result.baseline.coords
-    # 06:30 출발: 1구간(07:20~, 23206)은 active_at 에 없지만 avoided 엔 scheduled 로 들어간다
+    assert result.path.coords != result.baseline.coords
+    # 04:45 출발: 끝까지 걸어도 05:00 전 → 창 밖이라 원래 길 그대로 (808.3 m)
+    early = planner.plan(query(datetime(2026, 3, 15, 4, 45, tzinfo=KST)))
+    assert early.path.avoided == () and early.path.coords == early.baseline.coords
+    # 06:30 출발: 출발지(진행 중)는 confirmed 로 막히고, 1구간(07:20~, 23206)은 닿는 시각이
+    # 창 밖이라 피하지 않는다 — 지평 조회엔 들어오지만 비용은 0. 그래서 지하보도까지 가지 않고
+    # 36391 만 비켜 다른 횡단보도로 건넌다 (예전 x3 규칙에선 23206 도 피해 지하보도였다)
     depart = datetime(2026, 3, 15, 6, 30, tzinfo=KST)
     active = planner.repo.active_at(depart, planner.bbox_of(query(depart)))
     at_ids = {c.crosswalk_id for c in active}
     assert "06-0000036391" in at_ids and "06-0000023206" not in at_ids
     result = planner.plan(query(depart))
-    assert EdgeKind.underpass in {leg.kind for leg in result.path.legs}
     assert {(a.crosswalk_id, a.status) for a in result.path.avoided} == {
-        ("06-0000023206", Status.scheduled),
-        ("06-0000036391", Status.confirmed),
+        ("06-0000036391", Status.confirmed)
     }
+    assert result.path.coords != result.baseline.coords
+    assert EdgeKind.underpass not in {leg.kind for leg in result.path.legs}
 
 
 def test_invalid_query_and_no_flask() -> None:
