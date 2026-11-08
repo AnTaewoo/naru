@@ -80,6 +80,8 @@ export function parseFeatureCollection(json: unknown): FeatureCollection {
 
 export function parseClosureEvents(json: unknown): ClosureEventsResponse {
   if (!isRecord(json) || !Array.isArray(json.events)) throw new NaruApiError(200, null);
+  const coverage: unknown = json.coverage; // v0.10 부터 필수 — 보행망 bbox (T5.7)
+  if (!Array.isArray(coverage) || coverage.length !== 4) throw new NaruApiError(200, null);
   return json as unknown as ClosureEventsResponse;
 }
 

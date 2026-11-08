@@ -20,8 +20,10 @@ import { recorded, recordedClosures, recordedEvents, recordedRoute } from "../te
 import {
   DEFAULT_BBOX,
   EMPTY_CLOSURES,
+  asBbox4,
   closureReducer,
   eventBbox,
+  inBbox,
   initialClosureState,
 } from "./ClosureProvider";
 import {
@@ -244,14 +246,18 @@ describe("길찾기 라벨", () => {
 
 // recorded naru_api/closure_events.json — 11/7 집회 2(15:00·12:00 시작) + 3/15 마라톤 5, 시작 늦은 순
 const events = recordedEvents().events;
+// 같은 파일의 coverage (INTERFACE v0.10) — 보행망 노드 bbox (T5.7 재기록, MANIFEST)
+const coverage = asBbox4(recordedEvents().coverage);
 
 describe("closureReducer — 통제 사건·지도 맞춤 (T5.4)", () => {
   it("receiveEvents 로 목록, focus 는 누를 때마다 순번이 올라 같은 사건도 다시 맞춘다", () => {
     const s0 = initialClosureState();
     expect(s0.events).toBeNull();
     expect(s0.focus).toBeNull();
-    const s1 = closureReducer(s0, { type: "receiveEvents", events });
+    expect(s0.coverage).toBeNull();
+    const s1 = closureReducer(s0, { type: "receiveEvents", events, coverage });
     expect(s1.events).toBe(events);
+    expect(s1.coverage).toBe(coverage);
     const bbox = events[0] ? eventBbox(events[0]) : null;
     if (!bbox) throw new Error("기록 사건에 bbox 가 없다");
     const f1 = closureReducer(s1, { type: "focus", bbox });
@@ -292,5 +298,27 @@ describe("근거 문장 (통제 근거 말투, 태우 2026-11-08)", () => {
     const [notice] = recordedRoute("route_1107_1500").avoided[0]?.evidence ?? [];
     if (!notice) throw new Error("공지 근거");
     expect(evidenceTextKo(notice, "2026-11-07T15:00:00+09:00")).toBe("서울경찰청 집회 공지");
+  });
+});
+
+describe("내 위치 (T5.7)", () => {
+  // 출발·도착 = recorded route_0745 질의(카카오 광화문교보빌딩·덕수궁 대한문)
+  const od = odFromLocation(`?from=${q745["from"] ?? ""}&to=${q745["to"] ?? ""}`);
+  const kyobo: LngLat = od.from ?? [0, 0];
+  const daehanmun: LngLat = od.to ?? [0, 0];
+  // 범위 밖 — 태우가 실서버에 보낸 잠실 요청 (recorded naru_api/error_out_of_coverage.json 의 from)
+  const jamsil = parseLatLng(recorded("error_out_of_coverage").query?.["from"]) ?? [0, 0];
+
+  it("coverage — 기록된 보행망 bbox, 교보빌딩·대한문은 안, 잠실은 밖. 숫자 4개가 아니면 null", () => {
+    expect(coverage).toEqual([
+      126.94810841609588, 37.54264971358972, 127.02668353217784, 37.63148349215145,
+    ]);
+    if (!coverage) throw new Error("기록에 coverage 가 없다 — make record-naru-api");
+    expect(inBbox(kyobo, coverage)).toBe(true);
+    expect(inBbox(daehanmun, coverage)).toBe(true);
+    expect(jamsil).toEqual([127.098, 37.5133]);
+    expect(inBbox(jamsil, coverage)).toBe(false);
+    expect(asBbox4([1, 2, 3])).toBeNull();
+    expect(asBbox4([1, 2, "3", 4])).toBeNull();
   });
 });

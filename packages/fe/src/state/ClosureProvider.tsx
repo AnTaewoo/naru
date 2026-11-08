@@ -28,6 +28,8 @@ export interface ClosureState {
   /** 통제 불러오기 목록 (GET /closures/events, T5.4). null = 아직 못 받음 */
   events: ClosureEvent[] | null;
   eventsError: string | null;
+  /** 보행망 범위 (같은 응답의 coverage, INTERFACE v0.10) — 내 위치가 밖이면 안내 (T5.7). null = 모름 */
+  coverage: Bbox4 | null;
   /** 지도 맞춤 요청 — 같은 범위를 다시 눌러도 맞추도록 순번을 올린다 (MapView 가 본다) */
   focus: { bbox: Bbox4; seq: number } | null;
 }
@@ -35,10 +37,23 @@ export interface ClosureState {
 /** [minLng, minLat, maxLng, maxLat] */
 export type Bbox4 = [number, number, number, number];
 
-/** 사건의 bbox (생성 타입이 unknown 튜플이라 숫자를 확인한다) */
+/** 숫자 4개면 Bbox4 (생성 타입이 unknown 튜플이라 숫자를 확인한다) */
+export function asBbox4(xs: readonly unknown[]): Bbox4 | null {
+  const [w, s, e, n] = xs;
+  if (xs.length !== 4) return null;
+  if (typeof w !== "number" || typeof s !== "number") return null;
+  if (typeof e !== "number" || typeof n !== "number") return null;
+  return [w, s, e, n];
+}
+
+/** 사건의 bbox */
 export function eventBbox(e: ClosureEvent): Bbox4 | null {
-  const [w, s, n1, n2] = e.bbox;
-  return [w, s, n1, n2].every((x) => typeof x === "number") ? ([w, s, n1, n2] as Bbox4) : null;
+  return asBbox4(e.bbox);
+}
+
+/** [lng, lat] 가 bbox 안(경계 포함)인가 */
+export function inBbox(p: readonly [number, number], b: Bbox4): boolean {
+  return b[0] <= p[0] && p[0] <= b[2] && b[1] <= p[1] && p[1] <= b[3];
 }
 
 export type ClosureAction =
@@ -46,7 +61,7 @@ export type ClosureAction =
   | { type: "receive"; at: string; bbox: string; closures: FeatureCollection }
   | { type: "fail"; error: string }
   | { type: "setBbox"; bbox: string }
-  | { type: "receiveEvents"; events: ClosureEvent[] }
+  | { type: "receiveEvents"; events: ClosureEvent[]; coverage: Bbox4 | null }
   | { type: "failEvents"; error: string }
   | { type: "focus"; bbox: Bbox4 };
 
@@ -63,6 +78,7 @@ export function initialClosureState(partial: Partial<ClosureState> = {}): Closur
     error: null,
     events: null,
     eventsError: null,
+    coverage: null,
     focus: null,
     ...partial,
   };
@@ -86,7 +102,7 @@ export function closureReducer(state: ClosureState, action: ClosureAction): Clos
     case "setBbox":
       return state.bbox === action.bbox ? state : { ...state, bbox: action.bbox };
     case "receiveEvents":
-      return { ...state, events: action.events, eventsError: null };
+      return { ...state, events: action.events, coverage: action.coverage, eventsError: null };
     case "failEvents":
       return { ...state, eventsError: action.error };
     case "focus":
@@ -140,7 +156,9 @@ export function ClosureProvider({
     const controller = new AbortController();
     api
       .events({}, controller.signal)
-      .then((r) => dispatch({ type: "receiveEvents", events: r.events }))
+      .then((r) =>
+        dispatch({ type: "receiveEvents", events: r.events, coverage: asBbox4(r.coverage) }),
+      )
       .catch((e: unknown) => {
         if (controller.signal.aborted) return;
         const msg = e instanceof NaruApiError ? e.message : "통제 목록을 받지 못했다";

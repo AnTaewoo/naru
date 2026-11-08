@@ -94,6 +94,9 @@ describe("naruApiClient", () => {
     expect(body.events[0]?.window.start).toBe("2026-11-07T15:00:00+09:00");
     expect(body.events[0]?.crosswalks).toBe(31);
     expect(body.events.at(-1)?.reason).toBe("marathon 출발지 광화문 광장 (미국대사관 앞 세종대로)");
+    // v0.10 coverage — 보행망 노드 bbox (T5.7 재기록). 없으면 계약 위반
+    expect(body.coverage).toHaveLength(4);
     expect(() => parseClosureEvents(recorded("closures_0745").body)).toThrow(NaruApiError);
+    expect(() => parseClosureEvents({ events: body.events })).toThrow(NaruApiError);
   });
 });
