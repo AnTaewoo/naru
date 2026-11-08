@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from conftest import CourseWorld
 
+from naru_be.errors import OutOfCoverageError
 from naru_be.models.domain.ped_graph import EdgeKind
 from naru_be.models.domain.routers import BaselineRouter, TimeDependentRouter
 from naru_be.models.domain.types import Path, RouteLeg
@@ -77,29 +78,50 @@ def test_during_closure_detours_via_underpass(
     assert not (used & set(avoided))
 
 
-def test_scheduled_is_penalized_not_excluded(
+def test_scheduled_penalty_only_inside_notice_window(
     world: tuple[TimeDependentRouter, list[ClosureState]],
-) -> None:
+) -> None:  # ADR-011 A — 예정은 닿는 시각이 공지 창 안일 때만 횡단보도당 +300초, 창 밖은 보통
     router, states = world
-    # 04:30: 첫 통제(출발지 05:00) 전이라 전부 scheduled → x3. 세종대로사거리를 피해 지하도가 싸다
+    # 04:30: 첫 통제(출발지 05:00) 전 — 끝까지 걸어도 창 밖이라 기준 경로 그대로
+    # (808.3 m, 2026-11-07)
     at = datetime(2026, 3, 15, 4, 30, tzinfo=KST)
-    path = router.route(KYOBO, DAEHANMUN, at, states)
-    assert EdgeKind.underpass in {leg.kind for leg in path.legs}
-    assert 835 < path.distance_m < 845  # 839.6 m (2026-11-07)
-    assert {(a.crosswalk_id, a.status) for a in path.avoided} == {
-        ("06-0000023206", Status.scheduled),
-        ("06-0000036391", Status.scheduled),
-    }
-    # 07:00: 출발지 구간(05:00~)은 confirmed, 1구간(07:20~)은 scheduled — 횡단보도마다 다르게
+    early = router.route(KYOBO, DAEHANMUN, at, states)
+    assert early.avoided == () and 800 < early.distance_m < 830
+    # 07:00: 출발지(05:00~)는 confirmed 라 차단, 1구간(07:20~)은 닿는 시각(07:0x)이 창 밖이라 보통
     mixed = {
         a.crosswalk_id: a.status
         for a in router.route(KYOBO, DAEHANMUN, at + timedelta(hours=2, minutes=30), states).avoided
     }
-    assert mixed == {"06-0000023206": Status.scheduled, "06-0000036391": Status.confirmed}
-    # confidence < 0.7 인 scheduled 는 무시 → 기준 경로 그대로 (808.3 m)
+    assert mixed == {"06-0000036391": Status.confirmed}
+    # 확신도 0.75(≥ 0.7, 확인 기준 0.8 미만) 면 창 안에서도 scheduled — 07:45 엔 출발지·1구간 창 안
+    # → 횡단보도당 +300초라 지하보도로 피하고, 피한 곳은 scheduled
+    soft = [s.model_copy(update={"confidence": 0.75}) for s in states]
+    inside = router.route(KYOBO, DAEHANMUN, datetime(2026, 3, 15, 7, 45, tzinfo=KST), soft)
+    assert EdgeKind.underpass in {leg.kind for leg in inside.legs}
+    assert {(a.crosswalk_id, a.status) for a in inside.avoided} == {
+        ("06-0000023206", Status.scheduled),
+        ("06-0000036391", Status.scheduled),
+    }
+    # 확신도 0.7 미만 예정은 무시 → 기준 경로 그대로
     low = [s.model_copy(update={"confidence": 0.5}) for s in states]
-    free = router.route(KYOBO, DAEHANMUN, at, low)
+    free = router.route(KYOBO, DAEHANMUN, datetime(2026, 3, 15, 7, 45, tzinfo=KST), low)
     assert free.avoided == () and 800 < free.distance_m < 830
+    assert router.settings.scheduled_penalty_s == 300
+
+
+def test_outside_graph_is_out_of_coverage(
+    world: tuple[TimeDependentRouter, list[ClosureState]],
+) -> None:  # ADR-011 그래프 밖 — 태우 2026-11-08 실서버 요청(잠실), 그래프는 종로·중구
+    router, states = world
+    jamsil_from, jamsil_to = (127.0980, 37.5133), (127.1035, 37.5145)
+    at = datetime(2026, 3, 15, 10, 0, tzinfo=KST)
+    with pytest.raises(OutOfCoverageError) as e:
+        router.route(jamsil_from, jamsil_to, at, states)
+    assert e.value.field == "from" and e.value.code == "out_of_coverage"
+    with pytest.raises(OutOfCoverageError) as e:
+        router.route(KYOBO, jamsil_to, at, states)
+    assert e.value.field == "to"
+    assert router.settings.max_snap_m == 150
 
 
 def leg_length_m(path: Path, leg: RouteLeg) -> float:
