@@ -13,12 +13,12 @@ import {
 import type { LngLat } from "../map/layers/routeLayer";
 import { useRoute, useRouteDispatch, type OdField, type PlaceName } from "../state/RouteProvider";
 import { SearchResults } from "./PlaceSearch";
-import { minutesOf } from "./RouteCard";
 import styles from "./RoutePanel.module.css";
 
 // 시안 01 검색창 → 홈은 장소 검색(결과마다 출발·도착) + 길찾기 버튼. 길찾기를 켜면 시안 02 rpanel
 // (뒤로·출발/도착·내 위치·바꾸기·탭). 칸을 누르면 그 칸이 검색 입력칸이고, 그동안 지도를 누르면 그 칸에
-// (T5.8). 좌표는 화면에 쓰지 않는다 — 장소 이름·주소, 모르면 "선택한 위치". 탭은 "가장 빠른 길"만
+// (T5.8). 좌표는 화면에 쓰지 않는다 — 장소 이름·주소, 모르면 "선택한 위치". 경로 종류가 하나("가장
+// 빠른 길")라 탭 줄은 숨긴다 — 분은 아래 경로 카드에 있다 (T5.10)
 const OD_NAME = { from: "출발", to: "도착" } as const;
 
 function samePoint(a: LngLat, b: LngLat | null): boolean {
@@ -164,7 +164,7 @@ function HomeSearch() {
 }
 
 export function RoutePanel() {
-  const { active, from, to, route, locate, mine, names, editing } = useRoute();
+  const { active, from, to, locate, mine, names, editing } = useRoute();
   const dispatch = useRouteDispatch();
   // 입력 중인 칸의 검색어 — 칸이 바뀌면 빈 칸에서 시작
   const [search, setSearch] = useState<{ which: OdField | null; q: string }>({
@@ -228,12 +228,6 @@ export function RoutePanel() {
           <Field which="to" text={toText} filled={to !== null && locating !== "to"} />
         )}
         <LocateButton which="to" busy={locating === "to"} />
-      </div>
-      <div className={styles.modes} role="tablist" aria-label="경로 종류">
-        <button type="button" role="tab" aria-selected="true" className={styles.mode}>
-          <b>{route ? `${minutesOf(route.duration_s)}분` : "—"}</b>
-          가장 빠른 길
-        </button>
       </div>
       {editing && (
         <SearchResults

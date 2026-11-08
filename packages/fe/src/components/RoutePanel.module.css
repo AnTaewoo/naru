@@ -52,7 +52,7 @@
   right: 0;
   background: #fff;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  padding: 6px 12px 0;
+  padding: 6px 12px; /* 탭 줄이 없어 아래도 6px — 패널 108px (T5.10) */
   z-index: 5;
 }
 
@@ -160,29 +160,4 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.modes {
-  display: flex;
-  margin-top: 6px;
-}
-
-.mode {
-  flex: 1;
-  border: 0;
-  background: none;
-  padding: 8px 0 7px;
-  font: inherit;
-  font-size: 13.5px;
-  color: #2d6bff;
-  border-bottom: 2.5px solid #2d6bff;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.mode b {
-  font-size: 14px;
-  font-variant-numeric: tabular-nums;
 }

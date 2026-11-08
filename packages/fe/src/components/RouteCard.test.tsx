@@ -298,7 +298,7 @@ describe("RoutePanel", () => {
     expect(screen.getByRole("button", { name: "출발 종로구 종로 1" })).toBeDefined();
     const panel = screen.getByRole("region", { name: "출발·도착" });
     expect(panel.textContent).not.toMatch(/\d+\.\d{4}/); // 위경도 숫자 없음
-    expect(screen.getByRole("tab", { selected: true }).textContent).toContain("12분");
+    expect(screen.queryByRole("tablist")).toBeNull(); // 경로 종류가 하나라 탭 줄은 숨김 (T5.10)
     fireEvent.click(screen.getByRole("button", { name: "출발·도착 바꾸기" }));
     expect(screen.getByRole("button", { name: "출발 중구 세종대로 99" })).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "뒤로" }));

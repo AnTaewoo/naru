@@ -21,7 +21,7 @@
 }
 
 .app[data-mode="route"] :global(.maplibregl-ctrl-top-right) {
-  top: 172px;
+  top: 116px; /* 출발·도착 패널 108px 아래 (탭 줄 숨김, T5.10) */
 }
 
 /* 하단 시트 "전체"의 윗변 — 위에 떠 있는 UI 바로 아래 (T5.6, BottomSheet 가 읽는다) */
@@ -30,7 +30,7 @@
 }
 
 .app[data-mode="route"] {
-  --sheet-top: 176px;
+  --sheet-top: 112px; /* 출발·도착 패널 108px 아래 (T5.10) */
 }
 
 .mapLoading {
