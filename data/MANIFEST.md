@@ -112,7 +112,10 @@
 | topis_notice | 2026-11-07 | 2 | TOPIS 공지 NoticeList 최신 300건 (xml) + 2026-11-08 최신 30건(T6.4). 운영 워커가 10분마다 바뀔 때만 더한다. 아래 "recorded/topis_notice" |
 | incident | 2026-11-07 | 4 | TOPIS 돌발 — AccMainCode 13 · AccSubCode 43 · AccInfo 53행 (`make record API=incident`). 2026-11-08 AccInfo 1(워커 live 경로 확인, T6.1). 운영 워커(`NARU_INCIDENT_SOURCE=live`)가 5분마다 내용이 바뀔 때만 더한다 |
 | links | 2026-11-07 | 14 | 돌발 링크 4개의 LinkInfo + LinkVerInfo (`make record API=links --limit 4`) + 2026-11-08 집회 링크 3개(`--links`, T6.1). 운영 워커는 처음 보는 링크만 받아 더한다 |
-| rtd | 2026-11-07 | 1 | 실시간 도시데이터 citydata 광화문·덕수궁 (json, 175 KB) |
+| rtd | 2026-11-07 | 2 | 실시간 도시데이터 citydata 광화문·덕수궁 (json) — 11/7 15:41(175 KB) + 11/9 08:28(T6.5, 사고통제현황 0건) |
+| topis_web | 2026-11-09 | 3 | TOPIS 홈페이지 원문(T6.5 조사, ADR-011 E — robots 허용·같은 곳 10분 간격·NaruBot): 통제지도 openControlMap.do 와 그 내부 AJAX 응답. 아래 "recorded/… (T6.5 조사)" |
+| data_go_kr_web | 2026-11-09 | 1 | 공공데이터포털 15088841(경찰청_교통돌발정보서비스) 페이지(T6.5) |
+| seoul_opendata_web | 2026-11-09 | 1 | 열린데이터광장 OA-21285(실시간 도시데이터) 페이지(T6.5 — 라이선스 확인) |
 | kakao | 2026-11-07 | 3 | 로컬 키워드 검색 숭례문·덕수궁·교보빌딩 (`kakao/keyword/<sha1(검색어)>.json`, 리졸버 재생용). 아래 "recorded/kakao" |
 | kakao/local | 2026-11-08 | 10 | BE 지오코딩 재생용(T5.8, ADR-011 B) — 역지오코딩 4·키워드 6(쓰는 것 3) (`make record API=geocode`). 아래 "recorded/kakao/local" |
 | bus | 2026-11-07 | 9 | 버스위치 getBusPosByRtid 노선 100100118, 차량 12대 (json) + 2026-11-08 광화문 노선 7개(`--routes`, T6.2) + 워커 live 경로 확인 1(100100118). 운영 워커(`NARU_BUS_SOURCE=live`)가 `bus/notice/`(공지 통제 창, 60초)·`bus/incident/`(TOPIS 집회·행사 돌발 기준 데이터, 120초, 하루 300)에 더한다(전체 하루 900). 나누기 전 9개는 `bus/` 바로 아래 그대로. 아래 "recorded/bus" |
@@ -157,6 +160,15 @@
 - 출처: 열린데이터광장 `citydata` (json), AREA_NM=광화문·덕수궁(AREA_CD POI009). 파일 `data/recorded/rtd/20261107T154125_citydata.json`
 - 필드(실제): `CITYDATA.{AREA_NM, AREA_CD, LIVE_PPLTN_STTS[{AREA_CONGEST_LVL, AREA_CONGEST_MSG, AREA_PPLTN_MIN, AREA_PPLTN_MAX, PPLTN_TIME, FCST_PPLTN[]}], ROAD_TRAFFIC_STTS, PRK_STTS, SUB_STTS, LIVE_SUB_PPLTN, BUS_STN_STTS, LIVE_BUS_PPLTN, ACDNT_CNTRL_STTS, SBIKE_STTS, WEATHER_STTS}`. 2026-11-07 15:10 "약간 붐빔" 48,000~50,000명
 - 기록 형식: `api, endpoint(키는 <키>), params, called_at(+09:00), status, raw`. 응답 본문의 키도 `<키>`로 가린다
+- 2026-11-09 08:28:44 `data/recorded/rtd/20261109T082844_citydata.json` (186,128 B, sha256 `7388ab7220fb…`, T6.5) — `ACDNT_CNTRL_STTS` 0건(같은 때 OA-13315 AccInfo 08:24 는 서울 9건, 광화문·덕수궁 안 없음). 라이선스 공공누리 1유형(OA-21285 페이지, 아래)
+
+### recorded/topis_web · data_go_kr_web · seoul_opendata_web (T6.5 조사 — 웹 페이지·내부 AJAX 원문)
+- 받은 방법: `web_record`(조사 스크립트, 받은 그대로 `api, endpoint, params{method, body}, called_at, status, content_type, raw`, 키는 `<키>`). ADR-011 E — robots.txt 확인(TOPIS 11/8 19:19: `/visit/`·`/map/openTotalMap.do` 만 금지, data.go.kr: Googlebot 규칙뿐, data.seoul.go.kr: 모두 허용), 같은 곳 10분 간격, User-Agent `NaruBot/0.1 (+https://naru.antaewoo.com)`
+- `topis_web/20261109T082705_openControlMap.json` (116,464 B, sha256 `6ee2efe548d1…`) — TOPIS 교통통제 지도 페이지. 안의 스크립트가 부르는 AJAX: 목록 `POST /map/accMap/selectAccAllListASC.do {accDate: NOW, trafficdataAppyYn: Y}`, 통제 도로 `POST /map/accMap/selectAccLinkList.do {accId, trafficdataAppyYn: Y}`, 링크 꼭짓점 `POST /map/selectVmsLinkList.do {linkId}`(rows `grs80tmX·grs80tmY`, EPSG:5181). 저작권·이용약관 표기 없음
+- `topis_web/20261109T083719_selectAccAllListASC.json` (5,608 B, sha256 `2b0512512a61…`) — 목록 6행: `accId, ingYn(Y 통제 중·N 예정), accType/accTypeNm, accDtype/accDtypeNm, roadNm, roadNms, linkId, linkNm, posX·posY(EPSG:5181), occrDt·clrDt, accRoadYn(전체·부분 통제), accRoadCnt, accInfo …`. 예정 3(덕수궁길 행사, 국회대로 집회 1109233 — 경찰청 11/9 r02 행진 9.5 km, 강남대로 집회 1109234)은 같은 때 OA-13315 에 없고, 통제 중 3 중 2개(1071788·1071792)는 OA-13315 와 같은 acc_id, 1개(1108643 남이장군사당제 — TOPIS 공지 6289)는 OA-13315 에 없다
+- `topis_web/20261109T084734_selectAccLinkList_1109233.json` (4,697 B, sha256 `32a9ce8fef6d…`) — 1109233 통제 도로 19행: `accId, linkId, linkSeq, axisCd, axisDirCd(NB·EB·WB·IN), stNodeNm, edNodeNm, roadName, ingYn`. 도로축(axisCd)마다 linkSeq 순으로 이으면 행진 경로 전체 — 국회대로 → 여의서로 → 여의대로(마포대교) → 마포대로 → 신촌로 → 충정로 → 새문안로 → 세종대로(세종대로사거리 → 광화문) → 사직로 → 효자로. 링크 꼭짓점은 OA-13311 LinkVerInfo 와 같은 TOPIS 링크(아직 기록 없음)
+- `data_go_kr_web/20261109T082805_openapi_15088841.json` (188,740 B, sha256 `a2fda234f6e9…`) — 경찰청_교통돌발정보서비스: "고속도로 및 국도상의 실시간 돌발 정보", XML, "키 값 및 IP 인증 필요", 제공형태 LINK(경찰청 도시교통정보센터 쪽 키), 이용허락범위 제한 없음, 무료
+- `seoul_opendata_web/20261109T082921_OA-21285.json` (115,011 B, sha256 `9bbd6924917c…`) — 서울시 실시간 도시데이터: 공공누리 1유형(출처표시, 상업적 이용·변경 가능), 제공기관 서울특별시, 실시간
 
 ### recorded/naru_api (로컬 Flask 응답 — FE 테스트 입력, T3.4)
 - 출처: `make record-naru-api` → `scripts/record_naru_api.py`. 실제 앱(create_app, 개발 DB naru)에 `data/recorded/candidates/course/` 최신 배치를 POST 한 뒤 /route·/closures·/closures/events·/geocode/*·오류 응답을 그대로 기록. 기록일 2026-11-08T07:56:52+00:00, 커밋 c0b787d
