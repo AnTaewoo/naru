@@ -6,7 +6,9 @@ import { RECORDED_DIR, recorded } from "../test/recorded";
 import type { FeatureCollection, RouteResponse } from "../types/contracts";
 import {
   closuresUrl,
+  eventsUrl,
   NaruApiError,
+  parseClosureEvents,
   parseFeatureCollection,
   parseRouteResponse,
   routeUrl,
@@ -74,5 +76,24 @@ describe("naruApiClient", () => {
     expect(body.error.field).toBe("depart_at");
     expect(() => parseRouteResponse(err.body)).toThrow(NaruApiError);
     expect(() => parseFeatureCollection({ type: "Feature" })).toThrow(NaruApiError);
+  });
+
+  it("통제 사건 (INTERFACE §3.1, T5.4) — URL 은 bbox 선택, recorded 응답을 그대로 파싱", () => {
+    expect(eventsUrl("/api")).toBe("/api/closures/events");
+    const scoped = new URL(
+      eventsUrl("/api", { bbox: "126.965,37.555,126.990,37.580" }),
+      "http://naru.test",
+    );
+    expect(scoped.pathname).toBe("/api/closures/events");
+    expect(scoped.searchParams.get("bbox")).toBe("126.965,37.555,126.990,37.580");
+    const rec = recorded("closure_events");
+    expect(rec.path).toBe("/closures/events");
+    const body = parseClosureEvents(rec.body);
+    // 기록 당시 개발 DB: 11/7 집회 2 + 3/15 마라톤 5, 시작 늦은 순 (closure_events.json 을 열어 확인)
+    expect(body.events).toHaveLength(7);
+    expect(body.events[0]?.window.start).toBe("2026-11-07T15:00:00+09:00");
+    expect(body.events[0]?.crosswalks).toBe(31);
+    expect(body.events.at(-1)?.reason).toBe("marathon 출발지 광화문 광장 (미국대사관 앞 세종대로)");
+    expect(() => parseClosureEvents(recorded("closures_0745").body)).toThrow(NaruApiError);
   });
 });

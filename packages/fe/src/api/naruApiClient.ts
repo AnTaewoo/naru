@@ -1,5 +1,10 @@
 // 네트워크를 만지는 유일한 파일 (CONVENTIONS §5.4). 같은 오리진 /api/* → Next rewrites → Flask.
-import type { ErrorBody, FeatureCollection, RouteResponse } from "../types/contracts";
+import type {
+  ClosureEventsResponse,
+  ErrorBody,
+  FeatureCollection,
+  RouteResponse,
+} from "../types/contracts";
 
 export interface RouteParams {
   /** "lat,lng" (INTERFACE §2) */
@@ -13,6 +18,11 @@ export interface ClosuresParams {
   /** "minLng,minLat,maxLng,maxLat" (INTERFACE §3) */
   bbox: string;
   at: string;
+}
+
+export interface EventsParams {
+  /** "minLng,minLat,maxLng,maxLat" — 없으면 전체 (INTERFACE §3.1) */
+  bbox?: string;
 }
 
 export class NaruApiError extends Error {
@@ -33,6 +43,13 @@ export function routeUrl(baseUrl: string, p: RouteParams): string {
 export function closuresUrl(baseUrl: string, p: ClosuresParams): string {
   const q = new URLSearchParams({ bbox: p.bbox, at: p.at });
   return `${baseUrl}/closures?${q.toString()}`;
+}
+
+export function eventsUrl(baseUrl: string, p: EventsParams = {}): string {
+  const q = new URLSearchParams();
+  if (p.bbox) q.set("bbox", p.bbox);
+  const qs = q.toString();
+  return `${baseUrl}/closures/events${qs ? `?${qs}` : ""}`;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -61,10 +78,16 @@ export function parseFeatureCollection(json: unknown): FeatureCollection {
   return json as unknown as FeatureCollection;
 }
 
+export function parseClosureEvents(json: unknown): ClosureEventsResponse {
+  if (!isRecord(json) || !Array.isArray(json.events)) throw new NaruApiError(200, null);
+  return json as unknown as ClosureEventsResponse;
+}
+
 export interface NaruApiClient {
   readonly baseUrl: string;
   route(p: RouteParams, signal?: AbortSignal): Promise<RouteResponse>;
   closures(p: ClosuresParams, signal?: AbortSignal): Promise<FeatureCollection>;
+  events(p?: EventsParams, signal?: AbortSignal): Promise<ClosureEventsResponse>;
 }
 
 async function getJson(
@@ -91,5 +114,7 @@ export function createNaruApiClient(
       parseRouteResponse(await getJson(routeUrl(baseUrl, p), fetchImpl, signal)),
     closures: async (p, signal) =>
       parseFeatureCollection(await getJson(closuresUrl(baseUrl, p), fetchImpl, signal)),
+    events: async (p, signal) =>
+      parseClosureEvents(await getJson(eventsUrl(baseUrl, p), fetchImpl, signal)),
   };
 }

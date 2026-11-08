@@ -174,3 +174,32 @@ export const ROUTE_ERROR_KO: Record<string, string> = {
 export function routeErrorKo(code: string | null): string {
   return (code && ROUTE_ERROR_KO[code]) || "경로를 받지 못했어요. 잠시 뒤 다시 해 주세요";
 }
+
+const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
+
+function kstParts(iso: string): { y: number; m: number; d: number; wd: number } | null {
+  const ms = new Date(iso).getTime();
+  if (Number.isNaN(ms)) return null;
+  const k = new Date(ms + KST_OFFSET_MIN * 60_000);
+  return { y: k.getUTCFullYear(), m: k.getUTCMonth() + 1, d: k.getUTCDate(), wd: k.getUTCDay() };
+}
+
+/** "3월 15일" (KST). 시각이 없으면 "시간 미정" */
+export function dateKo(iso: string | null | undefined): string {
+  const p = iso ? kstParts(iso) : null;
+  return p ? `${p.m}월 ${p.d}일` : "시간 미정";
+}
+
+/** "3월 15일 (일)" (KST) — 통제 불러오기의 날짜 머리 */
+export function dayKo(iso: string | null | undefined): string {
+  const p = iso ? kstParts(iso) : null;
+  return p ? `${p.m}월 ${p.d}일 (${WEEKDAY_KO[p.wd] ?? ""})` : "시간 미정";
+}
+
+/** 하단 시트 제목 — 기준 시각 t 가 지금과 같은 날(KST)이면 "오늘 통제", 아니면 "3월 15일 통제" */
+export function sheetTitleKo(t: string, nowMs: number): string {
+  const a = kstParts(t);
+  const b = kstParts(new Date(nowMs).toISOString());
+  const same = a !== null && b !== null && a.y === b.y && a.m === b.m && a.d === b.d;
+  return same ? "오늘 통제" : `${dateKo(t)} 통제`;
+}
