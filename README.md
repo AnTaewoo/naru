@@ -52,19 +52,29 @@ P0 데이터·툴체인 → P1 그래프·인덱스(`from_segment` 포함) → P
 
 1. 순서: MySQL·마이그레이션 → Next 빌드 → gunicorn `127.0.0.1:5050`(workers 2·threads 4) → AI 워커 1회(코스·공지 기록 재생, 외부 API 호출 없음) → Next `127.0.0.1:3050`
 2. 포트를 바꾸려면 `make serve SERVE_BE_PORT=… SERVE_FE_PORT=…`. 둘 다 127.0.0.1 에만 열린다
-3. 공개는 nginx 가 FE 포트 하나만 프록시한다. Flask 와 `/internal/*` 은 밖에 열지 않는다(Next rewrites 가 `/api/internal/*` 을 넘기지 않는다)
+3. 공개 주소는 **https://naru.antaewoo.com** (DNS 2026-11-08). nginx 가 FE 포트 하나만 프록시한다. Flask 와 `/internal/*` 은 밖에 열지 않는다(Next rewrites 도 `/api/internal/*` 을 넘기지 않는다)
    ```nginx
    server {
-       server_name naru.example.com;          # 태우가 정하는 도메인
+       listen 80;
+       server_name naru.antaewoo.com;
+       location / { return 301 https://$host$request_uri; }
+   }
+   server {
+       listen 443 ssl;
+       server_name naru.antaewoo.com;
+       ssl_certificate     /etc/letsencrypt/live/<인증서 이름>/fullchain.pem;
+       ssl_certificate_key /etc/letsencrypt/live/<인증서 이름>/privkey.pem;
+       location /api/internal/ { return 404; }
        location / {
            proxy_pass http://127.0.0.1:3050;
+           proxy_http_version 1.1;
            proxy_set_header Host $host;
            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
            proxy_set_header X-Forwarded-Proto $scheme;
        }
-       # TLS 는 이 서버의 기존 nginx 인증서 설정을 따른다
    }
    ```
+   인증서가 이름을 나열한 형식이면 `naru.antaewoo.com` 을 더해 다시 받는다: `certbot certonly --nginx --cert-name <인증서 이름> -d <기존 이름 전부> -d naru.antaewoo.com` 뒤 nginx 다시 읽기
 4. 계속 띄워 두기: tmux 나 systemd 사용자 서비스에서 `make serve`. 코드를 바꾸면 다시 `make serve`(빌드부터 한다)
 5. 확인: `NARU_FE_ORIGIN=http://127.0.0.1:3050 NARU_CHROME_PATH=/usr/local/bin/google-chrome pnpm -C packages/fe e2e` (10 passed)
 6. 시연 주소: `/?t=2026-03-15T07:45:00+09:00&from=37.5709686446227,126.9779039768265&to=37.5650416322942,126.976542945622`. 고지는 `/licenses`
