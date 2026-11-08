@@ -47,7 +47,7 @@
 | `Resolver` | `resolve(tag, canonical) -> PlacePoint \| None` | 지명사전: 교차로(서울시 데이터) · 도로명(도로명코드) · POI/주소(카카오 기록). 못 찾으면 None |
 | `CandidateBuilder` | `build(parsed) -> list[ClosureCandidate]` | segments → `SegmentGeom`(양 끝 풀린 것만), 나머지 spans → `PointGeom`. confidence는 출처·시간 명시 여부 규칙 |
 | `ZoneMatcher` | `match(zone_name) -> ZoneGeom` | 지역명(여의도·광화문 일대) → 폴리곤. v1 |
-| `IncidentIngestor` | `pull() -> list[ClosureCandidate]` | TOPIS 돌발 → link_ids |
+| `IncidentIngestor` | `build(incidents, ref, received_at) -> list[ClosureCandidate]` | TOPIS 돌발(OA-13315) 집회(10B02)만 → TOPIS 링크 선(LinkVerInfo, 없으면 돌발 좌표 점)·확신도 0.9·근거 topis_incident(at = 수신 시각). 원문·링크는 `SeoulOpenApi` 가 기록 (T6.1) |
 | `BusPoller` | `poll() -> BusPositionBatch` | 통제 창(시작 1시간 전 ~ 끝+30분) 노선 최대 3개를 60초마다 → 원문 기록 → `POST /internal/bus-positions`. 판단 없음, 후보를 만들지 않는다 (ADR-013, T6.2) |
 | `CongestionWatcher` | `watch(zone) -> CongestionSpike \| None` | confidence 승격만 (보류, ADR-002) |
 | `IngestWorker` | `run_forever()` (`--loop`) | 스케줄: 코스 1회 · 공지 5분 · 돌발(OA-13315) 5분 · 공지 게시판 10분(T6.4) · 버스 60초(통제 창만, T6.2) · 혼잡 보류. 소스마다 격리, 연속 3회 실패면 ERROR. 일 상한 LLM 200·버스 900. 웹 페이지는 같은 곳 10분 이상, 키로 쓰는 공개 API 는 그 한도 (ADR-011 E·ADR-013 H) |
@@ -70,7 +70,7 @@
 | `CrosswalkIndex` | `from_point(pt, radius_m=30)` · `from_line(line, buffer_m)` · `from_segment(seg)` → `set[str]` | geometry → crosswalk_ids. STRtree, EPSG:5179. **`from_segment`**: `RoadGraph.shortest_path(from, via, to, road)` → LineString → 버퍼(`road_class`: 대로 25 / 로 15 / 길 8 m) → `from_line` |
 | `RoadGraph` | `shortest_path(points, road=None) -> LineString` | 표준노드링크(또는 도보망) NetworkX. road가 있으면 그 도로명 링크만 |
 | `ClosureEngine` | `apply(candidate, crosswalk_ids) -> list[ClosureState]` · `transition(prev, evidence)` | 상태기계 |
-| `CandidateIntake` | `accept(batch) -> IntakeResult` | 후보 → CrosswalkIndex → ClosureEngine → Repository |
+| `CandidateIntake` | `accept(batch) -> IntakeResult` | 후보 → CrosswalkIndex → ClosureEngine → Repository. 돌발 ↔ 공지가 같은 횡단보도·겹치는 시각이면 공지 후보 전체에 topis_incident 근거(어느 쪽이 먼저 와도). 같은 배치 재수신은 받은 시각만 새로(= data_as_of 돌발) (T6.1) |
 | `BusIntake` | `accept(batch) -> int` | 버스 위치 적재(`bus_positions`) → 영향 받는 후보의 보정 계열(`bus_corrections`) 다시 계산 (ADR-013, T6.2·T6.3) |
 | `BusCorrection` | `correction(candidate_id, at) -> Correction` | 최근 20분 관측 → 항목 합 [−0.30, +0.25] → clamp(base + 합, 0, 0.95), bus_skip 은 20분 안에서만, 정상 통과 2번(20분 간격)이면 해제. 읽을 때 적용 (ADR-013, T6.3) |
 | `ClosureStateEntity` | SQLAlchemy ORM, 테이블 `closure_states` | crosswalk_id, status, confidence, window_start/end(UTC), evidence(JSON), lng/lat |
