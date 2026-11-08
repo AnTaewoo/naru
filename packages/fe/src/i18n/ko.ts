@@ -1,5 +1,14 @@
 // enum 코드값 → 한국어 라벨. 한국어는 이 파일에만 (INTERFACE §4, CONVENTIONS §5.8)
-import type { ClosureType, EvidenceKind, Impact, LegKind, Status } from "../types/contracts";
+import type {
+  ClosureEvent,
+  ClosureType,
+  DataAsOf,
+  EvidenceKind,
+  Impact,
+  LegKind,
+  Status,
+  SummarySegment,
+} from "../types/contracts";
 
 export const STATUS_KO: Record<Status, string> = {
   scheduled: "예정",
@@ -241,4 +250,92 @@ export function sheetTitleKo(t: string, nowMs: number): string {
   const b = kstParts(new Date(nowMs).toISOString());
   const same = a !== null && b !== null && a.y === b.y && a.m === b.m && a.d === b.d;
   return same ? "오늘 통제" : `${dateKo(t)} 통제`;
+}
+
+// 통제 목록 문구 (T5.9, ADR-012) — 제목·둘째 줄은 파서 요약(구조화 칸)으로. 문장·숫자 표기는 여기서만
+type EventLike = Pick<ClosureEvent, "reason" | "type" | "summary">;
+
+function uniq(xs: string[]): string[] {
+  return xs.filter((x, i) => xs.indexOf(x) === i);
+}
+
+/** 구간 경로 "A → B → C" (via 포함, 같은 이름이 이어지면 하나로) */
+function pathKo(s: SummarySegment): string {
+  const names = [s.from_, ...(s.via ?? []), s.to];
+  return names.filter((n, i) => i === 0 || n !== names[i - 1]).join(" → ");
+}
+
+/**
+ * 사건 제목 — 공지 "A~B → C·D" 는 "A~B 집회 → C·D 행진"(첫 구간 끝에서 갈라지는 구간이 행진),
+ * 그 밖은 구간 경로·지점 이름 + 종류. 요약이 없으면(마라톤 등) reason
+ */
+export function eventTitleKo(e: EventLike): string {
+  const segs = e.summary?.segments ?? [];
+  const points = e.summary?.points ?? [];
+  const label = e.type ? TYPE_KO[e.type] : "";
+  const [first, ...rest] = segs;
+  if (first) {
+    const branches = uniq(rest.filter((x) => x.from_ === first.to).map((x) => x.to));
+    if (branches.length > 0 && first.from_ !== first.to) {
+      return `${first.from_}~${first.to} ${TYPE_KO.rally} → ${branches.join("·")} ${TYPE_KO.march}`;
+    }
+    const body = segs.map((x) =>
+      e.type === "rally" ? (x.from_ === x.to ? x.from_ : `${x.from_}~${x.to}`) : pathKo(x),
+    );
+    return `${uniq(body).join(", ")} ${label}`.trim();
+  }
+  if (points.length > 0) return `${uniq(points).join("·")} ${label}`.trim();
+  return reasonKo(e.reason);
+}
+
+/** 인원 — 만 명부터는 "5만 명"(소수 한 자리까지), 그 아래는 "5,000명" */
+export function peopleKo(n: number): string {
+  if (n >= 10_000) return `${Math.round(n / 1_000) / 10}만 명`;
+  return `${n.toLocaleString("ko-KR")}명`;
+}
+
+/** 사건 둘째 줄 — "5만 명 · 태평로". 요약이 없으면 빈 문자열 */
+export function eventDetailKo(e: Pick<ClosureEvent, "summary">): string {
+  const s = e.summary;
+  if (!s) return "";
+  const people = s.reported_people ?? null;
+  const roads = (s.roads ?? []).join("·");
+  return [people === null ? "" : peopleKo(people), roads].filter(Boolean).join(" · ");
+}
+
+/** 실시간 출처가 이 분보다 오래 안 바뀌면 회색 경고 (결정 C) */
+export const DATA_STALE_MIN = 30;
+
+/** 시각이 없거나 maxMin 분보다 오래면 true */
+export function isStale(
+  at: string | null | undefined,
+  nowMs: number,
+  maxMin = DATA_STALE_MIN,
+): boolean {
+  const t = at ? Date.parse(at) : Number.NaN;
+  return Number.isNaN(t) || nowMs - t > maxMin * 60_000;
+}
+
+function monthDayKo(iso: string): string {
+  const p = kstParts(iso);
+  return p ? `${p.m}/${p.d}` : "";
+}
+
+/**
+ * 목록 위 기준 시각 — "TOPIS 13:25 · 경찰청 11/6 공지 · 마라톤 3/12 시각표 기준".
+ * 실시간 돌발(TOPIS)이 없거나 30분 넘게 안 바뀌었으면 회색 경고 한 줄
+ */
+export function dataAsOfKo(a: DataAsOf, nowMs: number): { text: string; warning: string | null } {
+  const parts: string[] = [];
+  if (a.topis_incident) parts.push(`TOPIS ${hhmm(a.topis_incident)}`);
+  if (a.smpa) parts.push(`경찰청 ${monthDayKo(a.smpa)} 공지`);
+  if (a.topis_notice) parts.push(`TOPIS ${monthDayKo(a.topis_notice)} 공지`);
+  if (a.course) parts.push(`마라톤 ${monthDayKo(a.course)} 시각표`);
+  const text = parts.length ? `${parts.join(" · ")} 기준` : "받은 통제 정보가 없어요";
+  const warning = !a.topis_incident
+    ? "실시간 돌발(TOPIS)은 아직 받지 않아요"
+    : isStale(a.topis_incident, nowMs)
+      ? `실시간 돌발(TOPIS)이 ${DATA_STALE_MIN}분 넘게 안 바뀌었어요`
+      : null;
+  return { text, warning };
 }
