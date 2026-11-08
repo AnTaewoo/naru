@@ -7,8 +7,9 @@ PedGraph 조립 임계값. 바꾸면 그 문서들도 같이 바꾼다.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +30,13 @@ class Settings(BaseSettings):
 
     # POST /internal/candidates 헤더 X-Naru-Internal-Token (.env NARU_INTERNAL_TOKEN). 비면 전부 401
     internal_token: str = ""
+
+    # 지오코딩 (ADR-011 B, INTERFACE §7) — 카카오 로컬. 키는 .env KAKAO_REST_KEY(접두사 없음),
+    # 서버에만.
+    # recorded = data/recorded/kakao/local 재생(테스트·e2e·기록), live = 실서버
+    kakao_rest_key: SecretStr = Field(default=SecretStr(""), validation_alias="KAKAO_REST_KEY")
+    geocode_source: Literal["live", "recorded"] = "live"
+    kakao_timeout_s: float = 5.0
 
     # 상태기계 (ARCHITECTURE "ClosureState 상태기계", INTERFACE §5)
     review_confidence: float = 0.7  # 미만이면 review_required, 라우팅에 안 씀

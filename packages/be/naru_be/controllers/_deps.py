@@ -10,6 +10,7 @@ from naru_be.config import Settings
 from naru_be.models.domain.candidate_intake import CandidateIntake
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
+from naru_be.models.domain.geocoder import Geocoder
 from naru_be.models.domain.ped_graph import PedGraph
 from naru_be.models.domain.road_graph import RoadGraph
 from naru_be.models.domain.route_planner import RoutePlanner
@@ -26,6 +27,7 @@ class NaruModels:
     repo: ClosureRepository
     route_planner: RoutePlanner
     intake: CandidateIntake
+    geocoder: Geocoder
 
 
 def naru_models() -> NaruModels:

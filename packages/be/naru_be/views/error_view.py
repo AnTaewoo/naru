@@ -41,4 +41,6 @@ def _code(code: str) -> ErrorCode:
         return "no_route"
     if code == "out_of_coverage":
         return "out_of_coverage"
+    if code == "geocode_unavailable":
+        return "geocode_unavailable"
     return "internal"

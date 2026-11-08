@@ -16,7 +16,12 @@ from pydantic import ValidationError
 from werkzeug.exceptions import HTTPException
 
 from naru_be.config import Settings
-from naru_be.controllers import candidate_controller, closure_controller, route_controller
+from naru_be.controllers import (
+    candidate_controller,
+    closure_controller,
+    geocode_controller,
+    route_controller,
+)
 from naru_be.controllers._deps import NaruModels
 from naru_be.db import make_engine, make_sessions
 from naru_be.errors import NaruError
@@ -24,11 +29,13 @@ from naru_be.log import configure_logging
 from naru_be.models.domain.candidate_intake import CandidateIntake
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
+from naru_be.models.domain.geocoder import Geocoder
 from naru_be.models.domain.ped_graph import PedGraph
 from naru_be.models.domain.road_graph import RoadGraph
 from naru_be.models.domain.route_planner import RoutePlanner
 from naru_be.models.domain.routers import BaselineRouter, TimeDependentRouter
 from naru_be.models.repositories.closure_repository import ClosureRepository
+from naru_be.models.repositories.kakao_local import KakaoLocal, LiveKakaoLocal, RecordedKakaoLocal
 from naru_be.views import error_view
 
 log = logging.getLogger(__name__)
@@ -61,7 +68,16 @@ def build_models(settings: Settings) -> NaruModels:
         },
     )
     intake = CandidateIntake(index, engine, repo, road_graph, settings)
-    return NaruModels(settings, ped, road_graph, index, engine, repo, planner, intake)
+    return NaruModels(
+        settings, ped, road_graph, index, engine, repo, planner, intake, Geocoder(kakao(settings))
+    )
+
+
+def kakao(settings: Settings) -> KakaoLocal:
+    """지오코딩 출처 (ADR-011 B) — recorded 면 기록 재생, live 면 서버 키로 카카오."""
+    if settings.geocode_source == "recorded":
+        return RecordedKakaoLocal(settings.data_dir / "recorded" / "kakao" / "local")
+    return LiveKakaoLocal(settings.kakao_rest_key.get_secret_value(), settings.kakao_timeout_s)
 
 
 def create_app(settings: Settings | None = None, models: NaruModels | None = None) -> Flask:
@@ -74,6 +90,7 @@ def create_app(settings: Settings | None = None, models: NaruModels | None = Non
     app.register_blueprint(route_controller.bp)
     app.register_blueprint(closure_controller.bp)
     app.register_blueprint(candidate_controller.bp)
+    app.register_blueprint(geocode_controller.bp)
     _register_errors(app)
     return app
 
