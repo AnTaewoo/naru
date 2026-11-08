@@ -312,7 +312,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - 🧑 태우: 서비스 설치
 
 ### T6.2 버스 관측 수집 (ADR-013, 태우 2026-11-08)
-- status: DOING
+- status: DONE
 - depends: T6.1
 - 계기: 버스 신호를 "2대 이탈 → 통제 중 / 정상 통과 → 해제" 이진 규칙에서 기존 통제의 확신도 보정으로 바꾼다(태우 제안, ADR-013 — T6.1 시작 때 커밋). 테스트는 통제일의 실제 버스 기록이 있어야 하는데 지금은 11/7 예시 노선 스냅샷 1장뿐이고 지난 날 위치는 못 받는다 → 수집부터 당겨 다음 통제일부터 기록
 - 산출: 노선 마스터 — 정류소 순서는 열린데이터광장 OA-1095(`make fetch SRC=bus_routes`), 노선 경로는 노선정보 API getRoutePath(노선당 하루 한 번 `bus_routes/<날짜>/path_<노선>.json`(raw), 도로 그래프로 정류소 잇기 금지 — 태우 2026-11-08). 계약 `BusPosition`·`BusPositionBatch`(API 필드 그대로, 판단 없음) INTERFACE v0.13. AI `naru_ai/signal/bus_feed.py`·`bus_poller.py` — 1순위 공지 통제(시작 1시간 전 ~ 끝+30분, 통제 횡단보도 100 m 안 노선 3개, 60초, 쿼터 먼저), 2순위 TOPIS 집회·행사 돌발(기준 데이터 — 돌발마다 노선 1개, 120초, 하루 300·돌발 하나 30, 공지가 쓰고 남은 만큼), 원문은 `bus/notice/`·`bus/incident/`(recorded), 전체 하루 900. BE `POST /internal/bus-positions` → `BusIntake` → `bus_positions`(Alembic 0004, `bus_corrections` 는 T6.3)
@@ -320,7 +320,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - 🧑 태우: 노선정보 API(data.go.kr 15000193) 활용신청 — 2026-11-08 getRoutePath 가 HTTP 401 "등록되지 않은 서비스키". 워커 재시작. 마라톤·M2 는 운영계정 상향
 
 ### T6.4 TOPIS 통제 공지 게시판
-- status: TODO
+- status: DOING
 - depends: T6.2 (태우 2026-11-08 — 11/13(금) 18:00 전 운영)
 - 산출: https://topis.seoul.go.kr/notice/openNoticeList.do 를 10분마다(robots 허용 확인됨: /visit/, /map/openTotalMap.do 만 금지). 새 글만 → 원문 기록 → notice_v2 live 파싱(결정 D) → 후보 발행. 기존 N045·N046 문장이 이 게시판 형식이다 — 파싱 결과가 cases 와 같은 형식인지 확인
 

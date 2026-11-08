@@ -231,3 +231,9 @@
 - 정한 것: 유형은 집회만(11/7 범위 안 집회 8·차 없는 거리 2·축제 1·버스 무정차 2·시설물보수 3 — 나머지는 README impact 상 none), "(인도)" 보도 집회 뺌, 같은 링크·시각은 한 후보, 선 버퍼 15 m(방향별 링크 4곳), "같은 링크" = 같은 횡단보도 + 겹치는 시각, 원문은 바뀔 때만 새 파일, `--once` 는 코스·공지 그대로, alembic fileConfig 가 기존 로거를 끄지 않게
 - 막힌 것 / 태우 대기: 🧑 `sudo cp deploy/naru-worker.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart naru && sudo systemctl enable --now naru-worker`. 확인 적재로 개발 DB(공개와 같음)에 11/7 돌발 사건 5개·r04 근거가 들어갔다 — 재시작 전 공개 BE 는 돌발 기준 시각을 11/7 15:40 으로 보인다. 돌발이 예상 종료 전에 사라지는 경우·acc_road_code 009/010 뜻은 미확인. live 7회(링크 6·AccInfo 1)
 - 커밋: 9da0968 071e8b4 67127c7 48c0477 6c88255 fb6621f 1493451 2be5444 84176a4 (하네스 b7b875d 11df7d6 f5cd1ae) / 이 항목의 커밋
+
+## 2026-11-08 · T6.2 DONE
+- 한 것: 버스 관측 수집 — 노선 마스터 OA-1095(`make fetch SRC=bus_routes`, 41,688행·718노선, WGS84), 계약 `BusPosition`·`BusPositionBatch`(INTERFACE §1.2 v0.13, getBusPosByRtid 필드 그대로), 워커 bus 소스: 1순위 공지 통제(시작 1시간 전 ~ 끝+30분, 횡단보도 100 m 안 노선 3개, 60초, 쿼터 먼저) · 2순위 TOPIS 집회·행사 돌발(기준 데이터, 노선 1개, 120초, 하루 300·돌발 하나 30), 원문 `bus/notice`·`bus/incident`, 전체 하루 900(그날 기록 파일 수로 셈), 부른 노선은 getRoutePath 하루 한 번(`bus_routes/<날짜>/`, raw). BE `POST /internal/bus-positions` → `bus_positions`(Alembic 0004, 같은 노선·차량·시각은 한 번). 실데이터: 11/7 15:30 공지 창 노선 6개 → 위치 75개, 2순위 대상 13·노선 12(공지와 안 겹침)
+- 정한 것: 노선 고르기는 정류소(NODE_ID) 수 순, N·새벽 노선 뺌, 돌발 하나 30회(약 1시간), 나누기 전 기록 9개는 옮기지 않고 재생 때 같이, `bus_corrections` 는 T6.3, 노선 경로 키 `DATA_GO_KR_ROUTE_KEY`(없으면 `DATA_GO_KR_KEY`). 태우 결정(고침): 2순위 돌발·기록 폴더·getRoutePath(도로 그래프 잇기 금지)·순서 T6.4 → T6.6 → T6.3
+- 막힌 것 / 태우 대기: getRoutePath 는 처음 HTTP 401 "등록되지 않은 서비스키" → 태우 활용신청·확인("잘 나옴"). 🧑 `sudo systemctl restart naru`(Alembic 0004) · 워커 단위 다시 설치·재시작. 2순위 위치 수집은 실측 대기(첫 기록은 운영 워커가). live 10(버스 8·getRoutePath 2)
+- 커밋: b6dbc94 5ea323c c536bab 62876d4 65de6b3 0b81b35 36296c5 6be502f 35f4420 06408f7 d96f92e 40e0d9b 1aff44a e79961c (하네스 f989672 576c267) / 이 항목의 커밋
