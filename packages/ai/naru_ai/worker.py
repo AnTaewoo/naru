@@ -1,11 +1,12 @@
 """IngestWorker — 코스·공지·TOPIS 돌발을 후보로 만들어 BE 에 보낸다 (ARCHITECTURE AI, T4.4·T6.1).
 
     uv run python -m naru_ai.worker --once          # 코스·공지 1회 (시연, make dev 로 BE 띄운 뒤)
-    uv run python -m naru_ai.worker --loop          # 소스별 주기: 코스 1회 · 공지 5분 · 돌발 5분
+    uv run python -m naru_ai.worker --loop          # 소스별: 코스 1회 · 공지·돌발 5분 · 버스 60초
     uv run python -m naru_ai.worker --once --live   # 기록 없는 공지 문장을 Claude 로 (상한 안에서)
 
 공지는 기본적으로 기록된 LLM 응답(data/recorded/llm)만 재생한다 — 키 없이도 돈다. 돌발은
-NARU_INCIDENT_SOURCE=live 면 OA-13315 를 불러 원문을 기록하고, 아니면 기록을 재생한다.
+NARU_INCIDENT_SOURCE=live 면 OA-13315 를 불러 원문을 기록하고, 아니면 기록을 재생한다. 버스(T6.2)는
+공지 통제 창에만 근처 노선 위치를 받아 POST /internal/bus-positions (NARU_BUS_SOURCE, 하루 상한).
 batch_id 는 내용(돌발은 원문) 해시라 같은 배치를 다시 보내도 BE 가 멱등 처리한다.
 --loop 는 소스마다 따로 돈다 — 한 소스가 실패해도 다른 소스는 계속, 연속 3회 실패면 ERROR.
 """
@@ -35,7 +36,14 @@ from naru_ai.notice.gazetteer import Gazetteer
 from naru_ai.notice.parser import NoticeParser
 from naru_ai.notice.resolver import KakaoRecords, Resolver
 from naru_ai.publish import CandidatePublisher
-from naru_contracts import CandidateBatch, CandidateBatchResponse, ClosureCandidate
+from naru_ai.signal.bus_feed import BusApi
+from naru_ai.signal.bus_poller import BusPoller, RouteStops
+from naru_contracts import (
+    BusPositionBatchResponse,
+    CandidateBatch,
+    CandidateBatchResponse,
+    ClosureCandidate,
+)
 
 log = logging.getLogger(__name__)
 
@@ -48,15 +56,16 @@ def _latest(parent: Path, pattern: str) -> Path:
 
 
 FAIL_ALERT = 3  # 한 소스가 연속으로 이만큼 실패하면 ERROR (T6.1)
+Response = CandidateBatchResponse | BusPositionBatchResponse
 
 
 @dataclass
 class _Source:
-    """--loop 의 소스 하나. every_s 가 None 이면 성공할 때까지만(코스 1회)."""
+    """--loop 의 소스 하나 — run(now) 가 만들고 보내 응답을 돌려준다. every_s None = 성공까지만."""
 
     name: str
     every_s: int | None
-    make: Callable[[], CandidateBatch | None]
+    run: Callable[[datetime], list[Response]]
     next_at: datetime | None = None
     failures: int = 0
     done: bool = False
@@ -101,10 +110,28 @@ class IngestWorker:
         self.incidents = IncidentFeed(recorded, api, settings.incident_record)
         links = LinkBook(recorded / "links", api.fetch_link if api is not None else None)
         self.incident_ingestor = IncidentIngestor(links)
+        bus_key = settings.data_go_kr_key.get_secret_value()
+        if settings.bus_source == "live" and not bus_key:
+            raise ValueError("DATA_GO_KR_KEY 없음 — 버스 live 를 쓸 수 없다")
+        self.bus = BusPoller(
+            RouteStops.load(_latest(raw, "bus_routes_*") / "OA-1095.xlsx"),
+            BusApi(recorded, bus_key if settings.bus_source == "live" else None),
+            publisher.events,
+            publisher.closures,
+            settings.bus_routes_per_event,
+            settings.bus_daily_cap,
+        )
         self.sources = [
-            _Source("course", None, self.course_batch),
-            _Source("notice", settings.notice_interval_s, self.notice_batch),
-            _Source("incident", settings.incident_interval_s, self.incident_batch),
+            _Source("course", None, lambda _: self._send(self.course_batch())),
+            _Source(
+                "notice", settings.notice_interval_s, lambda _: self._send(self.notice_batch())
+            ),
+            _Source(
+                "incident",
+                settings.incident_interval_s,
+                lambda _: self._send(self.incident_batch()),
+            ),
+            _Source("bus", settings.bus_interval_s, self.bus_round),
         ]
 
     # --- 배치 ---------------------------------------------------------------------
@@ -191,22 +218,27 @@ class IngestWorker:
         )
         return response
 
+    def _send(self, batch: CandidateBatch | None) -> list[Response]:
+        return [] if batch is None else [self._publish(batch)]
+
+    def bus_round(self, now: datetime) -> list[Response]:
+        """창 안 공지 통제의 근처 노선 위치 → BE (T6.2). 볼 노선이 없으면 부르지 않는다."""
+        return [self.publisher.publish_bus(b) for b in self.bus.batches(now)]
+
     def run_once(self, include_course: bool = True) -> list[CandidateBatchResponse]:
         batches = [self.course_batch()] if include_course else []
         batches.append(self.notice_batch())
         return [self._publish(b) for b in batches if b is not None]
 
-    def tick(self, now: datetime) -> list[CandidateBatchResponse]:
+    def tick(self, now: datetime) -> list[Response]:
         """--loop 한 바퀴: 때가 된 소스만 돌린다. 실패는 그 소스에만 남기고 다음 소스로 간다."""
-        out: list[CandidateBatchResponse] = []
+        out: list[Response] = []
         for src in self.sources:
             if src.done or (src.next_at is not None and now < src.next_at):
                 continue
             retry_s = src.every_s or self.settings.notice_interval_s
             try:
-                batch = src.make()
-                if batch is not None:
-                    out.append(self._publish(batch))
+                out.extend(src.run(now))
             except Exception as exc:  # 한 소스의 실패가 다른 소스를 막지 않는다 (T6.1)
                 src.failures += 1
                 level = logging.ERROR if src.failures >= FAIL_ALERT else logging.WARNING
