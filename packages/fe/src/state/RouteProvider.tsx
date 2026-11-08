@@ -174,8 +174,8 @@ export function routeReducer(state: RouteState, action: RouteAction): RouteState
 
 const FROM_MINE: LocateState = { which: "from", status: "locating" };
 
-/** getCurrentPosition — 정확도 우선, 권한 대답 뒤 15초, 1분 안의 위치는 다시 쓴다 */
-const POSITION_OPTIONS: PositionOptions = {
+/** getCurrentPosition — 정확도 우선, 권한 대답 뒤 15초, 1분 안의 위치는 다시 쓴다 (지도 버튼도 같은 값) */
+export const POSITION_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
   timeout: 15_000,
   maximumAge: 60_000,

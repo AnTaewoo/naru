@@ -45,6 +45,22 @@
   }
 }
 
+/* 지도 '내 위치 찾기' 결과가 보행망 밖일 때 (T5.7) — 위에 떠 있는 UI 바로 아래에 6초 */
+.notice {
+  position: absolute;
+  top: calc(var(--sheet-top, 112px) + 8px);
+  left: 12px;
+  right: 56px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(34, 34, 34, 0.88);
+  color: #fff;
+  font-size: 13.5px;
+  line-height: 1.4;
+  pointer-events: none;
+  z-index: 3;
+}
+
 /* 출발·도착 핀 (DOM 마커) — 말풍선 + 꼬리 + 점. 색은 --pin. 클릭은 지도로 흘려보낸다 */
 .pin {
   display: flex;

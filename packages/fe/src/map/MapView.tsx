@@ -3,6 +3,7 @@
 import {
   AttributionControl,
   GeoJSONSource,
+  GeolocateControl,
   Map as MapLibreMap,
   Marker,
   NavigationControl,
@@ -12,8 +13,9 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { SHEET_COLLAPSED_PX } from "../components/BottomSheet";
-import { useClosureDispatch, useClosures } from "../state/ClosureProvider";
-import { useRoute, useRouteDispatch } from "../state/RouteProvider";
+import { MAP_LOCALE_KO, MAP_OUTSIDE_KO } from "../i18n/ko";
+import { inBbox, useClosureDispatch, useClosures } from "../state/ClosureProvider";
+import { POSITION_OPTIONS, useRoute, useRouteDispatch } from "../state/RouteProvider";
 import type { FeatureCollection, RouteResponse, Status } from "../types/contracts";
 import { ICON_IDS, ICON_PIXEL_RATIO, renderIcon } from "./icons";
 import {
@@ -167,15 +169,18 @@ export function MapView({ visible }: MapViewProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const loaded = useRef(false);
-  const { closures, bbox, focus } = useClosures();
+  const { closures, bbox, focus, coverage } = useClosures();
   const dispatch = useClosureDispatch();
-  const { route, from, to, active } = useRoute();
+  const { route, from, to, active, mine } = useRoute();
   const routeDispatch = useRouteDispatch();
   const fromPin = useRef<Marker | null>(null);
   const toPin = useRef<Marker | null>(null);
   const fitted = useRef<string | null>(null);
   // 지도 load 전에는 회색 대신 로딩 표시 (T5.6)
   const [ready, setReady] = useState(false);
+  // 지도 '내 위치 찾기' 가 보행망 밖이면 잠깐 안내 (T5.7)
+  const [notice, setNotice] = useState<string | null>(null);
+  const coverageRef = useRef(coverage);
   // load 이전에 바뀐 값은 ref 에 두었다가 load 때 한 번에 반영한다
   const closuresRef = useRef(closures);
   const visibleRef = useRef(visible);
@@ -191,8 +196,20 @@ export function MapView({ visible }: MapViewProps) {
       center: centerOf(initialBbox.current),
       zoom: 15,
       attributionControl: false,
+      locale: MAP_LOCALE_KO,
     });
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+    // 내 위치 찾기 (T5.7) — 한 번 찾아 파란 점을 찍고 옮긴다. 보행망 밖이면 안내
+    const geolocate = new GeolocateControl({
+      positionOptions: POSITION_OPTIONS,
+      fitBoundsOptions: { maxZoom: 16 },
+    });
+    geolocate.on("geolocate", (e) => {
+      const cov = coverageRef.current;
+      const outside = cov !== null && !inBbox([e.coords.longitude, e.coords.latitude], cov);
+      setNotice(outside ? MAP_OUTSIDE_KO : null);
+    });
+    map.addControl(geolocate, "top-right");
     // 출처 표기는 늘 펼쳐 두고 위쪽에 — 아래 모서리는 하단 시트가 덮는다. 고지 전문은 /licenses
     map.addControl(
       new AttributionControl({
@@ -246,6 +263,29 @@ export function MapView({ visible }: MapViewProps) {
       mapRef.current = null;
     };
   }, [dispatch, routeDispatch]);
+
+  useEffect(() => {
+    coverageRef.current = coverage;
+  }, [coverage]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 6000);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  // 출발·도착을 내 위치로 받으면(T5.7) 그 점을 떠 있는 UI 와 접힌 시트 사이 가운데로
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mine) return;
+    const run = () => {
+      const p = fitPadding(map);
+      const zoom = Math.max(map.getZoom(), 15);
+      map.easeTo({ center: mine, zoom, offset: [0, (p.top - p.bottom) / 2] });
+    };
+    if (loaded.current) run();
+    else map.once("load", run);
+  }, [mine]);
 
   // closures 가 바뀌면 소스 데이터만 갱신
   useEffect(() => {
@@ -304,6 +344,11 @@ export function MapView({ visible }: MapViewProps) {
         <div className={styles.loading} role="status" aria-label="지도 불러오는 중">
           <span className={styles.spinner} aria-hidden />
           지도 불러오는 중…
+        </div>
+      )}
+      {notice && (
+        <div className={styles.notice} role="status">
+          {notice}
         </div>
       )}
     </div>

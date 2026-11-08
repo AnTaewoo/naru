@@ -224,6 +224,21 @@ export function locateNoteKo(
   }
 }
 
+/** 지도 오른쪽 위 '내 위치 찾기'(GeolocateControl) 결과가 보행망 밖일 때 */
+export const MAP_OUTSIDE_KO = "내 위치는 아직 길찾기 범위(종로·중구) 밖이에요";
+
+/**
+ * maplibre 컨트롤 문구 — 쓰는 컨트롤 것만. 키는 설치된 maplibre-gl 6.16.0 의 기본 영어 표
+ * (node_modules/maplibre-gl/dist/maplibre-gl-dev.mjs 의 defaultLocale)에서 확인
+ */
+export const MAP_LOCALE_KO: Record<string, string> = {
+  "Map.Title": "지도 화면",
+  "NavigationControl.ZoomIn": "확대",
+  "NavigationControl.ZoomOut": "축소",
+  "GeolocateControl.FindMyLocation": "내 위치 찾기",
+  "GeolocateControl.LocationNotAvailable": "내 위치를 쓸 수 없어요",
+};
+
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
 
 function kstParts(iso: string): { y: number; m: number; d: number; wd: number } | null {
