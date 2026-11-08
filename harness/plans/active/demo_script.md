@@ -3,7 +3,7 @@
 숫자는 전부 recorded `/route`·`/closures`(2026-03-15 서울마라톤, 광화문 일대)와 e2e 로 확인한 값이다. 화면 시안의 예시 숫자는 쓰지 않는다.
 
 ## 준비
-- 서버: `make serve` (공개 주소가 있으면 그 주소). 개발 중이면 `make dev` 의 http://localhost:3000 도 같다
+- 서버: 공개 주소 https://naru.antaewoo.com (`make serve` 가 떠 있어야 한다). 개발 중이면 `make dev` 의 http://localhost:3000 도 같다
 - 화면: Chrome 개발자 도구 기기 모드 430×900 (e2e 와 같은 크기). 확대 100%
 - 주소
   - 홈 07:45: `/?t=2026-03-15T07:45:00+09:00`
