@@ -94,6 +94,10 @@ def main(argv: list[str] | None = None) -> int:
     # 예정 집회 창 안 우회 (ADR-011 A) · 그래프 밖 (ADR-011, INTERFACE §6)
     q = {"from": SEJONG[0], "to": SEJONG[1], "depart_at": "2026-11-07T15:00:00+09:00"}
     record(out, "route_1107_1500", "GET", "/route", client.get("/route", query_string=q), query=q)
+    # 같은 시각 광화문 통제(T5.9) — 홈 목록의 공지 행(파서 제목·공지 원문 보기) 입력
+    q2 = {"bbox": GWANGHWAMUN, "at": "2026-11-07T15:00:00+09:00"}
+    resp = client.get("/closures", query_string=q2)
+    record(out, "closures_1107_1500", "GET", "/closures", resp, query=q2)
     q = {"from": JAMSIL[0], "to": JAMSIL[1], "depart_at": "2026-03-15T10:00:00+09:00"}
     resp = client.get("/route", query_string=q)
     record(out, "error_out_of_coverage", "GET", "/route", resp, query=q)
