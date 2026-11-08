@@ -17,10 +17,22 @@ from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.orm import Session, sessionmaker
 
 from naru_be.config import Settings
-from naru_be.models.domain.types import IntakeResult
+from naru_be.models.domain.types import CandidateMeta, IntakeResult
 from naru_be.models.entities.candidate_batch import CandidateBatchEntity
 from naru_be.models.entities.closure_state import ClosureStateEntity
-from naru_contracts import ClosureEvent, ClosureState, Evidence, Impact, Status, Window
+from naru_contracts import (
+    CandidateSummary,
+    ClosureEvent,
+    ClosureState,
+    ClosureType,
+    DataAsOf,
+    Evidence,
+    Impact,
+    NoticeRef,
+    Source,
+    Status,
+    Window,
+)
 
 KST = timezone(timedelta(hours=9))
 Bbox = tuple[float, float, float, float]  # minLng, minLat, maxLng, maxLat
@@ -43,8 +55,11 @@ class ClosureRepository:
         self._sessions = sessions
         self.settings = settings or Settings()
 
-    def upsert_many(self, states: Iterable[ClosureState], candidate_id: str) -> int:
-        rows = [self._row(state, candidate_id) for state in states]
+    def upsert_many(
+        self, states: Iterable[ClosureState], candidate_id: str, meta: CandidateMeta | None = None
+    ) -> int:
+        """meta(ADR-012): 후보의 종류·출처·summary·notice. 없으면 null(테스트의 직접 저장)."""
+        rows = [self._row(state, candidate_id, meta) for state in states]
         if not rows:
             return 0
         stmt = insert(ClosureStateEntity).values(rows)
@@ -107,8 +122,15 @@ class ClosureRepository:
                 e.lat.between(Decimal(str(bbox[1])), Decimal(str(bbox[3])))
             )
         stmt = stmt.order_by(e.window_start.is_(None), e.window_start.desc(), e.reason)
+        # 사건마다 후보 메타(ADR-012) — 같은 사건의 행은 같은 item 에서 와서 메타가 같다
+        meta_stmt = select(
+            e.reason, e.window_start, e.window_end, e.source, e.type, e.summary, e.notice
+        ).where(e.source.is_not(None))
         with self._sessions.begin() as s:
             rows = s.execute(stmt).all()
+            metas: dict[tuple[object, ...], tuple[object, ...]] = {}
+            for reason, start, end, *meta in s.execute(meta_stmt).all():
+                metas.setdefault((reason, start, end), tuple(meta))
         return [
             ClosureEvent(
                 reason=reason,
@@ -116,9 +138,35 @@ class ClosureRepository:
                 crosswalks=int(n),
                 bbox=(float(min_lng), float(min_lat), float(max_lng), float(max_lat)),
                 approx=bool(approx),
+                **_event_meta(metas.get((reason, start, end))),
             )
             for reason, start, end, n, min_lng, min_lat, max_lng, max_lat, approx in rows
         ]
+
+    def data_as_of(self) -> DataAsOf:
+        """출처마다 저장된 통제의 가장 늦은 근거 시각 (INTERFACE §3.1 v0.12, ADR-011 C·ADR-012).
+
+        공지(smpa·topis_notice)는 게시 시각, course 는 시각표 게시 시각(상태 전이 근거는 뺀다),
+        topis_incident 는 돌발 수신 시각. 그 출처가 없으면 null.
+        """
+        e = ClosureStateEntity
+        stmt = select(e.source, e.evidence, e.notice).where(e.source.is_not(None))
+        latest: dict[str, datetime] = {}
+        with self._sessions.begin() as s:
+            for source, evidence, notice in s.execute(stmt).all():
+                key = str(source)
+                for at in _source_times(key, evidence, notice):
+                    if key not in latest or at > latest[key]:
+                        latest[key] = at
+        kst = {k: v.astimezone(KST) for k, v in latest.items()}
+        # 키(ADR-011 C) ↔ 출처: topis_incident = incident(TOPIS 돌발),
+        # topis_notice = topis(TOPIS 공지)
+        return DataAsOf(
+            topis_incident=kst.get(Source.incident.value),
+            topis_notice=kst.get(Source.topis.value),
+            smpa=kst.get(Source.smpa.value),
+            course=kst.get(Source.course.value),
+        )
 
     def count(self) -> int:
         with self._sessions.begin() as s:
@@ -157,7 +205,9 @@ class ClosureRepository:
             s.query(CandidateBatchEntity).delete()
 
     @staticmethod
-    def _row(state: ClosureState, candidate_id: str) -> dict[str, object]:
+    def _row(
+        state: ClosureState, candidate_id: str, meta: CandidateMeta | None
+    ) -> dict[str, object]:
         return {
             "candidate_id": candidate_id,
             "crosswalk_id": state.crosswalk_id,
@@ -172,6 +222,10 @@ class ClosureRepository:
             "impact": state.impact.value,
             "approx": state.approx,
             "updated_at": datetime.now(UTC).replace(tzinfo=None, microsecond=0),
+            "source": meta.source if meta else None,
+            "type": meta.type if meta else None,
+            "summary": meta.summary if meta else None,
+            "notice": meta.notice if meta else None,
         }
 
     @staticmethod
@@ -188,3 +242,35 @@ class ClosureRepository:
             impact=Impact(row.impact),
             approx=row.approx,
         )
+
+
+def _event_meta(meta: tuple[object, ...] | None) -> dict[str, object]:
+    """저장된 메타 → ClosureEvent 칸. v0.12 전 행이면 전부 null."""
+    if meta is None:
+        return {"type": None, "source": None, "summary": None, "notice": None}
+    source, type_, summary, notice = meta
+    return {
+        "type": ClosureType(str(type_)) if type_ else None,
+        "source": Source(str(source)) if source else None,
+        "summary": CandidateSummary.model_validate(summary) if summary else None,
+        "notice": NoticeRef.model_validate(notice) if notice else None,
+    }
+
+
+def _source_times(source: str, evidence: object, notice: object) -> list[datetime]:
+    """그 출처의 데이터 시각들 — 공지는 게시 시각, 나머지는 근거 시각(상태 전이 근거는 뺀다)."""
+    if source in (Source.smpa.value, Source.topis.value):
+        published = notice.get("published_at") if isinstance(notice, dict) else None
+        return [datetime.fromisoformat(published)] if isinstance(published, str) else []
+    kind = {Source.course.value: "timetable", Source.incident.value: "topis_incident"}.get(source)
+    out: list[datetime] = []
+    for ev in evidence if isinstance(evidence, list) else []:
+        if not isinstance(ev, dict) or ev.get("kind") != kind:
+            continue
+        detail = ev.get("detail")
+        if isinstance(detail, dict) and "transition" in detail:
+            continue  # 엔진이 붙인 상태 전이(해제 예정 등)는 데이터 시각이 아니다
+        at = ev.get("at")
+        if isinstance(at, str):
+            out.append(datetime.fromisoformat(at))
+    return out

@@ -38,3 +38,8 @@ class ClosureStateEntity(Base):
     impact: Mapped[str] = mapped_column(String(32), default="blocks")
     approx: Mapped[bool] = mapped_column(default=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False))  # UTC
+    # v0.12 (ADR-012) — 후보의 종류·출처·summary·notice_ref 그대로. 그 전에 저장된 행은 null
+    source: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    summary: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    notice: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)

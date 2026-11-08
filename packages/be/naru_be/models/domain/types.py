@@ -6,10 +6,29 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from naru_be.models.domain.ped_graph import EdgeKind
-from naru_contracts import Evidence, Status
+from naru_contracts import ClosureCandidate, Evidence, Status
 
 LngLat = tuple[float, float]
 KST = timezone(timedelta(hours=9))  # 응답 시각 표기 (CONVENTIONS §4.5). 저장은 UTC
+
+
+@dataclass(frozen=True)
+class CandidateMeta:
+    """후보의 종류·출처·summary·notice_ref (ADR-012) — 상태 행에 같이 저장해 사건까지 전한다."""
+
+    source: str
+    type: str
+    summary: dict[str, object] | None
+    notice: dict[str, object] | None
+
+    @classmethod
+    def of(cls, c: ClosureCandidate) -> CandidateMeta:
+        return cls(
+            source=c.source.value,
+            type=c.type.value,
+            summary=c.summary.model_dump(mode="json") if c.summary else None,
+            notice=c.notice_ref.model_dump(mode="json") if c.notice_ref else None,
+        )
 
 
 @dataclass(frozen=True)

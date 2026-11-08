@@ -17,7 +17,7 @@ from naru_be.config import Settings
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
 from naru_be.models.domain.road_graph import RoadGraph
-from naru_be.models.domain.types import IntakeResult
+from naru_be.models.domain.types import CandidateMeta, IntakeResult
 from naru_be.models.repositories.closure_repository import ClosureRepository
 from naru_contracts import (
     CandidateBatch,
@@ -59,7 +59,8 @@ class CandidateIntake:
             candidate = self.promote_unknown(raw)
             ids = self.crosswalk_ids(candidate)
             states = self.engine.apply(candidate, ids, at=at)
-            updated += self.repo.upsert_many(states, candidate.candidate_id)
+            meta = CandidateMeta.of(candidate)
+            updated += self.repo.upsert_many(states, candidate.candidate_id, meta)
             accepted += 1
             review += int(candidate.review_required)
         result = IntakeResult(batch.batch_id, accepted, review, updated)
