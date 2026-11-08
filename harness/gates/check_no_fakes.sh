@@ -7,12 +7,12 @@ PATTERNS='unittest\.mock|MagicMock|monkeypatch|\brespx\b|import responses|from r
 TARGETS="packages scripts"
 
 hits=$(grep -rnEi --include='*.py' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.mjs' --include='*.json' \
-  --exclude-dir=node_modules --exclude-dir=.venv --exclude-dir=dist \
+  --exclude-dir=node_modules --exclude-dir=.venv --exclude-dir=dist --exclude-dir=.next --exclude-dir=coverage --exclude-dir=playwright-report \
   "$PATTERNS" $TARGETS 2>/dev/null || true)
 
 # 파일명 검사
 names=$(find $TARGETS -type f \( -iname '*fake*' -o -iname '*dummy*' -o -iname '*stub*' -o -iname '*mock*' -o -iname 'sample_*' \) \
-  -not -path '*/node_modules/*' -not -path '*/.venv/*' -not -name 'check_no_fakes.sh' 2>/dev/null || true)
+  -not -path '*/node_modules/*' -not -path '*/.venv/*' -not -path '*/.next/*' -not -path '*/coverage/*' -not -path '*/playwright-report/*' -not -name 'check_no_fakes.sh' 2>/dev/null || true)
 
 if [[ -n "$hits" || -n "$names" ]]; then
   echo "❌ check-no-fakes 실패 — 가짜 데이터/모킹 금지 (.claude/CLAUDE.md §2)"
