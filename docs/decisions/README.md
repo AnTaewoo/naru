@@ -6,3 +6,4 @@ Notion "결정 기록" DB와 동기화한다 (Notion이 팀용, 여기는 코드
 - ADR-008 공지 파서 v2 출력(impact·toward·approx)을 BE가 받는 규칙 + INTERFACE v0.6 (승인, 2026-11-07)
 - ADR-009 경로 레그가 선의 어디인지 — `legs[].coord_range` + INTERFACE v0.7 (승인, 2026-11-08)
 - ADR-010 통제 사건 목록 — `GET /closures/events` + INTERFACE v0.8 (승인, 2026-11-08)
+- ADR-011 실서버 운영 결정 묶음 — 라우터 비용(예정 +300초)·그래프 밖·지오코딩·데이터 신선도·운영 워커 live·외부 수집 (승인, 2026-11-08)
