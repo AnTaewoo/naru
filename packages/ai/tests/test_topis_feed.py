@@ -20,7 +20,7 @@ import pytest
 from naru_ai.config import Settings
 from naru_ai.llm.prompt import NoticeEnvelope
 from naru_ai.notice.candidates import candidate_stem
-from naru_ai.notice.parser import ParsedNotice
+from naru_ai.notice.parser import ParsedItem, ParsedNotice
 from naru_ai.notice.source import NoticeSentence
 from naru_ai.notice.topis_feed import post_sentences, title_dates
 from naru_ai.publish import CandidatePublisher
@@ -165,6 +165,30 @@ def test_topis_batch_on_nov7_morning(worker: IngestWorker, record: dict[str, str
     assert c.notice_ref is not None and c.notice_ref.sentence_id == "topis-6300-u202611061734"
     assert c.evidence[0].ref.endswith(f"{RECORD}#topis-6300-u202611061734")  # 버전은 근거에만
     assert worker.topis_batch(nov7).batch_id == batch.batch_id  # 같은 내용 = 같은 배치(BE 멱등)
+
+
+def test_area_endpoint_uses_the_intersection_of_the_same_name(
+    worker: IngestWorker, record: dict[str, str]
+) -> None:
+    # 태우 C①(2026-11-08): 구간 끝점은 AREA 라도 교차로 사전에 같은 이름이 있으면 그 교차로.
+    # 태그는 기록 그대로 — 6288 '서울광장 일대'(AREA, 정규 이름 서울광장), 6262 '광화문광장'(AREA,
+    # 구간 셋의 출발), 6287 '여의도'(AREA). OA-23081 교차로명: 서울광장 7088 · 광화문 677 만 있고
+    # 광화문광장·여의도는 없다
+    posts = {p.notice_id: p for p in _posts(record, datetime(2026, 10, 26, tzinfo=KST))}
+
+    def item(nid: str) -> ParsedItem:
+        env = NoticeEnvelope.from_sentence(posts[nid].to_json())
+        return worker.parser.parse(env).items[0]
+
+    res = worker.builder.resolver
+    seoul, plaza, yeouido = item("topis-6288"), item("topis-6262"), item("topis-6287")
+    assert seoul.tag_of("서울광장") == "AREA"
+    assert res.resolve("서울광장", "AREA") is None  # 지점은 그대로 — AREA 는 점이 아니다
+    p = res.resolve_endpoint("서울광장", seoul.tag_of("서울광장"))
+    assert p is not None and (p.gazetteer_source, p.gazetteer_id) == ("seoul_intersection", "7088")
+    assert plaza.segments[0].from_ == "광화문광장" and plaza.tag_of("광화문광장") == "AREA"
+    assert res.resolve_endpoint("광화문광장", "AREA") is None  # 사전에 없으면 그대로 None
+    assert res.resolve_endpoint("여의도", yeouido.tag_of("여의도")) is None
 
 
 def test_candidate_ids_drop_the_post_version() -> None:

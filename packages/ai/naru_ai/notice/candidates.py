@@ -2,7 +2,8 @@
 
 - impact none 은 후보 없음. blocks → Impact.blocks, unknown → Impact.unknown(confidence ≤ 0.65)
 - segment: from·to 둘 다 풀리면 SegmentGeom(via 는 풀린 것만, road 는 사전에 있을 때 road_class),
-  하나라도 못 풀면 풀린 쪽만 PointGeom. 틀린 선보다 빠진 점이 낫다
+  하나라도 못 풀면 풀린 쪽만 PointGeom. 틀린 선보다 빠진 점이 낫다. 끝점은 AREA 태그라도 교차로
+  사전에 같은 이름이 있으면 그 교차로(Resolver.resolve_endpoint, T6.4 — TOPIS 의 '서울광장')
 - points: 풀리면 PointGeom. toward 가 있고 풀리면 출발지 → toward SegmentGeom, confidence 0.65 상한
 - confidence 는 파서의 규칙 값(규칙서 §3.8)에 위 상한만 적용. 0.7 미만이면 review_required
 - 못 푼 정규형은 후보를 만들지 않는다 (추측 좌표 0)
@@ -95,8 +96,8 @@ class CandidateBuilder:
             )
             prefix = f"{candidate_stem(parsed.envelope.sentence_id)}-i{i}"
             for k, seg in enumerate(pi.segments, start=1):
-                src = self.resolver.resolve(seg.from_, pi.tag_of(seg.from_), hint)
-                dst = self.resolver.resolve(seg.to, pi.tag_of(seg.to), hint)
+                src = self.resolver.resolve_endpoint(seg.from_, pi.tag_of(seg.from_), hint)
+                dst = self.resolver.resolve_endpoint(seg.to, pi.tag_of(seg.to), hint)
                 if src is not None and dst is not None:
                     via = [
                         p

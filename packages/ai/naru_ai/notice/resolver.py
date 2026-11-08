@@ -72,6 +72,18 @@ class Resolver:
             return None
         return self._kakao(canonical, area_hint)
 
+    def resolve_endpoint(
+        self, canonical: str, tag: str | None = None, area_hint: str | None = None
+    ) -> PlacePoint | None:
+        """구간 끝점 — AREA 태그라도 교차로 사전에 같은 이름이 있으면 그 교차로 (T6.4, 태우 C①).
+
+        TOPIS 글은 '서울광장'처럼 광장을 AREA 로 내는데, 구간의 끝이면 점이다. 사전에 없으면 그대로
+        None — 카카오로 넓히지 않는다(먼 POI 와 이으면 틀린 선). 지점(points)은 resolve 그대로.
+        """
+        if tag == "AREA":
+            return self.gazetteer.intersection(canonical)
+        return self.resolve(canonical, tag, area_hint)
+
     def resolve_road(self, name: str) -> tuple[str, RoadClass | None] | None:
         return self.gazetteer.road(name)
 
