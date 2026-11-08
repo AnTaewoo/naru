@@ -298,3 +298,44 @@ describe("RoutePanel", () => {
     expect(screen.getByText("지도를 눌러 출발을 고르세요")).toBeDefined();
   });
 });
+
+describe("내 위치 안내 (T5.7)", () => {
+  const note = (route: Partial<RouteState>) => {
+    const { unmount } = render(
+      <Providers at={T745} route={{ from: null, ...route }}>
+        <RouteCard />
+      </Providers>,
+    );
+    const text = screen.getByRole("region", { name: "길찾기 결과" }).textContent ?? "";
+    unmount();
+    return text;
+  };
+
+  it("범위 밖·거부·실패 — 칸은 비우고 지도로 고르라고, 찾는 중엔 지도로 골라도 된다고", () => {
+    expect(note({ locate: { which: "from", status: "outside" } })).toContain(
+      "내 위치가 길찾기 범위(종로·중구) 밖이에요. 지도를 눌러 출발을 고르세요",
+    );
+    expect(note({ locate: { which: "from", status: "denied" } })).toContain(
+      "위치 권한이 꺼져 있어요. 지도를 눌러 출발을 고르세요",
+    );
+    expect(note({ locate: { which: "to", status: "unavailable" } })).toContain(
+      "내 위치를 찾지 못했어요. 지도를 눌러 도착을 고르세요",
+    );
+    expect(note({ locate: { which: "from", status: "locating" } })).toContain(
+      "내 위치를 찾고 있어요. 지도를 눌러 출발을 골라도 돼요",
+    );
+    expect(note({})).toContain("지도를 눌러 출발·도착을 골라 주세요");
+  });
+
+  it("경로가 있어도 안내는 보인다 — 07:45 경로에서 도착을 내 위치로 했다가 거부", () => {
+    const text = note({
+      from: od.from,
+      status: "ready",
+      route: r0745,
+      at: T745,
+      locate: { which: "to", status: "denied" },
+    });
+    expect(text).toContain("위치 권한이 꺼져 있어요. 지도를 눌러 도착을 고르세요");
+    expect(text).toContain("12분");
+  });
+});

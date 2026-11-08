@@ -192,6 +192,38 @@ export function routeErrorKo(code: string | null): string {
   return (code && ROUTE_ERROR_KO[code]) || "경로를 받지 못했어요. 잠시 뒤 다시 해 주세요";
 }
 
+// 내 위치 (T5.7)
+export const MY_LOCATION_KO = "내 위치";
+export const LOCATING_KO = "내 위치 찾는 중…";
+const OD_KO = { from: "출발", to: "도착" } as const;
+
+/** 출발·도착 칸이 비었을 때 */
+export function odHintKo(which: "from" | "to"): string {
+  return `지도를 눌러 ${OD_KO[which]}을 고르세요`;
+}
+
+/** 출발·도착 칸 옆 버튼 이름 — "출발을 내 위치로" */
+export function locateButtonKo(which: "from" | "to"): string {
+  return `${OD_KO[which]}을 내 위치로`;
+}
+
+/** 내 위치를 칸에 못 넣었을 때 안내 — 칸은 비워 두고 지도로 고르게 한다 */
+export function locateNoteKo(
+  which: "from" | "to",
+  status: "locating" | "denied" | "unavailable" | "outside",
+): string {
+  switch (status) {
+    case "locating":
+      return `내 위치를 찾고 있어요. 지도를 눌러 ${OD_KO[which]}을 골라도 돼요`;
+    case "denied":
+      return `위치 권한이 꺼져 있어요. ${odHintKo(which)}`;
+    case "unavailable":
+      return `내 위치를 찾지 못했어요. ${odHintKo(which)}`;
+    case "outside":
+      return `내 위치가 길찾기 범위(종로·중구) 밖이에요. ${odHintKo(which)}`;
+  }
+}
+
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
 
 function kstParts(iso: string): { y: number; m: number; d: number; wd: number } | null {

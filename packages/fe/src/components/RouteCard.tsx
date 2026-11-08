@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LEG_KO, distanceKo, hhmm, routeErrorKo, routeNoteKo } from "../i18n/ko";
+import { LEG_KO, distanceKo, hhmm, locateNoteKo, routeErrorKo, routeNoteKo } from "../i18n/ko";
 import { CROSSING_KINDS, routeOdKey } from "../map/layers/routeLayer";
 import { useRoute } from "../state/RouteProvider";
 import { useTime } from "../state/TimeProvider";
@@ -92,7 +92,7 @@ export function routeCrossing(route: RouteResponse): string | null {
 type Panel = "legs" | "evidence" | "events" | null;
 
 export function RouteCard() {
-  const { status, route, errorCode, at } = useRoute();
+  const { status, route, errorCode, at, locate } = useRoute();
   const { t } = useTime();
   const [panel, setPanel] = useState<Panel>(null);
   const [stage, setStage] = useState<SheetStage>("half");
@@ -108,10 +108,13 @@ export function RouteCard() {
   const fast = route ? fastestCard(route, at ?? t) : null;
   const orig = route ? originalCard(route) : null;
   const hasAvoided = (route?.avoided.length ?? 0) > 0;
+  // 내 위치를 칸에 못 넣었거나 찾는 중 (T5.7) — 경로가 있어도 맨 위에
+  const locateNote = locate ? locateNoteKo(locate.which, locate.status) : null;
   return (
     <BottomSheet label="길찾기 결과" stage={stage} onStage={setStage}>
       {route && fast ? (
         <>
+          {locateNote && <p className={styles.msg}>{locateNote}</p>}
           <div className={styles.cards}>
             <article className={`${styles.card} ${styles.sel}`} aria-label="가장 빠른 길">
               <span className={`${styles.badge} ${styles.blue}`}>가장 빠름</span>
@@ -173,7 +176,7 @@ export function RouteCard() {
             ? routeErrorKo(errorCode)
             : status === "loading"
               ? "경로 찾는 중…"
-              : "지도를 눌러 출발·도착을 골라 주세요"}
+              : (locateNote ?? "지도를 눌러 출발·도착을 골라 주세요")}
         </p>
       )}
       <TimeSlider />
