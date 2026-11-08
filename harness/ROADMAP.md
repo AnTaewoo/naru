@@ -320,12 +320,13 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - 🧑 태우: 노선정보 API(data.go.kr 15000193) 활용신청 — 2026-11-08 getRoutePath 가 HTTP 401 "등록되지 않은 서비스키". 워커 재시작. 마라톤·M2 는 운영계정 상향
 
 ### T6.4 TOPIS 통제 공지 게시판
-- status: DOING
+- status: DONE
 - depends: T6.2 (태우 2026-11-08 — 11/13(금) 18:00 전 운영)
 - 산출: https://topis.seoul.go.kr/notice/openNoticeList.do 를 10분마다(robots 허용 확인됨: /visit/, /map/openTotalMap.do 만 금지). 새 글만 → 원문 기록 → notice_v2 live 파싱(결정 D) → 후보 발행. 기존 N045·N046 문장이 이 게시판 형식이다 — 파싱 결과가 cases 와 같은 형식인지 확인
+- 결과(2026-11-08): 원문은 게시판과 최신 글이 같은 열린데이터광장 NoticeList(OA-22861, 키) — 웹은 안 긁는다. 글 하나 = 문장 하나(`topis-<번호>-u<고친 시각>`), 한 번 10·하루 200 live. N045·N046 은 게시판이 아니라 돌발(AccInfo) 형식이었다
 
 ### T6.6 경찰청 PDF inbox
-- status: TODO
+- status: DOING
 - depends: T6.4 (태우 2026-11-08 — 11/13(금) 18:00 전 운영)
 - 산출: smpa 는 robots.txt 가 막혀 있어 자동 수집 안 한다. `data/raw/notices/smpa/inbox/` 에 태우가 PDF 를 넣으면 워커가 새 파일을 감지 → 표 추출 → notice_v2 live 파싱 → 후보 발행 → 처리한 파일은 `data/raw/notices/smpa/<날짜>.pdf` 로 옮기고 MANIFEST 갱신
 

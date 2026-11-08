@@ -237,3 +237,9 @@
 - 정한 것: 노선 고르기는 정류소(NODE_ID) 수 순, N·새벽 노선 뺌, 돌발 하나 30회(약 1시간), 나누기 전 기록 9개는 옮기지 않고 재생 때 같이, `bus_corrections` 는 T6.3, 노선 경로 키 `DATA_GO_KR_ROUTE_KEY`(없으면 `DATA_GO_KR_KEY`). 태우 결정(고침): 2순위 돌발·기록 폴더·getRoutePath(도로 그래프 잇기 금지)·순서 T6.4 → T6.6 → T6.3
 - 막힌 것 / 태우 대기: getRoutePath 는 처음 HTTP 401 "등록되지 않은 서비스키" → 태우 활용신청·확인("잘 나옴"). 🧑 `sudo systemctl restart naru`(Alembic 0004) · 워커 단위 다시 설치·재시작. 2순위 위치 수집은 실측 대기(첫 기록은 운영 워커가). live 10(버스 8·getRoutePath 2)
 - 커밋: b6dbc94 5ea323c c536bab 62876d4 65de6b3 0b81b35 36296c5 6be502f 35f4420 06408f7 d96f92e 40e0d9b 1aff44a e79961c (하네스 f989672 576c267) / 이 항목의 커밋
+
+## 2026-11-08 · T6.4 DONE (고침: 태우 "C①로 고치고 E도 고쳐, 그다음 다음")
+- 한 것: TOPIS 통제·버스 공지 — 열린데이터광장 NoticeList(OA-22861, 게시판과 최신 글 같음) 10분마다 → 볼 글(통제안내·버스안내, 제목 날짜가 오늘 이후, 없으면 3일 안) → 글 하나 = 문장 하나(`topis-<번호>-u<고친 시각>`) → 기록 재생 또는 `--live` 로 notice_v2(한 번 10·하루 `NARU_LLM_DAILY_CAP` 200, 그날 기록 파일 수) → 후보(ID 는 버전 없이, batch_id 에 버전). 글 하나 실패는 그 글만, 프로세스 동안 다시 안 부름. 실데이터: 11/8 19:20 NoticeList 30행 + Claude 기록 28건 — 11/8 저녁 볼 글 6건은 후보 0(추측 좌표 0), 11/7 아침 6300 → 세종대로 7곳, 같은 날 돌발 근거로 12:00 통제 중(0.8). 고침: 구간 끝점은 AREA 라도 교차로 사전에 같은 이름이면 그 교차로(C①), '공지 원문 보기' 줄바꿈(E, iPhone 13 스크린샷)
+- 정한 것: 원문은 API(웹 안 긁음), 글 단위(규칙서 §1.3), 볼 글 기준 `topis_feed.RECENT`, 하루 수는 기록 파일 시각(KST). 버그 고침 — 빌더 로그 extra `name`(LogRecord 예약어라 INFO 에서 KeyError, 운영 워커는 INFO). C① 은 지금 기록 33건에서 바뀌는 후보 0: AREA 끝점은 6262 광화문광장뿐인데 OA-23081 에 없고, 6288 서울광장은 구간 끝점이 아니라 지점이다 — 보고의 "범위 안 놓침을 다 잡는다"는 틀렸다
+- 막힌 것 / 태우 대기: 🧑 `sudo cp deploy/naru-worker.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart naru-worker`(지금 워커는 18:56 T6.1 유닛 — 버스 live·TOPIS 안 돈다). 범위 안 놓침(서울광장 지점·광화문광장)을 잡을 방법은 태우 결정 대기. ADR-011 E 위반 1회(게시판 GET 2.7분 뒤 POST). 버스 e2e 2건이 운영 기록 폴더의 '가장 최근'을 재생. 펼친 원문이 길면 행의 점·배지가 가운데로 내려감. 기록 live: API 29(NoticeList 1·Claude 28, ≈ $0.017 / $50) + 웹 3
+- 커밋: 7feec75 cdedc37 0bc2627 bf5fffc 39a8b3c ff4e7bb 6d5e7f8 1ec8a59 / 이 항목의 커밋

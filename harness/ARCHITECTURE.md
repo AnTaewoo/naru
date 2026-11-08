@@ -50,7 +50,7 @@
 | `IncidentIngestor` | `build(incidents, ref, received_at) -> list[ClosureCandidate]` | TOPIS 돌발(OA-13315) 집회(10B02)만 → TOPIS 링크 선(LinkVerInfo, 없으면 돌발 좌표 점)·확신도 0.9·근거 topis_incident(at = 수신 시각). 원문·링크는 `SeoulOpenApi` 가 기록 (T6.1) |
 | `BusPoller` | `batches(now) -> list[BusPositionBatch]` | 1순위 공지 통제 창(시작 1시간 전 ~ 끝+30분) 횡단보도 100 m 안 노선 3개 60초, 2순위 TOPIS 집회·행사 돌발(기준 데이터) 노선 1개 120초·하루 300 → 원문 기록(notice·incident 폴더) → `POST /internal/bus-positions`. 부른 노선은 하루 한 번 경로(getRoutePath). 판단 없음, 후보를 만들지 않는다 (ADR-013 G·I, T6.2) |
 | `CongestionWatcher` | `watch(zone) -> CongestionSpike \| None` | confidence 승격만 (보류, ADR-002) |
-| `IngestWorker` | `run_forever()` (`--loop`) | 스케줄: 코스 1회 · 공지 5분 · 돌발(OA-13315) 5분 · 공지 게시판 10분(T6.4) · 버스 60초(통제 창만, T6.2) · 혼잡 보류. 소스마다 격리, 연속 3회 실패면 ERROR. 일 상한 LLM 200·버스 900. 웹 페이지는 같은 곳 10분 이상, 키로 쓰는 공개 API 는 그 한도 (ADR-011 E·ADR-013 H) |
+| `IngestWorker` | `run_forever()` (`--loop`) | 스케줄: 코스 1회 · 공지 5분 · 돌발(OA-13315) 5분 · TOPIS 공지 NoticeList 10분(T6.4, 글 하나 = 문장 하나, 기록 없는 글만 live) · 버스 60초(통제 창만, T6.2) · 혼잡 보류. 소스마다 격리, 연속 3회 실패면 ERROR. 일 상한 LLM 200·버스 900. 웹 페이지는 같은 곳 10분 이상, 키로 쓰는 공개 API 는 그 한도 (ADR-011 E·ADR-013 H) |
 | `CandidatePublisher` | `publish(batch: CandidateBatch) -> None` | httpx → `POST /internal/candidates` |
 
 ### BE — `packages/be` (`naru_be`) · Flask MVC
