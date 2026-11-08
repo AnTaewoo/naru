@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -48,6 +49,8 @@ KIND_TO_TYPE = {
     "unknown": ClosureType.event,
 }
 SENTENCES_REF = "data/raw/notices/sentences.jsonl"
+# TOPIS 공지 글 버전(T6.4 topis-<번호>-u<고친 시각>) — 후보 ID 는 버전 없이(고친 글이 덮는다)
+POST_VERSION = re.compile(r"-u\d{12}$")
 
 
 @dataclass(frozen=True)
@@ -68,7 +71,8 @@ class CandidateBuilder:
     def __init__(self, resolver: Resolver) -> None:
         self.resolver = resolver
 
-    def build(self, parsed: ParsedNotice) -> list[ClosureCandidate]:
+    def build(self, parsed: ParsedNotice, ref: str = SENTENCES_REF) -> list[ClosureCandidate]:
+        """ref = 근거가 가리킬 원문 (기본 sentences.jsonl, live TOPIS 공지는 그 NoticeList 기록)."""
         out: list[ClosureCandidate] = []
         for i, pi in enumerate(parsed.items, start=1):
             item = pi.item
@@ -84,12 +88,12 @@ class CandidateBuilder:
                 type=KIND_TO_TYPE[item.kind],
                 impact=Impact.blocks if item.impact == "blocks" else Impact.unknown,
                 window=window,
-                evidence=_evidence(parsed),
+                evidence=_evidence(parsed, ref),
                 notice_ref=_notice_ref(parsed),
                 approx=item.approx,
                 summary=_summary(pi),
             )
-            prefix = f"{parsed.envelope.sentence_id}-i{i}"
+            prefix = f"{candidate_stem(parsed.envelope.sentence_id)}-i{i}"
             for k, seg in enumerate(pi.segments, start=1):
                 src = self.resolver.resolve(seg.from_, pi.tag_of(seg.from_), hint)
                 dst = self.resolver.resolve(seg.to, pi.tag_of(seg.to), hint)
@@ -165,6 +169,11 @@ class CandidateBuilder:
         )
 
 
+def candidate_stem(sentence_id: str) -> str:
+    """후보 ID 앞부분 — TOPIS 글 버전(-u<고친 시각>)을 뗀다. 고친 글이 같은 ID 로 덮는다 (T6.4)."""
+    return POST_VERSION.sub("", sentence_id)
+
+
 def _summary(pi: ParsedItem) -> CandidateSummary:
     """item 의 구조화 칸 (ADR-012) — 이름은 spans 정규 이름, roads 는 road_hints 와 구간 road."""
     name = pi.canonical_of
@@ -200,11 +209,11 @@ def _dt(value: str | None) -> datetime | None:
     return dt
 
 
-def _evidence(parsed: ParsedNotice) -> Evidence:
+def _evidence(parsed: ParsedNotice, ref: str = SENTENCES_REF) -> Evidence:
     env = parsed.envelope
     return Evidence(
         kind=EvidenceKind.notice,
-        ref=f"{SENTENCES_REF}#{env.sentence_id}",
+        ref=f"{ref}#{env.sentence_id}",
         at=datetime.fromisoformat(env.published_at),
         detail={"model": parsed.model, "prompt_version": parsed.prompt_version},
     )
