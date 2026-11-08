@@ -288,7 +288,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - 테스트: recorded route_0745(통제 중 2곳)·route_1107_1500(공지상 1곳) 렌더, e2e iPhone 13
 
 ### T5.12 지도 출처 칸 줄이기 ★ (태우 2026-11-08)
-- status: DOING
+- status: DONE
 - depends: T5.10 (태우 "OSM 오픈소스 고지 숨기면 안 되나 — 사용에 불편" → 고쳐 (a))
 - 산출: 지도 출처 칸은 "© OpenStreetMap contributors" 한 줄만. 숨기기·ⓘ 접기는 안 된다 — OSMF 타일 정책 §2 "Do not hide attribution beneath UI, behind toggles, or off-screen"(2026-11-08 원문 확인, OSM 타일을 쓰는 동안). "오픈소스·데이터 고지" 링크는 하단 시트 맨 아래 줄로(모바일, 펼쳤을 때만), 데스크톱은 푸터 그대로. P6 마감의 VWorld 타일로 바꾸면 그때 표기 조건을 다시 본다
 - 테스트: e2e — 출처 칸 글자, 시트 링크 → /licenses, 접힘에선 링크 없음, 데스크톱 푸터 링크
@@ -303,7 +303,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 ## P6 — 운영 워커·실시간 신호 (태우 2026-11-08: 실서버 점검 뒤 당김)
 
 ### T6.1 워커 상시 실행 + TOPIS 실시간 돌발
-- status: TODO
+- status: DOING
 - depends: T5.10
 - 계기(실서버 확인): `/api/closures/events` 가 7건뿐(11/7 집회 2, 3/15 마라톤 5구간), 11/8 서울 전체 0건. `make serve` 의 워커가 `--once` 로 기록 5건만 재생(live 0)하고 끝난다
 - 산출: `naru_ai.worker --loop` — 소스별 주기 실행, 한 소스 실패가 다른 소스를 안 막음, 연속 3회 실패면 ERROR 로그. batch_id 는 원문 해시(같은 내용이면 멱등). 첫 소스: OA-13315 5분마다 → 원문 기록(결정 E) → IncidentIngestor → POST /internal/candidates. 기존 notice 후보와 같은 링크·시간이면 confirmed 증거로 붙는지 확인. `deploy/naru-worker.service`(naru.service 와 같은 형식: User=antaewoo, WorkingDirectory, PATH 에 uv 경로, ExecStart=uv run python -m naru_ai.worker --loop, Restart=on-failure). 설치 명령은 보고에 적는다. `make serve` 에서는 워커를 안 띄운다(서비스 분리)
