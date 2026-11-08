@@ -1,0 +1,109 @@
+// 길찾기 화면 — 순수 함수(카드·레그·근거) + 렌더(Provider 초기 state 에 recorded 응답, 네트워크 없음)
+// 기대값은 recorded naru_api/route_{0430,0745,1330}.json·closures_0745.json 을 열어 확인한 값:
+// 07:45 경로 700 s·839.6 m(지하보도 1·횡단보도 1·계단 2), 원래 길 674 s·808.3 m, 피한 횡단보도 2곳(확인, 08:08·08:30 해제, 확신도 0.9)
+// 13:30 경로 = 원래 길 674 s(횡단보도 레그 2), 피한 곳 없음. 04:30 경로 705 s·846.3 m(횡단보도 레그 3), 예정 1곳(08:30)
+import { describe, expect, it } from "vitest";
+import { routeNoteKo } from "../i18n/ko";
+import { recordedClosures, recordedRoute } from "../test/recorded";
+import { evidenceGroups } from "./EvidencePopover";
+import { legRows } from "./LegList";
+import { fastestCard, originalCard, routeCrossing } from "./RouteCard";
+
+const T745 = "2026-03-15T07:45:00+09:00";
+const T1330 = "2026-03-15T13:30:00+09:00";
+const T430 = "2026-03-15T04:30:00+09:00";
+const r0745 = recordedRoute("route_0745");
+const r1330 = recordedRoute("route_1330");
+const r0430 = recordedRoute("route_0430");
+const fc0745 = recordedClosures("closures_0745");
+
+describe("카드·레그·근거 (순수)", () => {
+  it("07:45 가장 빠른 길 — 12분·840m·07:57 도착, 지하보도 1·횡단보도 1·계단 2", () => {
+    expect(fastestCard(r0745, T745)).toEqual({
+      minutes: 12,
+      distance: "840m",
+      arrive: "07:57",
+      facts: [
+        { kind: "underpass", count: 1 },
+        { kind: "crosswalk", count: 1 },
+        { kind: "stairs", count: 2 },
+      ],
+    });
+    expect(routeCrossing(r0745)).toBe("광화문(세종문화회관) 지하보도");
+  });
+
+  it("07:45 원래 길 — 11분·808m, 확인 2곳이라 지금 못 감, 08:30 해제", () => {
+    const orig = originalCard(r0745);
+    expect(orig).toEqual({
+      minutes: 11,
+      distance: "808m",
+      blocked: true,
+      crosswalks: 2,
+      until: "2026-03-15T08:30:00+09:00",
+    });
+    expect(
+      routeNoteKo({
+        ...(orig ?? { crosswalks: 0, until: null, blocked: false }),
+        crossing: routeCrossing(r0745),
+      }),
+    ).toBe(
+      "횡단보도 2곳이 08:30까지 막혀 있어 광화문(세종문화회관) 지하보도로 건너는 길을 골랐어요.",
+    );
+  });
+
+  it("13:30 — 피한 통제가 없으면 원래 길 카드 없음. 04:30 — 예정 1곳이라 막힘은 아님", () => {
+    expect(originalCard(r1330)).toBeNull();
+    expect(fastestCard(r1330, T1330)).toMatchObject({ minutes: 11, arrive: "13:41" });
+    expect(fastestCard(r1330, T1330).facts).toEqual([{ kind: "crosswalk", count: 2 }]);
+    const early = originalCard(r0430);
+    expect(early).toMatchObject({ blocked: false, crosswalks: 1, minutes: 11 });
+    expect(fastestCard(r0430, T430)).toMatchObject({
+      minutes: 12,
+      distance: "846m",
+      arrive: "04:42",
+    });
+    expect(
+      routeNoteKo({
+        ...(early ?? { crosswalks: 0, until: null, blocked: false }),
+        crossing: routeCrossing(r0430),
+      }),
+    ).toBe("횡단보도 1곳이 곧 통제될 예정이라 피해 가는 길을 골랐어요.");
+  });
+
+  it("LegList 07:45 — 레그 7행, 이름 있는 지하보도, 거리는 m 반올림", () => {
+    const rows = legRows(r0745);
+    expect(rows.map((r) => r.title)).toEqual([
+      "보도",
+      "계단",
+      "광화문(세종문화회관) 지하보도",
+      "계단",
+      "보도",
+      "횡단보도",
+      "보도",
+    ]);
+    expect(rows[2]?.sub).toBe("지하보도");
+    expect(rows[0]?.sub).toBeNull();
+    expect(rows.map((r) => r.distance)).toEqual(["53m", "9m", "156m", "22m", "96m", "33m", "470m"]);
+  });
+
+  it("근거 07:45 — 사유 2묶음(해제 빠른 순), 시각표 게시·해제 예정, 확신도는 /closures 0.9", () => {
+    const groups = evidenceGroups(r0745.avoided, fc0745, T745);
+    expect(groups.map((g) => g.reason)).toEqual([
+      "marathon 1구간 세종대로 사거리~숭례문 오거리",
+      "marathon 출발지 광화문 광장 (미국대사관 앞 세종대로)",
+    ]);
+    const [g1] = groups;
+    expect(g1).toMatchObject({
+      status: "confirmed",
+      type: "marathon",
+      crosswalks: 1,
+      confidence: 0.9,
+    });
+    expect(g1?.until).toBe("2026-03-15T08:08:00+09:00");
+    expect(g1?.evidence.map((e) => [e.when, e.text, e.kind])).toEqual([
+      ["3/12 16:07", "1구간 세종대로 사거리~숭례문 오거리", "timetable"],
+      ["08:08", "확인 → 해제 예정", "timetable"],
+    ]);
+    expect(evidenceGroups(r1330.avoided, fc0745, T1330)).toEqual([]);
+  });
+});
