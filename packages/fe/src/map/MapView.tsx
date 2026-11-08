@@ -108,10 +108,16 @@ function fitRoute(map: MapLibreMap, route: RouteResponse | null, fitted: RefObje
   const bounds = routeBounds(route);
   if (!key || !bounds || key === fitted.current) return;
   fitted.current = key;
-  const h = map.getContainer().clientHeight;
-  // 위는 출발·도착 패널(약 170px) + 핀 말풍선, 아래는 카드 시트가 덮는다
-  const padding = { top: 230, bottom: Math.round(h * 0.42), left: 40, right: 40 };
-  map.fitBounds(bounds, { padding, maxZoom: 17 });
+  const container = map.getContainer();
+  const h = container.clientHeight;
+  // 위는 패널과 그 아래 지도 컨트롤(확대·출처) + 핀 말풍선(약 50px), 아래는 카드 시트가 덮는다
+  const ctrl = container.querySelector(".maplibregl-ctrl-top-right");
+  const ctrlBottom = ctrl
+    ? ctrl.getBoundingClientRect().bottom - container.getBoundingClientRect().top
+    : 0;
+  const top = Math.round(Math.max(ctrlBottom, 0) + 50);
+  const bottom = Math.max(0, Math.min(Math.round(h * 0.42), h - top - 80));
+  map.fitBounds(bounds, { padding: { top, bottom, left: 40, right: 40 }, maxZoom: 17 });
 }
 
 /** 출발·도착 핀 — 글리프 서버 없이 DOM 마커로 (시안 02 말풍선) */
@@ -183,8 +189,14 @@ export function MapView({ visible }: MapViewProps) {
       attributionControl: false,
     });
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
-    // 출처 표기는 늘 펼쳐 두고 위쪽에 — 아래 모서리는 하단 시트가 덮는다
-    map.addControl(new AttributionControl({ compact: false }), "top-right");
+    // 출처 표기는 늘 펼쳐 두고 위쪽에 — 아래 모서리는 하단 시트가 덮는다. 고지 전문은 /licenses
+    map.addControl(
+      new AttributionControl({
+        compact: false,
+        customAttribution: '<a href="/licenses">오픈소스 고지</a>',
+      }),
+      "top-right",
+    );
     map.on("load", () => {
       for (const id of Object.values(ICON_IDS)) {
         const image = renderIcon(id);
