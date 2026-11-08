@@ -91,6 +91,11 @@ export type DistanceM = number;
 export type LegKind = "sidewalk" | "crosswalk" | "underpass" | "overpass" | "stairs" | "elevator" | "station";
 export type Name = string | null;
 export type DistanceM1 = number;
+/**
+ * @minItems 2
+ * @maxItems 2
+ */
+export type CoordRange = [unknown, unknown];
 export type DurationS1 = number;
 export type DistanceM2 = number;
 export type Legs = Leg[];
@@ -287,6 +292,7 @@ export interface Leg {
   kind: LegKind;
   name?: Name;
   distance_m: DistanceM1;
+  coord_range: CoordRange;
 }
 export interface RouteResponse {
   route: LineString;

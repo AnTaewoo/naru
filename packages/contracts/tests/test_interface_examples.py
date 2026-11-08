@@ -105,7 +105,8 @@ def test_candidate_batch_response_example() -> None:  # §1.1 응답
 def test_route_response_example() -> None:  # §2
     r = RouteResponse.model_validate(_json(3))
     assert r.duration_s == 840 and r.distance_m == 1120
-    assert r.legs[0].kind is LegKind.underpass and r.legs[0].name == "시청역 지하보도"
+    assert [leg.kind for leg in r.legs] == [LegKind.sidewalk, LegKind.underpass, LegKind.sidewalk]
+    assert r.legs[1].name == "시청역 지하보도" and r.legs[1].coord_range == (1, 2)
     assert (
         r.avoided[0].status is Status.confirmed
         and r.avoided[0].evidence[0].kind is EvidenceKind.bus_skip
@@ -239,3 +240,30 @@ def test_adr_008_impact_toward_approx() -> None:
     seg = ClosureCandidate.model_validate({**raw, "toward": "을지로입구역", "approx": True})
     assert seg.toward == "을지로입구역" and seg.approx is True
     assert RouteResponse.model_validate(_json(3)).avoided[0].approx is False
+
+
+def test_route_legs_must_partition_route() -> None:  # §2 v0.7, ADR-009
+    raw = _json(3)
+    RouteResponse.model_validate(raw)
+
+    def broken(**leg_changes: object) -> dict[str, object]:
+        legs = [dict(leg) for leg in raw["legs"]]
+        for k, v in leg_changes.items():
+            idx, field = k.split("_", 1)
+            legs[int(idx[1:])][field] = v
+        return {**raw, "legs": legs}
+
+    with pytest.raises(ValidationError, match="시작해야"):  # 빈틈: 1 → 2 사이가 비었다
+        RouteResponse.model_validate(broken(l1_coord_range=[2, 2]))
+    with pytest.raises(ValidationError, match="끝"):  # 마지막 레그가 끝까지 안 간다
+        RouteResponse.model_validate(broken(l2_coord_range=[2, 2]))
+    with pytest.raises(ValidationError, match="밖"):  # 범위 밖
+        RouteResponse.model_validate(broken(l2_coord_range=[2, 9]))
+    with pytest.raises(ValidationError, match="밖"):  # i > j
+        RouteResponse.model_validate(broken(l1_coord_range=[2, 1]))
+    with pytest.raises(ValidationError, match="distance_m"):  # 합이 총거리와 다르다
+        RouteResponse.model_validate(broken(l0_distance_m=10))
+    with pytest.raises(ValidationError):  # 필수
+        RouteResponse.model_validate({**raw, "legs": [{"kind": "sidewalk", "distance_m": 1120}]})
+    # 레그가 없으면 규칙 없음 (출발·도착이 같은 노드)
+    assert RouteResponse.model_validate({**raw, "legs": []}).legs == []

@@ -840,11 +840,26 @@
         "distance_m": {
           "title": "Distance M",
           "type": "number"
+        },
+        "coord_range": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Coord Range",
+          "type": "array"
         }
       },
       "required": [
         "kind",
-        "distance_m"
+        "distance_m",
+        "coord_range"
       ],
       "title": "Leg",
       "type": "object"
