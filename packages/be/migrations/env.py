@@ -14,7 +14,8 @@ from naru_be.models.entities.closure_state import ClosureStateEntity
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # 테스트처럼 한 프로세스에서 마이그레이션을 돌려도 이미 있는 로거(워커 등)를 끄지 않는다 (T6.1)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 url = context.get_x_argument(as_dictionary=True).get("url") or Settings().database_url
 config.set_main_option("sqlalchemy.url", url)

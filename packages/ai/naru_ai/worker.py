@@ -1,11 +1,13 @@
-"""IngestWorker — 코스 1회 + 공지(5분)를 후보로 만들어 BE 에 보낸다 (ARCHITECTURE AI, T4.4).
+"""IngestWorker — 코스·공지·TOPIS 돌발을 후보로 만들어 BE 에 보낸다 (ARCHITECTURE AI, T4.4·T6.1).
 
-    uv run python -m naru_ai.worker --once          # 시연용 1회 (make dev 로 BE 띄운 뒤)
-    uv run python -m naru_ai.worker                 # 코스 1회, 공지 5분마다
+    uv run python -m naru_ai.worker --once          # 코스·공지 1회 (시연, make dev 로 BE 띄운 뒤)
+    uv run python -m naru_ai.worker --loop          # 소스별 주기: 코스 1회 · 공지 5분 · 돌발 5분
     uv run python -m naru_ai.worker --once --live   # 기록 없는 공지 문장을 Claude 로 (상한 안에서)
 
-공지는 기본적으로 기록된 LLM 응답(data/recorded/llm)만 재생한다 — 키 없이도 돈다. batch_id 는
-내용 해시라 같은 배치를 다시 보내도 BE 가 멱등 처리한다. 돌발·버스·혼잡은 P6(해커톤 이후).
+공지는 기본적으로 기록된 LLM 응답(data/recorded/llm)만 재생한다 — 키 없이도 돈다. 돌발은
+NARU_INCIDENT_SOURCE=live 면 OA-13315 를 불러 원문을 기록하고, 아니면 기록을 재생한다.
+batch_id 는 내용(돌발은 원문) 해시라 같은 배치를 다시 보내도 BE 가 멱등 처리한다.
+--loop 는 소스마다 따로 돈다 — 한 소스가 실패해도 다른 소스는 계속, 연속 3회 실패면 ERROR.
 """
 
 from __future__ import annotations
@@ -15,11 +17,15 @@ import hashlib
 import json
 import logging
 import time
-from datetime import UTC, datetime
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from naru_ai.config import Settings
 from naru_ai.ingest.course import CourseIngestor
+from naru_ai.ingest.incident import IncidentIngestor, parse_accinfo
+from naru_ai.ingest.topis_api import IncidentFeed, LinkBook, SeoulOpenApi
 from naru_ai.llm.client import AnthropicClient
 from naru_ai.llm.prompt import NoticeEnvelope
 from naru_ai.llm.recorder import LLMRecorder
@@ -39,6 +45,21 @@ def _latest(parent: Path, pattern: str) -> Path:
     if not dirs:
         raise FileNotFoundError(f"실데이터 없음: {parent}/{pattern} — make fetch 먼저")
     return dirs[-1]
+
+
+FAIL_ALERT = 3  # 한 소스가 연속으로 이만큼 실패하면 ERROR (T6.1)
+
+
+@dataclass
+class _Source:
+    """--loop 의 소스 하나. every_s 가 None 이면 성공할 때까지만(코스 1회)."""
+
+    name: str
+    every_s: int | None
+    make: Callable[[], CandidateBatch | None]
+    next_at: datetime | None = None
+    failures: int = 0
+    done: bool = False
 
 
 def _batch_id(prefix: str, parts: list[str]) -> str:
@@ -70,6 +91,21 @@ class IngestWorker:
         self.parser = NoticeParser(settings, self.recorder, client=client)
         self.builder = CandidateBuilder(Resolver(gazetteer, KakaoRecords(recorded)))
         self.live_budget = client.max_calls if client is not None else 0
+        api = (
+            SeoulOpenApi(
+                settings.seoul_opendata_key.get_secret_value(), recorded, settings.seoul_api_url
+            )
+            if settings.incident_source == "live"
+            else None
+        )
+        self.incidents = IncidentFeed(recorded, api, settings.incident_record)
+        links = LinkBook(recorded / "links", api.fetch_link if api is not None else None)
+        self.incident_ingestor = IncidentIngestor(links)
+        self.sources = [
+            _Source("course", None, self.course_batch),
+            _Source("notice", settings.notice_interval_s, self.notice_batch),
+            _Source("incident", settings.incident_interval_s, self.incident_batch),
+        ]
 
     # --- 배치 ---------------------------------------------------------------------
     def course_batch(self) -> CandidateBatch | None:
@@ -125,37 +161,83 @@ class IngestWorker:
             candidates=candidates,
         )
 
+    def incident_batch(self) -> CandidateBatch:
+        """TOPIS 돌발 — 범위 안 집회가 없어도 빈 배치를 보낸다(수신 시각이 data_as_of 가 된다)."""
+        feed = self.incidents.fetch()
+        rows = parse_accinfo(feed.raw)
+        candidates = self.incident_ingestor.build(rows, feed.path.as_posix(), feed.received_at)
+        log.info(
+            "incidents",
+            extra={"rows": len(rows), "candidates": len(candidates), "record": feed.path.name},
+        )
+        return CandidateBatch(
+            batch_id=_batch_id("incident", [feed.raw]),  # 원문 해시 — 같은 내용이면 BE 가 멱등
+            produced_at=datetime.now(UTC),
+            producer="incident",
+            candidates=candidates,
+        )
+
     # --- 실행 ---------------------------------------------------------------------
+    def _publish(self, batch: CandidateBatch) -> CandidateBatchResponse:
+        response = self.publisher.publish(batch)
+        log.info(
+            "batch published",
+            extra={
+                "batch_id": response.batch_id,
+                "accepted": response.accepted,
+                "review_required": response.review_required,
+                "crosswalks_updated": response.crosswalks_updated,
+            },
+        )
+        return response
+
     def run_once(self, include_course: bool = True) -> list[CandidateBatchResponse]:
-        out: list[CandidateBatchResponse] = []
         batches = [self.course_batch()] if include_course else []
         batches.append(self.notice_batch())
-        for batch in batches:
-            if batch is None:
+        return [self._publish(b) for b in batches if b is not None]
+
+    def tick(self, now: datetime) -> list[CandidateBatchResponse]:
+        """--loop 한 바퀴: 때가 된 소스만 돌린다. 실패는 그 소스에만 남기고 다음 소스로 간다."""
+        out: list[CandidateBatchResponse] = []
+        for src in self.sources:
+            if src.done or (src.next_at is not None and now < src.next_at):
                 continue
-            response = self.publisher.publish(batch)
-            log.info(
-                "batch published",
-                extra={
-                    "batch_id": response.batch_id,
-                    "accepted": response.accepted,
-                    "review_required": response.review_required,
-                    "crosswalks_updated": response.crosswalks_updated,
-                },
-            )
-            out.append(response)
+            retry_s = src.every_s or self.settings.notice_interval_s
+            try:
+                batch = src.make()
+                if batch is not None:
+                    out.append(self._publish(batch))
+            except Exception as exc:  # 한 소스의 실패가 다른 소스를 막지 않는다 (T6.1)
+                src.failures += 1
+                level = logging.ERROR if src.failures >= FAIL_ALERT else logging.WARNING
+                log.log(
+                    level,
+                    "source failed",
+                    extra={"source": src.name, "failures": src.failures, "error": repr(exc)},
+                )
+                src.next_at = now + timedelta(seconds=retry_s)
+                continue
+            src.failures = 0
+            src.done = src.every_s is None
+            src.next_at = now + timedelta(seconds=retry_s)
         return out
 
     def run_forever(self) -> None:
-        self.run_once(include_course=True)
         while True:
-            time.sleep(self.settings.notice_interval_s)
-            self.run_once(include_course=False)
+            self.tick(datetime.now(UTC))
+            now = datetime.now(UTC)
+            waits = [
+                (s.next_at - now).total_seconds()
+                for s in self.sources
+                if not s.done and s.next_at is not None
+            ]
+            time.sleep(min(60.0, max(1.0, min(waits, default=60.0))))
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Naru AI 워커 — 코스·공지 후보를 BE 로")
-    ap.add_argument("--once", action="store_true", help="1회 실행 (시연)")
+    ap = argparse.ArgumentParser(description="Naru AI 워커 — 코스·공지·돌발 후보를 BE 로")
+    ap.add_argument("--once", action="store_true", help="코스·공지 1회 (시연)")
+    ap.add_argument("--loop", action="store_true", help="소스별 주기 실행 (운영, 기본값)")
     ap.add_argument(
         "--live", action="store_true", help="기록 없는 공지 문장을 Claude 로 (상한 안에서)"
     )
