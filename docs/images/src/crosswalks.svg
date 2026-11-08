@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="600" viewBox="0 0 1600 600" font-family="'Noto Sans CJK KR',sans-serif">
+<defs>
+  <style>
+    .panel{fill:#f6f7f9;stroke:#d9dce1}
+    .pt{font-size:21px;font-weight:800;fill:#1b1b1b}
+    .cap{font-size:15px;fill:#4b5563}
+    .rd{stroke:#d3d7dd;stroke-linecap:round;fill:none}
+    .on{fill:#c62828;stroke:#fff;stroke-width:2}
+    .off{fill:#9aa1ab;stroke:#fff;stroke-width:2}
+    .node{fill:#1f2328}
+    .nl{font-size:16px;font-weight:800;fill:#fff}
+    .tag{font-size:13.5px;fill:#1f2328;font-weight:700}
+  </style>
+</defs>
+<rect width="1600" height="600" fill="#fff"/>
+<text x="40" y="52" font-size="28" font-weight="800" fill="#1b1b1b">막히는 횡단보도 고르기</text>
+<text x="40" y="82" font-size="16" fill="#5f6670">Claude가 뽑은 이름을 위치로 바꾼 뒤, 통제 모양에 따라 횡단보도를 고릅니다.</text>
+
+<!-- panel 1 -->
+<rect class="panel" x="40" y="110" width="490" height="450" rx="12"/>
+<text class="pt" x="62" y="146">구간 통제</text>
+<text class="cap" x="62" y="170">"A 교차로에서 B 교차로까지"</text>
+<g>
+  <line class="rd" x1="70" y1="215" x2="500" y2="215" stroke-width="14"/>
+  <line class="rd" x1="70" y1="320" x2="500" y2="320" stroke-width="24"/>
+  <line class="rd" x1="70" y1="430" x2="500" y2="430" stroke-width="10"/>
+  <line class="rd" x1="110" y1="195" x2="110" y2="460" stroke-width="12"/>
+  <line class="rd" x1="230" y1="195" x2="230" y2="460" stroke-width="12"/>
+  <line class="rd" x1="350" y1="195" x2="350" y2="460" stroke-width="16"/>
+  <line class="rd" x1="470" y1="195" x2="470" y2="460" stroke-width="12"/>
+  <path d="M110,320 H350 V215 H470" fill="none" stroke="#c62828" stroke-opacity=".16" stroke-width="58" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M110,320 H350 V215 H470" fill="none" stroke="#2563eb" stroke-width="5" stroke-linejoin="round"/>
+  <rect class="on" x="160" y="310" width="20" height="20" rx="4"/>
+  <rect class="on" x="280" y="310" width="20" height="20" rx="4"/>
+  <rect class="on" x="340" y="258" width="20" height="20" rx="4"/>
+  <rect class="on" x="400" y="205" width="20" height="20" rx="4"/>
+  <rect class="off" x="160" y="205" width="20" height="20" rx="4"/>
+  <rect class="off" x="220" y="370" width="20" height="20" rx="4"/>
+  <rect class="off" x="400" y="420" width="20" height="20" rx="4"/>
+  <rect class="off" x="460" y="370" width="20" height="20" rx="4"/>
+  <circle class="node" cx="110" cy="320" r="17"/><text class="nl" x="104" y="326">A</text>
+  <circle class="node" cx="470" cy="215" r="17"/><text class="nl" x="464" y="221">B</text>
+</g>
+<text class="cap" x="62" y="492">도로망에서 A–B 최단경로(파랑)를 긋고</text>
+<text class="cap" x="62" y="514">도로 폭만큼 범위(빨강) 안의 횡단보도를 고릅니다</text>
+<text class="tag" x="62" y="542">폭: 대로 25m · 로 15m · 길 8m</text>
+
+<!-- panel 2 -->
+<rect class="panel" x="555" y="110" width="490" height="450" rx="12"/>
+<text class="pt" x="577" y="146">한 장소 집회</text>
+<text class="cap" x="577" y="170">"교보빌딩 정문 앞"</text>
+<g>
+  <line class="rd" x1="585" y1="320" x2="1015" y2="320" stroke-width="24"/>
+  <line class="rd" x1="800" y1="195" x2="800" y2="460" stroke-width="18"/>
+  <line class="rd" x1="585" y1="225" x2="1015" y2="225" stroke-width="10"/>
+  <rect x="690" y="240" width="88" height="56" rx="6" fill="#e3e6ea"/>
+  <text x="702" y="273" font-size="13" fill="#5f6670">건물</text>
+  <circle cx="760" cy="300" r="78" fill="#ef8a00" fill-opacity=".14" stroke="#ef8a00" stroke-dasharray="6 5" stroke-width="2"/>
+  <circle cx="760" cy="300" r="9" fill="#ef8a00" stroke="#fff" stroke-width="3"/>
+  <text x="845" y="292" font-size="14" fill="#a85f00" font-weight="700">30m</text>
+  <line x1="760" y1="300" x2="838" y2="300" stroke="#ef8a00" stroke-width="1.5"/>
+  <rect class="on" x="725" y="310" width="20" height="20" rx="4"/>
+  <rect class="on" x="790" y="340" width="20" height="20" rx="4"/>
+  <rect class="off" x="900" y="310" width="20" height="20" rx="4"/>
+  <rect class="off" x="790" y="420" width="20" height="20" rx="4"/>
+  <rect class="off" x="640" y="215" width="20" height="20" rx="4"/>
+  <rect class="off" x="620" y="310" width="20" height="20" rx="4"/>
+</g>
+<text class="cap" x="577" y="492">장소에서 30m 안의 횡단보도를 고릅니다</text>
+<text class="cap" x="577" y="514">차도를 차지하는지 모르는 집회는 확신도가 낮아</text>
+<text class="cap" x="577" y="536">지도에만 표시합니다</text>
+
+<!-- panel 3 -->
+<rect class="panel" x="1070" y="110" width="490" height="450" rx="12"/>
+<text class="pt" x="1092" y="146">마라톤</text>
+<text class="cap" x="1092" y="170">통제 시간표 + 코스</text>
+<g>
+  <line class="rd" x1="1100" y1="250" x2="1530" y2="250" stroke-width="14"/>
+  <line class="rd" x1="1100" y1="380" x2="1530" y2="380" stroke-width="14"/>
+  <line class="rd" x1="1180" y1="195" x2="1180" y2="460" stroke-width="12"/>
+  <line class="rd" x1="1330" y1="195" x2="1330" y2="460" stroke-width="12"/>
+  <line class="rd" x1="1470" y1="195" x2="1470" y2="460" stroke-width="12"/>
+  <path d="M1180,200 V380 H1330 V250 H1470 V450" fill="none" stroke="#c62828" stroke-width="7" stroke-linejoin="round"/>
+  <rect class="on" x="1170" y="240" width="20" height="20" rx="4"/>
+  <rect class="on" x="1170" y="320" width="20" height="20" rx="4"/>
+  <rect class="on" x="1250" y="370" width="20" height="20" rx="4"/>
+  <rect class="on" x="1320" y="300" width="20" height="20" rx="4"/>
+  <rect class="on" x="1400" y="240" width="20" height="20" rx="4"/>
+  <rect class="on" x="1460" y="320" width="20" height="20" rx="4"/>
+  <rect class="off" x="1250" y="240" width="20" height="20" rx="4"/>
+  <rect class="off" x="1400" y="370" width="20" height="20" rx="4"/>
+  <rect x="1190" y="196" width="138" height="26" rx="13" fill="#fff" stroke="#c62828"/>
+  <text x="1201" y="214" font-size="13" fill="#c62828" font-weight="700">1구간 07:20–08:08</text>
+  <rect x="1340" y="196" width="138" height="26" rx="13" fill="#fff" stroke="#c62828"/>
+  <text x="1351" y="214" font-size="13" fill="#c62828" font-weight="700">2구간 07:23–08:57</text>
+</g>
+<text class="cap" x="1092" y="492">코스 선을 따라 고르고, 구간마다</text>
+<text class="cap" x="1092" y="514">시간표의 통제·해제 시각을 붙입니다</text>
+<text class="tag" x="1092" y="542">시간표가 곧 근거 → 시작하면 '통제 중'</text>
+</svg>

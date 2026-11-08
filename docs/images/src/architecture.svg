@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="760" viewBox="0 0 1600 760" font-family="'Noto Sans CJK KR','Apple SD Gothic Neo',sans-serif">
+<defs>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4a4a4a"/></marker>
+  <style>
+    .lane{fill:#f6f7f9;stroke:#d9dce1}
+    .lh{font-size:20px;font-weight:700;fill:#1f2328}
+    .ls{font-size:14px;fill:#6b7280}
+    .box{fill:#fff;stroke:#3b3f45;stroke-width:1.5}
+    .t{font-size:19px;font-weight:700;fill:#111}
+    .s{font-size:14.5px;fill:#4b5563}
+    .ln{fill:none;stroke:#4a4a4a;stroke-width:1.8}
+    .lab{font-size:13.5px;fill:#4b5563}
+  </style>
+</defs>
+<rect width="1600" height="760" fill="#fff"/>
+
+<rect class="lane" x="30" y="40" width="310" height="690" rx="10"/>
+<text class="lh" x="50" y="74">모으기</text><text class="ls" x="50" y="96">공지 · 시간표 · 실시간 정보</text>
+<rect class="lane" x="370" y="40" width="400" height="690" rx="10"/>
+<text class="lh" x="390" y="74">AI 워커</text><text class="ls" x="390" y="96">Python · Claude API</text>
+<rect class="lane" x="800" y="40" width="440" height="690" rx="10"/>
+<text class="lh" x="820" y="74">서버 (BE)</text><text class="ls" x="820" y="96">Flask · MySQL · 도로·보행 그래프</text>
+<rect class="lane" x="1270" y="40" width="300" height="690" rx="10"/>
+<text class="lh" x="1290" y="74">화면 (FE)</text><text class="ls" x="1290" y="96">Next.js · MapLibre</text>
+
+<rect class="box" x="55" y="125" width="260" height="70" rx="8"/>
+<text class="t" x="72" y="155">경찰청 「오늘의 주요집회」</text><text class="s" x="72" y="179">전날 18시 공지 · 행진 경로</text>
+<rect class="box" x="55" y="215" width="260" height="70" rx="8"/>
+<text class="t" x="72" y="245">TOPIS 통제 공지</text><text class="s" x="72" y="269">당일 통제 구간 · 차로</text>
+<rect class="box" x="55" y="335" width="260" height="70" rx="8"/>
+<text class="t" x="72" y="365">마라톤 통제 시간표</text><text class="s" x="72" y="389">구간별 통제 · 해제 시각</text>
+<rect class="box" x="55" y="425" width="260" height="70" rx="8"/>
+<text class="t" x="72" y="455">TOPIS 실시간 돌발</text><text class="s" x="72" y="479">지금 막힌 도로 (링크 ID)</text>
+
+<rect class="box" x="395" y="150" width="350" height="110" rx="8"/>
+<text class="t" x="413" y="182">Claude 공지 파서</text>
+<text class="s" x="413" y="208">시간 · 도로 · 교차로 · 구간 뽑기</text>
+<text class="s" x="413" y="232">통제 여부(impact) · 확신도 매기기</text>
+<rect class="box" x="395" y="295" width="350" height="95" rx="8"/>
+<text class="t" x="413" y="327">지명사전</text>
+<text class="s" x="413" y="353">이름 → 위치</text>
+<text class="s" x="413" y="375">서울시 교차로·횡단보도 · 카카오 로컬</text>
+<rect class="box" x="395" y="430" width="350" height="80" rx="8"/>
+<text class="t" x="413" y="462">통제 후보 보내기</text>
+<text class="s" x="413" y="488">POST /internal/candidates</text>
+<rect x="395" y="560" width="350" height="110" rx="8" fill="#fff8e1" stroke="#d4a72c"/>
+<text x="413" y="594" font-size="16.5" font-weight="700" fill="#5c4400">Claude는 위치를 만들지 않습니다</text>
+<text x="413" y="621" font-size="14.5" fill="#5c4400">이름만 뽑고, 위치는 공공 데이터에서</text>
+<text x="413" y="643" font-size="14.5" fill="#5c4400">찾습니다. 틀려도 확인할 수 있게.</text>
+
+<rect class="box" x="825" y="150" width="390" height="95" rx="8"/>
+<text class="t" x="843" y="182">횡단보도 고르기</text>
+<text class="s" x="843" y="208">구간 → 도로 최단경로 → 도로 폭만큼 범위</text>
+<text class="s" x="843" y="230">한 장소 → 30m 안 · 마라톤 → 코스 선</text>
+<rect class="box" x="825" y="285" width="390" height="95" rx="8"/>
+<text class="t" x="843" y="317">상태 매기기</text>
+<text class="s" x="843" y="343">예정 → 통제 중 → 해제</text>
+<text class="s" x="843" y="365">바뀔 때마다 근거 기록</text>
+<rect class="box" x="825" y="420" width="390" height="70" rx="8"/>
+<text class="t" x="843" y="450">MySQL</text><text class="s" x="843" y="474">횡단보도별 상태 · 시간 · 근거</text>
+<rect class="box" x="825" y="530" width="390" height="120" rx="8"/>
+<text class="t" x="843" y="562">길찾기</text>
+<text class="s" x="843" y="588">횡단보도에 도착하는 시각 기준</text>
+<text class="s" x="843" y="610">통제 중은 지나가지 않음 · 예정은 +5분</text>
+<text class="s" x="843" y="632">원래 길도 같이 계산</text>
+
+<rect class="box" x="1290" y="150" width="260" height="95" rx="8"/>
+<text class="t" x="1308" y="182">통제 지도</text>
+<text class="s" x="1308" y="208">지금 막힌 곳 · 곧 막힐 곳</text>
+<text class="s" x="1308" y="230">시간 바꾸기 · 통제 불러오기</text>
+<rect class="box" x="1290" y="420" width="260" height="95" rx="8"/>
+<text class="t" x="1308" y="452">길찾기 화면</text>
+<text class="s" x="1308" y="478">우회 길 · 원래 길 · 경로 상세</text>
+<text class="s" x="1308" y="500">지하보도 · 육교 · 계단</text>
+<rect class="box" x="1290" y="555" width="260" height="95" rx="8"/>
+<text class="t" x="1308" y="587">통제 근거</text>
+<text class="s" x="1308" y="613">어떤 공지·시간표로</text>
+<text class="s" x="1308" y="635">막혔다고 판단했는지</text>
+
+<path class="ln" d="M315,160 H355 V205 H395" marker-end="url(#ar)"/>
+<path class="ln" d="M315,250 H355 V205"/>
+<path class="ln" d="M570,260 V295" marker-end="url(#ar)"/>
+<path class="ln" d="M570,390 V430" marker-end="url(#ar)"/>
+<path class="ln" d="M315,370 H360 V470 H395" marker-end="url(#ar)"/>
+<path class="ln" d="M315,460 H360"/>
+<text class="lab" x="200" y="525">위치가 이미 있음</text><text class="lab" x="200" y="545">(코스 선 · 도로 링크)</text>
+<path class="ln" d="M745,470 H785 V197 H825" marker-end="url(#ar)"/>
+<text class="lab" transform="translate(779,335) rotate(-90)" text-anchor="middle">통제 후보</text>
+<path class="ln" d="M1020,245 V285" marker-end="url(#ar)"/>
+<path class="ln" d="M1020,380 V420" marker-end="url(#ar)"/>
+<path class="ln" d="M1020,490 V530" marker-end="url(#ar)"/>
+<path class="ln" d="M1215,455 H1245 V197 H1290" marker-end="url(#ar)"/>
+<text class="lab" transform="translate(1239,330) rotate(-90)" text-anchor="middle">/closures</text>
+<path class="ln" d="M1215,590 H1260 V467 H1290" marker-end="url(#ar)"/>
+<text class="lab" transform="translate(1254,535) rotate(-90)" text-anchor="middle">/route</text>
+<path class="ln" d="M1260,590 V602 H1290" marker-end="url(#ar)"/>
+</svg>
