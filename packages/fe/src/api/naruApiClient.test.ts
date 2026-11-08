@@ -3,14 +3,19 @@
 import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { RECORDED_DIR, recorded } from "../test/recorded";
-import type { FeatureCollection, RouteResponse } from "../types/contracts";
+import type { ErrorBody, FeatureCollection, RouteResponse } from "../types/contracts";
 import {
   closuresUrl,
   eventsUrl,
+  geocodeReverseUrl,
+  geocodeSearchUrl,
   NaruApiError,
   parseClosureEvents,
   parseFeatureCollection,
+  parseGeocodeReverse,
+  parseGeocodeSearch,
   parseRouteResponse,
+  placeLngLat,
   routeUrl,
 } from "./naruApiClient";
 
@@ -98,5 +103,43 @@ describe("naruApiClient", () => {
     expect(body.coverage).toHaveLength(4);
     expect(() => parseClosureEvents(recorded("closures_0745").body)).toThrow(NaruApiError);
     expect(() => parseClosureEvents({ events: body.events })).toThrow(NaruApiError);
+  });
+
+  it("지오코딩 (INTERFACE §7, T5.8) — URL, recorded 검색·주소 응답 파싱, 오류 본문", () => {
+    const base = "http://naru.test";
+    const search = new URL(
+      geocodeSearchUrl("/api", { q: "교보빌딩", near: "37.5675,126.9775" }),
+      base,
+    );
+    expect(search.pathname).toBe("/api/geocode/search");
+    expect(search.searchParams.get("q")).toBe("교보빌딩");
+    expect(search.searchParams.get("near")).toBe("37.5675,126.9775");
+    expect(new URL(geocodeSearchUrl("/api", { q: "시청" }), base).searchParams.has("near")).toBe(
+      false,
+    );
+    const rev = new URL(
+      geocodeReverseUrl("/api", { lat: 37.5709686446227, lng: 126.9779039768265 }),
+      base,
+    );
+    expect(rev.pathname).toBe("/api/geocode/reverse");
+    expect(rev.searchParams.get("lat")).toBe("37.5709686446227");
+    expect(rev.searchParams.get("lng")).toBe("126.9779039768265");
+    // recorded naru_api/geocode_*.json — 카카오 기록을 재생한 실제 Flask 응답 (MANIFEST 를 열어 확인)
+    const rec = recorded("geocode_search_kyobo");
+    expect(rec.query).toEqual({ q: "교보빌딩", near: "37.5675,126.9775" });
+    const found = parseGeocodeSearch(rec.body);
+    expect(found.places).toHaveLength(10);
+    const first = found.places[0];
+    if (!first) throw new Error("기록에 장소가 없다");
+    expect([first.name, first.address]).toEqual(["광화문교보빌딩", "서울 종로구 종로 1"]);
+    expect(placeLngLat(first)).toEqual([126.9779039768265, 37.5709686446227]);
+    expect(parseGeocodeReverse(recorded("geocode_reverse_kyobo").body).label).toBe("종로구 종로 1");
+    const noRoad = parseGeocodeReverse(recorded("geocode_reverse_sejong_to").body);
+    expect([noRoad.label, noRoad.road_address]).toEqual(["중구 남대문로2가 9-9", null]);
+    expect(() => parseGeocodeSearch(recorded("geocode_reverse_kyobo").body)).toThrow(NaruApiError);
+    expect(() => parseGeocodeReverse(rec.body)).toThrow(NaruApiError);
+    const err = recorded("error_geocode_unavailable");
+    expect(err.status).toBe(503);
+    expect((err.body as ErrorBody).error.code).toBe("geocode_unavailable");
   });
 });

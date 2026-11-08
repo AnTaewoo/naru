@@ -3,6 +3,9 @@ import type {
   ClosureEventsResponse,
   ErrorBody,
   FeatureCollection,
+  GeocodeReverseResponse,
+  GeocodeSearchResponse,
+  Place,
   RouteResponse,
 } from "../types/contracts";
 
@@ -23,6 +26,18 @@ export interface ClosuresParams {
 export interface EventsParams {
   /** "minLng,minLat,maxLng,maxLat" — 없으면 전체 (INTERFACE §3.1) */
   bbox?: string;
+}
+
+export interface GeocodeSearchParams {
+  /** 검색어 2~50자 (INTERFACE §7.1) */
+  q: string;
+  /** "lat,lng" — 있으면 반경 5 km 안 정확도 순 */
+  near?: string;
+}
+
+export interface GeocodeReverseParams {
+  lat: number;
+  lng: number;
 }
 
 export class NaruApiError extends Error {
@@ -50,6 +65,17 @@ export function eventsUrl(baseUrl: string, p: EventsParams = {}): string {
   if (p.bbox) q.set("bbox", p.bbox);
   const qs = q.toString();
   return `${baseUrl}/closures/events${qs ? `?${qs}` : ""}`;
+}
+
+export function geocodeSearchUrl(baseUrl: string, p: GeocodeSearchParams): string {
+  const q = new URLSearchParams({ q: p.q });
+  if (p.near) q.set("near", p.near);
+  return `${baseUrl}/geocode/search?${q.toString()}`;
+}
+
+export function geocodeReverseUrl(baseUrl: string, p: GeocodeReverseParams): string {
+  const q = new URLSearchParams({ lat: String(p.lat), lng: String(p.lng) });
+  return `${baseUrl}/geocode/reverse?${q.toString()}`;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -85,11 +111,40 @@ export function parseClosureEvents(json: unknown): ClosureEventsResponse {
   return json as unknown as ClosureEventsResponse;
 }
 
+/** 장소 좌표 [lng, lat] (생성 타입이 unknown 튜플이라 숫자를 확인한다) */
+export function placeLngLat(p: Place): [number, number] | null {
+  const [lng, lat] = p.coord;
+  return typeof lng === "number" && typeof lat === "number" ? [lng, lat] : null;
+}
+
+export function parseGeocodeSearch(json: unknown): GeocodeSearchResponse {
+  const places: unknown = isRecord(json) ? json.places : null;
+  const ok =
+    Array.isArray(places) &&
+    places.every(
+      (p) =>
+        isRecord(p) &&
+        typeof p.name === "string" &&
+        typeof p.address === "string" &&
+        placeLngLat(p as unknown as Place) !== null,
+    );
+  if (!ok) throw new NaruApiError(200, null);
+  return json as unknown as GeocodeSearchResponse;
+}
+
+export function parseGeocodeReverse(json: unknown): GeocodeReverseResponse {
+  const label: unknown = isRecord(json) ? json.label : undefined;
+  if (label !== null && typeof label !== "string") throw new NaruApiError(200, null);
+  return json as unknown as GeocodeReverseResponse;
+}
+
 export interface NaruApiClient {
   readonly baseUrl: string;
   route(p: RouteParams, signal?: AbortSignal): Promise<RouteResponse>;
   closures(p: ClosuresParams, signal?: AbortSignal): Promise<FeatureCollection>;
   events(p?: EventsParams, signal?: AbortSignal): Promise<ClosureEventsResponse>;
+  geocodeSearch(p: GeocodeSearchParams, signal?: AbortSignal): Promise<GeocodeSearchResponse>;
+  geocodeReverse(p: GeocodeReverseParams, signal?: AbortSignal): Promise<GeocodeReverseResponse>;
 }
 
 async function getJson(
@@ -118,5 +173,9 @@ export function createNaruApiClient(
       parseFeatureCollection(await getJson(closuresUrl(baseUrl, p), fetchImpl, signal)),
     events: async (p, signal) =>
       parseClosureEvents(await getJson(eventsUrl(baseUrl, p), fetchImpl, signal)),
+    geocodeSearch: async (p, signal) =>
+      parseGeocodeSearch(await getJson(geocodeSearchUrl(baseUrl, p), fetchImpl, signal)),
+    geocodeReverse: async (p, signal) =>
+      parseGeocodeReverse(await getJson(geocodeReverseUrl(baseUrl, p), fetchImpl, signal)),
   };
 }
