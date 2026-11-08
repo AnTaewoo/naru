@@ -6,6 +6,7 @@ import { CROSSING_KINDS } from "../map/layers/routeLayer";
 import { useRoute } from "../state/RouteProvider";
 import { useTime } from "../state/TimeProvider";
 import type { LegKind, RouteResponse } from "../types/contracts";
+import { ClosureEvents } from "./ClosureEvents";
 import { EvidencePopover } from "./EvidencePopover";
 import { LegList } from "./LegList";
 import styles from "./RouteCard.module.css";
@@ -71,7 +72,7 @@ export function routeCrossing(route: RouteResponse): string | null {
   return leg ? leg.name || LEG_KO[leg.kind] : null;
 }
 
-type Panel = "legs" | "evidence" | null;
+type Panel = "legs" | "evidence" | "events" | null;
 
 export function RouteCard() {
   const { status, route, errorCode, at } = useRoute();
@@ -134,6 +135,14 @@ export function RouteCard() {
               blocked: orig?.blocked ?? false,
               crossing: routeCrossing(route),
             })}
+            {!orig && (
+              <>
+                {" "}
+                <button type="button" className={styles.inline} onClick={() => toggle("events")}>
+                  통제 불러오기
+                </button>
+              </>
+            )}
           </p>
         </>
       ) : (
@@ -164,6 +173,7 @@ export function RouteCard() {
       )}
       {route && panel === "legs" && <LegList route={route} />}
       {route && hasAvoided && panel === "evidence" && <EvidencePopover route={route} />}
+      {panel === "events" && <ClosureEvents focusMap={false} onDone={() => setPanel(null)} />}
     </section>
   );
 }

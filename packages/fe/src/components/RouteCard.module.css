@@ -157,3 +157,14 @@
   background: #2d6bff;
   color: #fff;
 }
+
+.inline {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

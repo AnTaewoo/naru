@@ -103,21 +103,25 @@ function odKey(route: RouteResponse | null): string | null {
   return coords.length ? JSON.stringify([coords[0], coords[coords.length - 1]]) : null;
 }
 
-function fitRoute(map: MapLibreMap, route: RouteResponse | null, fitted: RefObject<string | null>) {
-  const key = odKey(route);
-  const bounds = routeBounds(route);
-  if (!key || !bounds || key === fitted.current) return;
-  fitted.current = key;
+/** 위는 떠 있는 UI 와 그 아래 지도 컨트롤(확대·출처) + 핀 말풍선(약 50px), 아래는 하단 시트가 덮는다 */
+function fitPadding(map: MapLibreMap) {
   const container = map.getContainer();
   const h = container.clientHeight;
-  // 위는 패널과 그 아래 지도 컨트롤(확대·출처) + 핀 말풍선(약 50px), 아래는 카드 시트가 덮는다
   const ctrl = container.querySelector(".maplibregl-ctrl-top-right");
   const ctrlBottom = ctrl
     ? ctrl.getBoundingClientRect().bottom - container.getBoundingClientRect().top
     : 0;
   const top = Math.round(Math.max(ctrlBottom, 0) + 50);
   const bottom = Math.max(0, Math.min(Math.round(h * 0.42), h - top - 80));
-  map.fitBounds(bounds, { padding: { top, bottom, left: 40, right: 40 }, maxZoom: 17 });
+  return { top, bottom, left: 40, right: 40 };
+}
+
+function fitRoute(map: MapLibreMap, route: RouteResponse | null, fitted: RefObject<string | null>) {
+  const key = odKey(route);
+  const bounds = routeBounds(route);
+  if (!key || !bounds || key === fitted.current) return;
+  fitted.current = key;
+  map.fitBounds(bounds, { padding: fitPadding(map), maxZoom: 17 });
 }
 
 /** 출발·도착 핀 — 글리프 서버 없이 DOM 마커로 (시안 02 말풍선) */
@@ -165,7 +169,7 @@ export function MapView({ visible }: MapViewProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const loaded = useRef(false);
-  const { closures, bbox } = useClosures();
+  const { closures, bbox, focus } = useClosures();
   const dispatch = useClosureDispatch();
   const { route, from, to, active } = useRoute();
   const routeDispatch = useRouteDispatch();
@@ -257,6 +261,24 @@ export function MapView({ visible }: MapViewProps) {
     applyRoute(map, route);
     fitRoute(map, route, fitted);
   }, [route]);
+
+  // 통제 불러오기(T5.4) — 고른 통제의 범위로 지도를 맞춘다. 순번이 바뀔 때마다
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !focus) return;
+    const [w, s, e, n] = focus.bbox;
+    const run = () => {
+      map.fitBounds(
+        [
+          [w, s],
+          [e, n],
+        ],
+        { padding: fitPadding(map), maxZoom: 16 },
+      );
+    };
+    if (loaded.current) run();
+    else map.once("load", run);
+  }, [focus]);
 
   // 출발·도착 핀, 고르는 중엔 십자 커서
   useEffect(() => {
