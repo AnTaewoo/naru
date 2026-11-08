@@ -6,7 +6,8 @@ api, endpoint(키 가림), params(키 없음), called_at, status, raw). 손으�
   incident  서울 열린데이터광장 TOPIS 돌발 — AccMainCode(돌발 유형 코드) · AccSubCode(세부 유형) ·
             AccInfo(실시간 돌발: acc_type, link_id, grs80tm_x/y[EPSG:5181], acc_info). xml만. 3회
   links     최근 AccInfo 기록에서 유형이 집회및행사·공사·기타인 돌발의 link_id를 골라
-            LinkInfo(도로명·노드명) + LinkVerInfo(vertex TM 좌표). 링크당 2회, --limit 로 상한
+            LinkInfo(도로명·노드명) + LinkVerInfo(vertex TM 좌표). 링크당 2회, --limit 로 상한.
+            --links 1010005900,... 이면 그 링크만 (T6.1)
   rtd       서울 실시간 도시데이터 citydata (json) — 광화문·덕수궁 1회
   bus       서울 버스위치정보 getBusPosByRtid (ws.bus.go.kr, data.go.kr 키) 1회
   kakao     카카오 로컬 키워드 검색 — 숭례문·덕수궁 1회씩. 리졸버 재생용으로
@@ -142,8 +143,14 @@ def latest(out: Path, api: str, name: str) -> Path:
     return files[-1]
 
 
-def record_links(client: httpx.Client, settings: Settings, out: Path, limit: int) -> None:
+def record_links(
+    client: httpx.Client, settings: Settings, out: Path, limit: int, chosen: tuple[str, ...] = ()
+) -> None:
+    """chosen 이 있으면 그 링크만(T6.1 돌발 후보의 집회 링크), 없으면 AccInfo 에서 고른다."""
     key = need(settings.seoul_opendata_key, "SEOUL_OPENDATA_KEY")
+    if chosen:
+        _record_link_ids(client, key, out, list(chosen))
+        return
     codes = json.loads(latest(out, "incident", "AccMainCode").read_text("utf-8"))
     names = {row["acc_type"]: row["acc_type_nm"] for row in seoul_rows(codes["raw"], "AccMainCode")}
     wanted = {code for code, name in names.items() if name in LINK_TYPES}
@@ -162,6 +169,10 @@ def record_links(client: httpx.Client, settings: Settings, out: Path, limit: int
     log.info(
         "돌발 유형 %s 링크 %d개 중 %d개 기록", {names[c] for c in wanted}, len(rows), len(link_ids)
     )
+    _record_link_ids(client, key, out, link_ids)
+
+
+def _record_link_ids(client: httpx.Client, key: str, out: Path, link_ids: list[str]) -> None:
     stamp = datetime.now(KST).strftime("%Y%m%dT%H%M%S")
     for link_id in link_ids:
         for service in ("LinkInfo", "LinkVerInfo"):
@@ -252,6 +263,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--recorded", type=Path, default=Path("data/recorded"))
     ap.add_argument("--limit", type=int, default=4, help="links: 기록할 링크 수 (링크당 2회 호출)")
     ap.add_argument("--queries", default="", help="kakao: 검색어 쉼표 구분 (없으면 KAKAO_QUERIES)")
+    ap.add_argument("--links", default="", help="links: 링크 ID 쉼표 (없으면 AccInfo 에서)")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)  # URL에 키가 있다
@@ -270,7 +282,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.api in ("incident", "all"):
             record_incident(client, settings, args.recorded)
         if args.api in ("links", "all"):
-            record_links(client, settings, args.recorded, args.limit)
+            chosen = tuple(x.strip() for x in args.links.split(",") if x.strip())
+            record_links(client, settings, args.recorded, args.limit, chosen)
         if args.api in ("rtd", "all"):
             record_rtd(client, settings, args.recorded)
         if args.api in ("bus", "all"):

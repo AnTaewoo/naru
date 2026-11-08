@@ -6,8 +6,9 @@ os.environ 을 직접 읽지 않는다. .env 의 ANTHROPIC_API_KEY / NARU_LLM_MO
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +31,21 @@ class Settings(BaseSettings):
     notice_interval_s: int = Field(
         default=300, validation_alias="NARU_NOTICE_INTERVAL_S"
     )  # 공지 5분
+    # T6.1 TOPIS 실시간 돌발(OA-13315). recorded = 기록 재생(키 없이, 개발·테스트),
+    # live = 호출 + 기록(운영 워커). incident_record 는 recorded 에서 쓸 파일(없으면 가장 최근)
+    incident_source: Literal["live", "recorded"] = Field(
+        default="recorded", validation_alias="NARU_INCIDENT_SOURCE"
+    )
+    incident_record: Path | None = Field(default=None, validation_alias="NARU_INCIDENT_RECORD")
+    incident_interval_s: int = Field(
+        default=300, validation_alias="NARU_INCIDENT_INTERVAL_S"
+    )  # 돌발 5분 — 키로 쓰는 공개 API 라 ADR-011 E 의 10분 대상이 아니다 (ADR-013 H)
+    seoul_opendata_key: SecretStr = Field(
+        default=SecretStr(""), validation_alias="SEOUL_OPENDATA_KEY"
+    )
+    seoul_api_url: str = Field(
+        default="http://openapi.seoul.go.kr:8088", validation_alias="NARU_SEOUL_API_URL"
+    )
 
     @property
     def recorded_llm_dir(self) -> Path:
