@@ -33,6 +33,9 @@ BE_DIR = Path(__file__).resolve().parents[1]
 TOKEN = "naru-e2e-token"
 GWANGHWAMUN = "126.965,37.555,126.990,37.580"
 ACCINFO_1107 = "data/recorded/incident/20261107T154053_AccInfo.json"  # 11/7 15:40 수신, 53건
+# 11/8 19:20 NoticeList — 볼 글 6건, 기록 재생으로 후보 0 (test_topis_feed). 운영 워커가 같은 폴더에
+# 새 기록을 쌓으므로 '가장 최근'이 아니라 이 파일로 고정
+TOPIS_1108 = "data/recorded/topis_notice/20261108T192013.json"
 
 
 @pytest.fixture(scope="module")
@@ -181,11 +184,13 @@ def test_incident_receipt_is_data_as_of(app: Flask) -> None:
 
 def test_loop_counts_failures_per_source(app: Flask, caplog: pytest.LogCaptureFixture) -> None:
     # 돌발만 live 로, 열린데이터광장 주소는 닫힌 포트 — 실제 연결 거부. 코스·공지는 실제 앱으로 간다
+    # TOPIS 공지(T6.4)는 기록 재생 — 후보가 없어 아무것도 안 보내고 실패도 없다
     loop, _ = _worker(
         app,
         NARU_INCIDENT_SOURCE="live",
         SEOUL_OPENDATA_KEY="naru-e2e-key",
         NARU_SEOUL_API_URL="http://127.0.0.1:9",
+        NARU_TOPIS_RECORD=TOPIS_1108,
     )
     t0 = datetime(2026, 11, 8, 9, 0, tzinfo=UTC)
     with caplog.at_level(logging.WARNING, logger="naru_ai.worker"):
@@ -271,3 +276,36 @@ def test_bus_second_priority_follows_rally_incidents(app: Flask, worker: IngestW
 def test_bus_positions_need_token(app: Flask) -> None:
     resp = app.test_client().post("/internal/bus-positions", json={})
     assert resp.status_code == 401
+
+
+def _refs(p: dict[str, object]) -> list[str]:
+    evidence = p["evidence"]
+    assert isinstance(evidence, list)
+    return [str(e["ref"]) for e in evidence if isinstance(e, dict)]
+
+
+def test_topis_notice_confirmed_by_incident(app: Flask) -> None:
+    # T6.4: TOPIS 공지 6300(11/7 도심 집회, 창 05:00~17:00, 0.8) — 11/7 09:00 에 볼 글 중 후보가
+    # 나오는 유일한 글(test_topis_feed). 같은 날 돌발과 같은 횡단보도·겹치는 시각이라 돌발 근거가
+    # 붙고, 0.8 이상이라 창이 시작되면 '통제 중' (README 상태 표)
+    models: NaruModels = app.extensions["naru"]
+    models.repo.truncate()
+    w, publisher = _worker(app, NARU_INCIDENT_RECORD=ACCINFO_1107, NARU_TOPIS_RECORD=TOPIS_1108)
+    publisher.publish(w.incident_batch())
+    batch = w.topis_batch(datetime(2026, 11, 7, 9, 0, tzinfo=KST))
+    assert batch is not None
+    r = publisher.publish(batch)
+    # seg2 숭례문오거리→세종대로사거리 6곳 + 숭례문 점 둘(seg1·seg3 끝점, 30 m) 2곳씩
+    assert (r.accepted, r.review_required, r.crosswalks_updated) == (3, 0, 10)
+
+    def mine(at: str) -> list[dict[str, object]]:
+        return [p for p in _features(app, at) if any("#topis-6300-" in ref for ref in _refs(p))]
+
+    # OA-23081 교차로명 — 숭례문(23254·23247)·삼성본관(45236)·시청(40204)·덕수궁앞(40206)·
+    # 프레스센터(42121)·세종대로사거리(23206): 세종대로
+    crosswalks = {f"06-00000{n}" for n in (23254, 23247, 45236, 40204, 40206, 42121, 23206)}
+    early, noon = mine("2026-11-07T04:30:00+09:00"), mine("2026-11-07T12:00:00+09:00")
+    assert len(noon) == 10 and {str(p["crosswalk_id"]) for p in noon} == crosswalks
+    assert {p["status"] for p in early} == {Status.scheduled}  # 창 05:00 전
+    assert {(p["status"], p["confidence"]) for p in noon} == {(Status.confirmed, 0.8)}
+    assert all(_kinds(p) == {"notice", "topis_incident"} for p in noon)
