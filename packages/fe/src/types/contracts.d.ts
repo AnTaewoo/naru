@@ -1,5 +1,12 @@
 /* 생성물 — scripts/export_schema.py (naru_contracts). 손으로 고치지 않는다 */
 
+export type From = string;
+export type To = string;
+export type Via = string[];
+export type Segments = SummarySegment[];
+export type Points = string[];
+export type ReportedPeople = number | null;
+export type Roads = string[];
 export type ClosureType = "marathon" | "march" | "rally" | "event" | "incident";
 export type EvidenceKind = "notice" | "timetable" | "topis_incident" | "bus_skip" | "bus_return" | "rtd_spike";
 export type Ref = string;
@@ -37,7 +44,7 @@ export type Coordinates1 = [unknown, unknown];
  */
 export type RoadClass = "대로" | "로" | "길";
 export type Kind2 = "segment";
-export type Via = PlacePoint[];
+export type Via1 = PlacePoint[];
 export type Road = string | null;
 export type Source = "course" | "smpa" | "topis" | "news" | "seoul_press" | "incident" | "bus" | "rtd";
 export type Status = "scheduled" | "confirmed" | "released" | "zone_scheduled";
@@ -75,8 +82,8 @@ export type Lat1 = number;
  */
 export type Impact1 = "blocks" | "unknown";
 export type Approx1 = boolean;
-export type From = string;
-export type To = string;
+export type From1 = string;
+export type To1 = string;
 export type DepartAt = string;
 export type Mode = string;
 export type CrosswalkId1 = string;
@@ -138,6 +145,10 @@ export type Crosswalks = number;
  */
 export type Bbox2 = [unknown, unknown, unknown, unknown];
 export type Approx4 = boolean;
+export type TopisIncident = string | null;
+export type TopisNotice = string | null;
+export type Smpa = string | null;
+export type Course = string | null;
 export type Events = ClosureEvent[];
 /**
  * @minItems 4
@@ -183,6 +194,7 @@ export type Field = string | null;
  * docs/INTERFACE.md v0.5 — scripts/export_schema.py 생성물. 수정 금지
  */
 export interface NaruContracts {
+  CandidateSummary?: CandidateSummary;
   ClosureType?: ClosureType;
   Evidence?: Evidence;
   EvidenceKind?: EvidenceKind;
@@ -195,6 +207,7 @@ export interface NaruContracts {
   SegmentGeom?: SegmentGeom;
   Source?: Source;
   Status?: Status;
+  SummarySegment?: SummarySegment;
   Window?: Window;
   ZoneGeom?: ZoneGeom;
   ClosureCandidate?: ClosureCandidate;
@@ -216,6 +229,7 @@ export interface NaruContracts {
   FeatureCollection?: FeatureCollection;
   ClosureEventsQuery?: ClosureEventsQuery;
   ClosureEvent?: ClosureEvent;
+  DataAsOf?: DataAsOf;
   ClosureEventsResponse?: ClosureEventsResponse;
   GeocodeSearchQuery?: GeocodeSearchQuery;
   Place?: Place;
@@ -225,6 +239,23 @@ export interface NaruContracts {
   ErrorDetail?: ErrorDetail;
   ErrorBody?: ErrorBody;
   [k: string]: unknown;
+}
+/**
+ * 공지 item 의 구조화 칸 (v0.12, ADR-012). 문장은 없다 — 화면 문장은 FE i18n 이 만든다.
+ */
+export interface CandidateSummary {
+  segments?: Segments;
+  points?: Points;
+  reported_people?: ReportedPeople;
+  roads?: Roads;
+}
+/**
+ * 공지 구간 이름 (v0.12, ADR-012) — 파서 spans 정규 이름 그대로, 좌표가 안 풀려도 남는다.
+ */
+export interface SummarySegment {
+  from_: From;
+  to: To;
+  via?: Via;
 }
 export interface Evidence {
   kind: EvidenceKind;
@@ -264,7 +295,7 @@ export interface SegmentGeom {
   kind?: Kind2;
   from_: PlacePoint;
   to: PlacePoint;
-  via?: Via;
+  via?: Via1;
   road?: Road;
   road_class?: RoadClass | null;
 }
@@ -291,6 +322,7 @@ export interface ClosureCandidate {
   toward?: Toward;
   approx?: Approx;
   review_required?: ReviewRequired;
+  summary?: CandidateSummary | null;
 }
 export interface CandidateBatch {
   batch_id: BatchId;
@@ -320,8 +352,8 @@ export interface ClosureState {
   approx?: Approx1;
 }
 export interface RouteQuery {
-  from: From;
-  to: To;
+  from: From1;
+  to: To1;
   depart_at: DepartAt;
   mode?: Mode;
 }
@@ -404,10 +436,24 @@ export interface ClosureEvent {
   crosswalks: Crosswalks;
   bbox: Bbox2;
   approx?: Approx4;
+  type?: ClosureType | null;
+  source?: Source | null;
+  summary?: CandidateSummary | null;
+  notice?: NoticeRef | null;
+}
+/**
+ * 출처별로 저장된 통제의 가장 늦은 근거 시각 (v0.12, ADR-011 C·ADR-012). 없으면 null.
+ */
+export interface DataAsOf {
+  topis_incident: TopisIncident;
+  topis_notice: TopisNotice;
+  smpa: Smpa;
+  course: Course;
 }
 export interface ClosureEventsResponse {
   events: Events;
   coverage: Coverage;
+  data_as_of: DataAsOf;
 }
 export interface GeocodeSearchQuery {
   q: Q;
