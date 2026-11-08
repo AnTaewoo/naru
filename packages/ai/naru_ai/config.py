@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     llm_max_tokens: int = Field(default=4096, validation_alias="NARU_LLM_MAX_TOKENS")
     # live 호출은 Task당 10회 이하 (CLAUDE.md §2)
     llm_max_calls_per_run: int = Field(default=10, validation_alias="NARU_LLM_MAX_CALLS")
+    # 운영 워커 live 파싱 하루 상한 (ADR-011 D) — 넘으면 다음 날로
+    llm_daily_cap: int = Field(default=200, validation_alias="NARU_LLM_DAILY_CAP")
 
     data_dir: Path = Field(default=Path("data"), validation_alias="NARU_DATA_DIR")
 
@@ -46,6 +48,13 @@ class Settings(BaseSettings):
     seoul_api_url: str = Field(
         default="http://openapi.seoul.go.kr:8088", validation_alias="NARU_SEOUL_API_URL"
     )
+    # T6.4 TOPIS 통제·버스 공지(NoticeList OA-22861). recorded = 기록(지정 파일, 없으면 최근)
+    topis_source: Literal["live", "recorded"] = Field(
+        default="recorded", validation_alias="NARU_TOPIS_SOURCE"
+    )
+    topis_record: Path | None = Field(default=None, validation_alias="NARU_TOPIS_RECORD")
+    topis_interval_s: int = Field(default=600, validation_alias="NARU_TOPIS_INTERVAL_S")  # 10분
+    topis_size: int = Field(default=50, validation_alias="NARU_TOPIS_SIZE")  # 최신 50건
     # T6.2 버스 위치 (ADR-013 D·G). recorded = 노선별 가장 최근 기록 재생, live = 호출 + 기록
     bus_source: Literal["live", "recorded"] = Field(
         default="recorded", validation_alias="NARU_BUS_SOURCE"

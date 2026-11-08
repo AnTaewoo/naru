@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 from anthropic.types import MessageParam
@@ -62,6 +62,20 @@ class LLMRecorder:
 
     def list_ids(self) -> list[str]:
         return sorted(p.stem for p in self.dir.glob("*.json"))
+
+    def saved_today(self, now: datetime) -> int:
+        """오늘(KST) 남긴 기록 수 = 오늘 live 로 부른 수 (ADR-011 D 하루 상한, T6.4).
+
+        파일 시각(mtime)으로 센다 — 기록은 손대지 않으니 쓴 시각이다. 복사로 시각이 새로 되면
+        더 세어 덜 부른다(상한 쪽으로만 틀린다). 기록이 안 남는 거절·잘림은 안 센다(워커가 막는다).
+        """
+        kst = timezone(timedelta(hours=9))
+        today = now.astimezone(kst).date()
+        return sum(
+            1
+            for p in self.dir.glob("*.json")
+            if datetime.fromtimestamp(p.stat().st_mtime, kst).date() == today
+        )
 
     def save(
         self,
