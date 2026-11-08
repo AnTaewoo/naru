@@ -117,7 +117,8 @@ class CandidateBuilder:
             for k, pt in enumerate(item.points, start=1):
                 place = self.resolver.resolve(pt.name, pi.tag_of(pt.name), hint)
                 if place is None:
-                    log.info("unresolved point", extra={"name": pt.name})
+                    # extra 에 name 은 LogRecord 예약어라 KeyError — INFO 에서 build 가 죽었다(T6.4)
+                    log.info("unresolved point", extra={"place": pt.name})
                     continue
                 out.extend(self._point_candidates(f"{prefix}-pt{k}", place, pi, base))
         return out
