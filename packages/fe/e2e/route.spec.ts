@@ -2,7 +2,7 @@
 // 보낸 질의 그대로(교보빌딩 앞 → 대한문). 카드 숫자는 그 recorded 응답과 같아야 한다 (같은 DB·같은 BE 커밋)
 import { expect, test } from "@playwright/test";
 import { recorded } from "../src/test/recorded";
-import { consoleErrors, expectAttributionUncovered, ownErrors } from "./helpers";
+import { consoleErrors, expandSheet, expectAttributionUncovered, ownErrors } from "./helpers";
 
 const q = recorded("route_0745").query ?? {};
 const od = `from=${q["from"] ?? ""}&to=${q["to"] ?? ""}`;
@@ -26,6 +26,7 @@ test("길찾기 07:45 — 지하보도로 건너는 경로, 원래 길 막힘, �
   await expectAttributionUncovered(page);
   await page.waitForTimeout(2500); // 화면 맞춤·타일 (스크린샷용)
   await page.screenshot({ path: "test-results/route-0745.png" });
+  await expandSheet(page, "길찾기 결과"); // 경로가 오면 시트가 접힌다(T5.6)
   await page.getByRole("button", { name: "경로 상세" }).click();
   await expect(page.getByRole("list", { name: "경로 상세" }).getByRole("listitem")).toHaveCount(7);
   await page.getByRole("button", { name: "통제 근거" }).click();

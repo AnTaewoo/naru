@@ -3,7 +3,7 @@
 // (같은 기록의 /closures 창이 가장 늦게 10:41 에 끝난다), 슬라이더 "10분 전" 35번 = 07:45 (recorded 와 같은 시각)
 import { expect, test } from "@playwright/test";
 import { recorded } from "../src/test/recorded";
-import { consoleErrors, ownErrors } from "./helpers";
+import { consoleErrors, expandSheet, ownErrors } from "./helpers";
 
 const q = recorded("route_0745").query ?? {};
 const od = `from=${q["from"] ?? ""}&to=${q["to"] ?? ""}`;
@@ -17,6 +17,7 @@ test("시연 — 통제 끝난 13:35 에서 슬라이더로 07:45 → 지하보�
   await expect(page.getByRole("article", { name: "가장 빠른 길" })).toContainText("11분");
   await expect(page.getByText("이 시각엔 경로에 걸린 통제가 없어요.")).toBeVisible();
   await expect(page.getByRole("article", { name: "원래 길" })).toHaveCount(0);
+  await expandSheet(page, "길찾기 결과"); // 경로가 오면 시트가 접힌다(T5.6) — 펼쳐서 슬라이더
   const back = page.getByRole("button", { name: "10분 전" });
   for (let k = 0; k < 35; k++) await back.click();
   await expect(page.getByText("07:45", { exact: true })).toBeVisible();

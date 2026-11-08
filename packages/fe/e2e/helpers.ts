@@ -32,3 +32,12 @@ export async function expectAttributionUncovered(page: Page) {
     expect(hit).toBe(name);
   }
 }
+
+/** 하단 시트를 손잡이 탭으로 펼친다(접힘 → 절반, T5.6). 접힌 시트 안의 버튼은 가려져 못 누른다 */
+export async function expandSheet(page: Page, name: string) {
+  const sheet = page.getByRole("region", { name });
+  if ((await sheet.getAttribute("data-stage")) === "collapsed") {
+    await sheet.getByRole("button", { name: "시트 높이" }).click();
+    await expect(sheet).not.toHaveAttribute("data-stage", "collapsed");
+  }
+}

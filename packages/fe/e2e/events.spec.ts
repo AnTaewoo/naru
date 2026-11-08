@@ -4,7 +4,7 @@
 // 지하보도 (07:45 기록과 같다). "지금"에 통제가 없는 날에만 성립한다 (2026-11-08 기준 지금 통제 0건)
 import { expect, test } from "@playwright/test";
 import { recorded } from "../src/test/recorded";
-import { consoleErrors, ownErrors } from "./helpers";
+import { consoleErrors, expandSheet, ownErrors } from "./helpers";
 
 const q = recorded("route_0745").query ?? {};
 const od = `from=${q["from"] ?? ""}&to=${q["to"] ?? ""}`;
@@ -27,6 +27,7 @@ test("홈 — 지금(통제 없음) → 빈 칸 안내 → 3/15 1구간 → 07:2
   await expect(page.getByText(/횡단보도 \d+곳 통제 중/)).toBeVisible();
   await page.waitForTimeout(2000); // 지도 맞춤·타일 (스크린샷용)
   await page.screenshot({ path: "test-results/events-0720.png" });
+  await expandSheet(page, "3월 15일 통제"); // 고르면 시트가 접힌다(T5.6) — 펼쳐서 "지금"
   await page.getByRole("button", { name: "지금 시각으로" }).click();
   await expect(page.getByText("오늘 통제", { exact: true })).toBeVisible();
   expect(ownErrors(errors)).toEqual([]);
@@ -38,6 +39,7 @@ test("길찾기 — 지금은 걸린 통제 없음 → 통제 불러오기 → 1
   const errors = consoleErrors(page);
   await page.goto(`/?${od}`);
   const note = page.getByText("이 시각엔 경로에 걸린 통제가 없어요.");
+  await expandSheet(page, "길찾기 결과"); // 경로가 오면 시트가 접힌다(T5.6)
   await note.getByRole("button", { name: "통제 불러오기" }).click();
   await page
     .getByRole("region", { name: "통제 불러오기" })
