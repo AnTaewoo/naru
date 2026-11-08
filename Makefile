@@ -67,7 +67,7 @@ fetch:
 	uv run python scripts/fetch_$(SRC).py
 
 record:
-	@test -n "$(API)" || { echo "API=bus|incident|rtd|kakao"; exit 1; }
+	@test -n "$(API)" || { echo "API=bus|incident|rtd|kakao|geocode"; exit 1; }
 	@test -f scripts/record_api.py || { echo "아직 없음 — T0.7"; exit 1; }
 	uv run python scripts/record_api.py --api $(API)
 

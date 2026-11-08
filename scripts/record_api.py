@@ -1,4 +1,4 @@
-"""실제 API 응답 기록 — `make record API=incident|links|rtd|bus|kakao|all` (ROADMAP T0.7).
+"""실제 API 응답 기록 — `make record API=incident|links|rtd|bus|kakao|geocode|all` (ROADMAP T0.7).
 
 호출 1회의 원문을 그대로 `data/recorded/<api>/<ts>_<이름>.json` 에 둔다 (real-data-testing §3:
 api, endpoint(키 가림), params(키 없음), called_at, status, raw). 손으로 고치지 않는다.
@@ -11,6 +11,9 @@ api, endpoint(키 가림), params(키 없음), called_at, status, raw). 손으�
   bus       서울 버스위치정보 getBusPosByRtid (ws.bus.go.kr, data.go.kr 키) 1회
   kakao     카카오 로컬 키워드 검색 — 숭례문·덕수궁 1회씩. 리졸버 재생용으로
             data/recorded/kakao/keyword/<sha1(검색어)>.json 에 둔다 (real-data-testing §4.3)
+  geocode   BE 지오코딩(ADR-011 B, T5.8) 재생용 — 역지오코딩 4점 + 지도 기본 중심에서 가까운 순
+            키워드 3개.
+            요청 모양·파일 이름은 BE(naru_be kakao_local)와 같은 함수 → data/recorded/kakao/local/
 """
 
 from __future__ import annotations
@@ -27,6 +30,14 @@ from urllib.parse import quote, unquote
 import httpx
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from naru_be.models.repositories.kakao_local import (
+    COORD2ADDRESS,
+    KEYWORD,
+    coord2address_params,
+    keyword_params,
+    record_name,
+)
+
 log = logging.getLogger("record_api")
 KST = timezone(timedelta(hours=9))
 SEOUL_API = "http://openapi.seoul.go.kr:8088"
@@ -39,6 +50,15 @@ LINK_TYPES = ("집회및행사", "공사", "기타")  # 태우 지시 — confir
 RTD_AREA = "광화문·덕수궁"  # citydata AREA_NM (sample 응답에서 확인: AREA_CD POI009)
 BUS_ROUTE_ID = "100100118"  # data.go.kr 활용가이드 예시 노선 (응답 headerCd=0 이어야 유효)
 KAKAO_QUERIES = ("숭례문", "덕수궁", "교보빌딩")  # 교보빌딩은 T3.1 라우터 테스트 출발점
+# T5.8 지오코딩 — [lng, lat]. 고른 점의 도로명 주소, 지도 기본 중심에서 가까운 장소
+GEOCODE_POINTS = (
+    (126.9779039768265, 37.5709686446227),  # 카카오 24020019 광화문교보빌딩 = route_0745 출발
+    (126.976542945622, 37.5650416322942),  # 카카오 17582477 덕수궁 대한문 = route_0745 도착
+    (126.97230, 37.56368),  # 태우 실서버 요청(2026-11-08) 11/7 15:00 세종대로 건너기 출발
+    (126.98193, 37.56368),  # 같은 요청의 도착
+)
+GEOCODE_NEAR = (126.9775, 37.5675)  # FE 지도 기본 중심 = ClosureProvider DEFAULT_BBOX 가운데
+GEOCODE_QUERIES = ("교보빌딩", "덕수궁", "시청")
 SECRETS: list[str] = []  # 응답 본문에 키가 섞여 와도(카카오 401이 그랬다) 기록에는 남기지 않는다
 
 
@@ -207,10 +227,27 @@ def record_kakao(
         )
 
 
+def record_geocode(client: httpx.Client, settings: Settings, out: Path) -> None:
+    """BE Geocoder 재생용 (호출 7회, 이미 있으면 건너뜀). 이름은 BE 의 record_name."""
+    key = need(settings.kakao_rest_key, "KAKAO_REST_KEY")
+    calls = [(COORD2ADDRESS, coord2address_params(lng, lat)) for lng, lat in GEOCODE_POINTS]
+    calls += [(KEYWORD, keyword_params(q, GEOCODE_NEAR)) for q in GEOCODE_QUERIES]
+    for endpoint, params in calls:
+        path = out / "kakao" / "local" / record_name(endpoint, params)
+        if path.exists():
+            logging.info("geocode %s: 이미 기록 — 건너뜀", params)
+            continue
+        called_at = datetime.now(KST)
+        r = client.get(endpoint, params=params, headers={"Authorization": f"KakaoAK {key}", **UA})
+        write_record(path, "kakao", endpoint, dict(params), r, called_at)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="실제 API 응답 기록 (T0.7)")
     ap.add_argument(
-        "--api", required=True, choices=["incident", "links", "rtd", "bus", "kakao", "all"]
+        "--api",
+        required=True,
+        choices=["incident", "links", "rtd", "bus", "kakao", "geocode", "all"],
     )
     ap.add_argument("--recorded", type=Path, default=Path("data/recorded"))
     ap.add_argument("--limit", type=int, default=4, help="links: 기록할 링크 수 (링크당 2회 호출)")
@@ -241,6 +278,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.api in ("kakao", "all"):
             queries = tuple(q.strip() for q in args.queries.split(",") if q.strip())
             record_kakao(client, settings, args.recorded, queries or KAKAO_QUERIES)
+        if args.api in ("geocode", "all"):
+            record_geocode(client, settings, args.recorded)
     return 0
 
 

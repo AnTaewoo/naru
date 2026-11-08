@@ -98,6 +98,7 @@
 | links | 2026-11-07 | 8 | 돌발 링크 4개의 LinkInfo + LinkVerInfo (`make record API=links --limit 4`) |
 | rtd | 2026-11-07 | 1 | 실시간 도시데이터 citydata 광화문·덕수궁 (json, 175 KB) |
 | kakao | 2026-11-07 | 3 | 로컬 키워드 검색 숭례문·덕수궁·교보빌딩 (`kakao/keyword/<sha1(검색어)>.json`, 리졸버 재생용). 아래 "recorded/kakao" |
+| kakao/local | 2026-11-08 | 10 | BE 지오코딩 재생용(T5.8, ADR-011 B) — 역지오코딩 4·키워드 6(쓰는 것 3) (`make record API=geocode`). 아래 "recorded/kakao/local" |
 | bus | 2026-11-07 | 1 | 버스위치 getBusPosByRtid 노선 100100118, 차량 12대 (json). 아래 "recorded/bus" |
 | candidates/course | 2026-11-07 | 1 | `make record-candidates SOURCE=course` — CourseIngestor(T2.2) 출력 `CandidateBatch` 그대로: 후보 16개(시각표 16구간, geometry line, scheduled, confidence 0.9, evidence timetable, v0.6 `impact: blocks`·`toward: null`·`approx: false`). BE 테스트(T2.3)가 naru_ai 없이 최신 파일을 읽는다. 유효본은 `20261107T194153.json`(ADR-008 반영 재기록). 그 전 둘(185022 조각 겹침, 185247 impact 없음)은 삭제 대상 |
 
@@ -113,6 +114,11 @@
 - 필드(실제): `meta{total_count, pageable_count, is_end, same_name}`, `documents[]{id, place_name, category_group_code, category_group_name, category_name, address_name, road_address_name, phone, place_url, distance, x(경도), y(위도)}` — 좌표는 WGS84 문자열
 - 1순위 결과: 숭례문 id 7813430 (126.975313, 37.560003, 세종대로 40) · 덕수궁 id 10305191 (126.974895, 37.565564, 세종대로 99)
 - `교보빌딩`(b8e23419…d65f.json, T3.1 라우터 출발점): 1순위는 **서초 교보타워**(7996006), 2순위 안양 교보빌딩, **3순위 광화문교보빌딩 id 24020019 (126.977904, 37.570969, 종로 1)**. 리졸버(T4.2)는 서울 범위·관할서 힌트로 골라야 한다 — 1순위 맹신 금지의 실례
+
+### recorded/kakao/local (BE 지오코딩 재생용, T5.8)
+- 출처: 카카오 로컬 `https://dapi.kakao.com/v2/local/geo/coord2address.json`(좌표 → 주소)·`.../search/keyword.json`. 수집 `make record API=geocode` → `scripts/record_api.py` `record_geocode`. 요청 모양·파일 이름은 BE `naru_be/models/repositories/kakao_local.py` 의 `coord2address_params`·`keyword_params`·`record_name`(sha1(endpoint?정렬한 params)) — BE `RecordedKakaoLocal` 이 같은 이름으로 재생한다. 형식은 위와 같다(`api, endpoint, params, called_at, status, raw`, 키 없음)
+- 2026-11-08 15:19 (live 7): 역지오코딩 4 — 교보빌딩 126.9779040,37.5709686 → 도로명 "서울특별시 종로구 종로 1"(건물 광화문 교보생명 본사사옥) `1e979f8e…` sha256 acb90677c437… · 대한문 126.9765429,37.5650416 → "서울특별시 중구 세종대로 99"(덕수궁) `73e7bcdd…` sha256 24a955ec30b9… · 세종대로 건너기 출발(태우 실서버 요청) 126.9723,37.56368 → "서울특별시 중구 서소문로11길 19" `33bb4ce9…` sha256 bd927a886e9b… · 같은 요청 도착 126.98193,37.56368 → 도로명 없음, 지번 "서울 중구 남대문로2가 9-9" `32cbd381…` sha256 c621f6aff1d4…. 키워드 3(거리순 `sort=distance`, near 126.9775,37.5675) `ccb338ff…`·`c649f46a…`·`52b28b05…` — 건물 안 가게가 앞서서(교보빌딩 1위 "투데이세차 광화문점") **쓰지 않는다**(지워도 됨, 태우 판단)
+- 2026-11-08 15:21 (live 3, 이 Task 합계 10): 키워드 반경 5 km 정확도 순(near 126.98,37.57 = FE 지도 기본 중심을 소수 2자리로) — `교보빌딩` 1위 광화문교보빌딩 24020019 `4826147a…` sha256 2749acd4a18b… · `덕수궁` 1위 덕수궁 10305191, 3위 덕수궁 대한문 17582477 `2a50cf58…` sha256 cc32f7f19c03… · `시청` 1위 서울특별시청 8430129 `984e9224…` sha256 5b3ebd591a1d…
 
 ### recorded/incident · links (TOPIS 돌발, `scripts/record_api.py`)
 - 출처: 서울 열린데이터광장 OA-13312 돌발 유형 코드(`AccMainCode`) · OA-13313 세부유형(`AccSubCode`) · OA-13315 실시간 돌발(`AccInfo`) · OA-13310 링크정보(`LinkInfo`, LINK_ID 필수) · OA-13311 링크 Vertex(`LinkVerInfo`, LINK_ID 필수). 전부 **xml만**. 공공누리 1유형
