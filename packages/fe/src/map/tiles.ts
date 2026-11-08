@@ -5,6 +5,8 @@ import type { StyleSpecification } from "maplibre-gl";
 export const VWORLD_TILE = (key: string) =>
   `https://api.vworld.kr/req/wmts/1.0.0/${key}/Base/{z}/{y}/{x}.png`;
 export const OSM_TILE = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+export const OSM_ATTRIBUTION =
+  '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>';
 
 export function baseStyle(vworldKey: string | undefined): StyleSpecification {
   const useVworld = Boolean(vworldKey);
@@ -15,9 +17,8 @@ export function baseStyle(vworldKey: string | undefined): StyleSpecification {
         type: "raster",
         tiles: [useVworld ? VWORLD_TILE(vworldKey ?? "") : OSM_TILE],
         tileSize: 256,
-        attribution: useVworld
-          ? "© VWorld (국토교통부)"
-          : "© OpenStreetMap contributors (VWorld 키 없음 — 개발용)",
+        // VWorld 키가 들어올 때까지 OSM (태우, 2026-11-08). 문구는 OSM 저작권 안내 그대로
+        attribution: useVworld ? "© VWorld (국토교통부)" : OSM_ATTRIBUTION,
         maxzoom: 19,
       },
     },
