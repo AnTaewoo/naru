@@ -94,8 +94,8 @@
 | api | 최초 기록 | 파일 수 | 비고 |
 |---|---|---|---|
 | topis_notice | 2026-11-07 | 1 | TOPIS 공지 NoticeList 최신 300건 (xml). 아래 "recorded/topis_notice" |
-| incident | 2026-11-07 | 3 | TOPIS 돌발 — AccMainCode 13 · AccSubCode 43 · AccInfo 53행 (`make record API=incident`) |
-| links | 2026-11-07 | 8 | 돌발 링크 4개의 LinkInfo + LinkVerInfo (`make record API=links --limit 4`) |
+| incident | 2026-11-07 | 4 | TOPIS 돌발 — AccMainCode 13 · AccSubCode 43 · AccInfo 53행 (`make record API=incident`). 2026-11-08 AccInfo 1(워커 live 경로 확인, T6.1). 운영 워커(`NARU_INCIDENT_SOURCE=live`)가 5분마다 내용이 바뀔 때만 더한다 |
+| links | 2026-11-07 | 14 | 돌발 링크 4개의 LinkInfo + LinkVerInfo (`make record API=links --limit 4`) + 2026-11-08 집회 링크 3개(`--links`, T6.1). 운영 워커는 처음 보는 링크만 받아 더한다 |
 | rtd | 2026-11-07 | 1 | 실시간 도시데이터 citydata 광화문·덕수궁 (json, 175 KB) |
 | kakao | 2026-11-07 | 3 | 로컬 키워드 검색 숭례문·덕수궁·교보빌딩 (`kakao/keyword/<sha1(검색어)>.json`, 리졸버 재생용). 아래 "recorded/kakao" |
 | kakao/local | 2026-11-08 | 10 | BE 지오코딩 재생용(T5.8, ADR-011 B) — 역지오코딩 4·키워드 6(쓰는 것 3) (`make record API=geocode`). 아래 "recorded/kakao/local" |
@@ -127,6 +127,9 @@
 - AccInfo 필드(실제): `acc_id, occr_date(YYYYMMDD), occr_time(HHMM 또는 HHMMSS), exp_clr_date, exp_clr_time, acc_type, acc_dtype, link_id, grs80tm_x, grs80tm_y, acc_info(통제 문장, \r 줄바꿈), acc_road_code`. 2026-11-07 15:40 기준 53건: 공사 27 · 집회및행사 15 · 기타 6 · 교통사고 4 · 차량고장 1. 집회및행사 예: 1108984 "세종대로 (시청역 → 숭례문) 집회관련 무대설치로 진행방향 전차로 통제" link 1010005900 07:00~16:00
 - **좌표계: `grs80tm_x/y`는 EPSG:5181** (중부원점, 북 500,000) — 봉은교 vertex (206174, 446261) → (127.0698, 37.5158). 5186으로 읽으면 위도 36.6으로 튄다
 - 링크 ID ↔ 표준노드링크: 4개 중 2개(1000003700 청계천로, 1010011000 덕수궁길)는 nodelink_seoul에 같은 ID가 있고 양 끝 좌표가 10 m 안에서 같다. 2개(1000003000, 1210020200)는 없다 → 좌표는 LinkVerInfo로 받는 게 안전. `make record API=links`는 집회및행사 → 공사 → 기타 순으로 링크를 고른다(`--limit`)
+- 2026-11-08 18:04 (live 6, T6.1 — 11/7 AccInfo 의 그래프 범위 안 집회 링크, `uv run python scripts/record_api.py --api links --links 1010005900,1010006000,1000012500`): `links/20261108T180400_{LinkInfo,LinkVerInfo}_<id>.json` — 1010005900 세종대로 시청역→숭례문 401 m 꼭짓점 4 (LinkInfo sha256 57fd3bcd59bb… · LinkVerInfo 2372984ba9c4…), 1010006000 세종대로 숭례문→시청역 401 m 꼭짓점 4 (511f3f043e36… · 08e14e3036c0…), 1000012500 사직로 경복궁역→사직공원 364 m 꼭짓점 6 (7031e7f053e6… · c06c31fc10dc…). 두 세종대로 링크는 방향별이고 약 20 m 떨어져 있다 — 15 m 선 버퍼로 각 4곳(그 방향 차로를 건너는 쪽), 25 m 면 6곳
+- 2026-11-08 18:20 (live 1, T6.1 워커 live 경로 확인 — `SeoulOpenApi`, 키 가림 확인): `incident/20261108T182054_AccInfo.json` (sha256 714cd3ecea46…) 10건 — 공사 3 · 행사(10B03) 3 · 기타(11B01) 3 · 교통사고 1, 집회 0 → 후보 0(빈 배치)
+- AccInfo `acc_road_code` 는 009(시각이 HHMM, 예 1109106 "세종대로 (숭례문 ↔ 덕수궁) 집회로 양방향 전면통제" 14:44)와 010(시각이 HHMMSS, 경찰 공지를 옮긴 듯한 "15:00∼17:00 서울시의회∼숭례문(편도全차로) ※행진…")이 섞여 있다. 뜻은 확인 못 함 — 둘 다 집회(10B02)면 같은 규칙으로 후보
 
 ### recorded/rtd (서울 실시간 도시데이터)
 - 출처: 열린데이터광장 `citydata` (json), AREA_NM=광화문·덕수궁(AREA_CD POI009). 파일 `data/recorded/rtd/20261107T154125_citydata.json`

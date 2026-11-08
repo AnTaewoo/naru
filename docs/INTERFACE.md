@@ -43,7 +43,7 @@ AI 워커가 내놓는 유일한 출력. BE의 `CandidateIntake`(Model)가 `Cros
 | kind | 필드 | 누가 만드나 | BE 처리 (`CrosswalkIndex`) |
 |---|---|---|---|
 | `point` | `coordinates: [lng, lat]` | 리졸버 (교차로·장소·주소) | `from_point` 반경 30m. `impact: unknown`이면 먼저 도로 30 m 규칙(ADR-008) — 승격 안 되면 `zone_scheduled` |
-| `line` | `coordinates: [[lng, lat], …]` | 코스 GPX, 버스 이탈 구간, 돌발 링크 | `from_line` 버퍼 15m (코스·버스), 링크 폭 |
+| `line` | `coordinates: [[lng, lat], …]` | 코스 GPX, 버스 이탈 구간, 돌발 링크 | `from_line` 버퍼 15m (코스·돌발 — TOPIS 링크는 방향별이라 그 방향 차로를 건너는 쪽 횡단보도) |
 | `segment` | `from_`, `to`, `via[]`: `PlacePoint` · `road`, `road_class` | 리졸버 (Claude segments 출력) | `from_segment`: 도로 그래프 최단경로(from→via→to, road 있으면 그 도로만) → LineString → 등급별 버퍼(대로 25 / 로 15 / 길 8 m) → `from_line` |
 | `zone` | `zone_name`, `polygon` | ZoneMatcher | 라우팅 무관, `zone_scheduled` 표시만 |
 
@@ -54,6 +54,7 @@ AI 워커가 내놓는 유일한 출력. BE의 `CandidateIntake`(Model)가 `Cros
 - `approx`: 파서가 근사 시간("14시경", "오후")을 양끝 10분씩 넓혔으면 `true`. BE는 window를 넓히지도 좁히지도 않고 상태·응답에 그대로 싣는다. 평가는 ±10분 허용.
 - `window.end`가 null이면 "종료 미정". 엔진은 시작+6시간을 임시 end로 두고 evidence에 남긴다.
 - `evidence[].kind ∈ {notice, timetable, topis_incident, bus_skip, bus_return, rtd_spike}`. `ref`는 데이터·recorded 파일 경로.
+- 돌발(producer `incident`, T6.1): OA-13315 실시간 돌발 중 **집회(10B02)만** — 행사(차 없는 거리·축제)·공사·기타(버스 무정차)·사고와 "(인도)" 보도 집회는 후보가 아니다(README impact). `geometry` = TOPIS 링크 선(OA-13311 LinkVerInfo, 없으면 돌발 좌표 `point`), `type` rally, `confidence` 0.9, `status_hint` scheduled, `summary` = 링크 시작·끝 노드 이름과 도로명(OA-13310 LinkInfo). 같은 링크·같은 시각의 돌발은 한 후보(근거는 돌발마다, 후보 ID = 가장 작은 acc_id). `evidence` = `topis_incident`(`at` = 수신 시각, `ref` = 원문 기록 파일`#acc_id`, `detail.acc_id`·`link_id`). BE 는 같은 횡단보도·겹치는 시각의 공지 후보(smpa·topis·news·seoul_press) 전체에도 그 근거를 붙인다(어느 쪽이 먼저 와도) — 공지 확신도가 0.8 이상이면 시작 뒤 `confirmed`. 범위 안 돌발이 없어도 빈 배치를 보낸다.
 - `notice_ref`는 공지에서 온 후보에만. `excerpt`는 FE 사건 상세의 "공지 원문 보기"에서만 보인다(v0.12, ADR-012 — 목록·통제 근거에는 출처를 쓰지 않는다).
 - `summary` (v0.12, ADR-012, 선택) — 공지 item 의 **구조화 칸만**(문장 없음): `segments[]`{`from_`, `to`, `via[]`}·`points[]` 이름은 파서 spans 의 정규 이름(canonical) 그대로(좌표가 안 풀린 이름도 남는다), `reported_people` 숫자 또는 null, `roads[]` = road_hints·구간 road 의 정규 이름. 같은 item 의 후보는 같은 summary. 코스(시각표) 후보는 null. 화면 문장("…집회 → …행진", "5만 명")은 FE `i18n/ko.ts` 가 만든다.
 
@@ -165,7 +166,7 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 - FE "통제 불러오기": 누르면 t = `window.start`, 지도 = `bbox`. start 가 없는 사건은 누를 수 없다.
 - `coverage` (v0.10, ADR-011 C) **필수** — 보행망(그래프) 노드의 [minLng, minLat, maxLng, maxLat]. FE 는 내 위치가 이 밖이면 길찾기 범위 밖이라고 안내한다(사각형이라 안쪽이어도 보행망에서 150 m 넘으면 `/route` 가 `out_of_coverage`).
 - `type`·`source` (v0.12, ADR-012) — 사건을 만든 후보의 종류·출처(§4 enum). v0.12 전에 저장된 상태라 모르면 null. `summary` — 후보의 summary(§1) 그대로, 없으면 null(코스 등). `notice` — 후보의 `notice_ref`(§1) 그대로, 공지가 아니면 null. FE 는 summary 로 제목·둘째 줄을 만들고(없으면 `reason`), `notice.excerpt` 는 상세의 "공지 원문 보기"에서만 보인다.
-- `data_as_of` (v0.12, ADR-011 C·ADR-012) **필수** — 출처마다 그 출처로 저장된 통제의 가장 늦은 근거 시각, 없으면 null: 공지(`smpa`, `topis_notice` = source `topis`)는 공지 게시 시각, `course` 는 시각표 게시 시각(상태 전이 근거는 뺀다), `topis_incident`(= source `incident`)는 돌발 수신 시각. 예시는 2026-11-08 개발 DB(서울경찰청 11/6 18:00 공지 · 서울마라톤 3/12 16:07 시각표). FE 는 목록 위에 기준 시각을 쓰고, 실시간 출처(`topis_incident`)가 없거나 30분보다 오래면 회색 경고.
+- `data_as_of` (v0.12, ADR-011 C·ADR-012) **필수** — 출처마다 그 출처로 저장된 통제의 가장 늦은 근거 시각, 없으면 null: 공지(`smpa`, `topis_notice` = source `topis`)는 공지 게시 시각, `course` 는 시각표 게시 시각(상태 전이 근거는 뺀다), `topis_incident`(= source `incident`)는 돌발 배치를 마지막으로 받은 시각(범위 안 돌발이 없는 빈 배치·같은 배치 재전송 포함, T6.1). 예시는 2026-11-08 개발 DB(서울경찰청 11/6 18:00 공지 · 서울마라톤 3/12 16:07 시각표). FE 는 목록 위에 기준 시각을 쓰고, 실시간 출처(`topis_incident`)가 없거나 30분보다 오래면 회색 경고.
 
 ## §4 enum
 | 필드 | 코드값 | FE 라벨 |
@@ -232,3 +233,4 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 | 2026-11-08 | v0.11 | §7 지오코딩 `GET /geocode/search`·`GET /geocode/reverse` 추가, §6 `geocode_unavailable`(503) (ADR-011 B) | 태우 승인 |
 | 2026-11-08 | v0.12 | §1 `summary`(구조화 칸: 구간·지점 이름·reported_people·roads), §3.1 사건 `type`·`source`·`summary`·`notice`, 응답 `data_as_of` 필수 (ADR-012, ADR-011 C) | 태우 승인 |
 | 2026-11-08 | v0.12 (보충) | §2 `legs[].name` 뜻 — 횡단보도는 교차로명, 없으면 가까운 도로명. 스키마 그대로 (ROADMAP T5.10) | 태우 (T5.10) |
+| 2026-11-08 | v0.12 (보충) | §1 돌발 후보(집회 10B02만·TOPIS 링크 선·0.9·`topis_incident` 를 같은 횡단보도·겹치는 시각의 공지 후보에도), §3.1 `data_as_of.topis_incident` = 돌발 배치를 마지막으로 받은 시각. 스키마 그대로 (ROADMAP T6.1) | 태우 (T6.1) |
