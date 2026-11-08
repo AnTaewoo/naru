@@ -1,7 +1,19 @@
 "use client";
 
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  type Dispatch,
+  type ReactNode,
+} from "react";
+import { NaruApiError } from "../api/naruApiClient";
 import type { LngLat } from "../map/layers/routeLayer";
 import type { RouteResponse } from "../types/contracts";
+import { useNaruApi } from "./ApiProvider";
+import { useTime } from "./TimeProvider";
 
 // Provider 4/4 — 길찾기: 출발·도착과 /api/route 결과. t·출발·도착이 바뀌면 다시 받는다 (이전 요청은 Abort)
 export type RouteStatus = "idle" | "loading" | "ready" | "error";
@@ -130,4 +142,73 @@ export function latLngParam(p: LngLat): string {
 export function odFromLocation(search: string): { from: LngLat | null; to: LngLat | null } {
   const q = new URLSearchParams(search);
   return { from: parseLatLng(q.get("from")), to: parseLatLng(q.get("to")) };
+}
+
+const RouteStateCtx = createContext<RouteState | null>(null);
+const RouteDispatchCtx = createContext<Dispatch<RouteAction> | null>(null);
+
+export function RouteProvider({
+  children,
+  initialState,
+  fetchEnabled = true,
+  debounceMs = 250,
+}: {
+  children: ReactNode;
+  /** 렌더 테스트: recorded 응답을 넣고 네트워크 없이 그린다 */
+  initialState?: Partial<RouteState>;
+  fetchEnabled?: boolean;
+  debounceMs?: number;
+}) {
+  const [state, dispatch] = useReducer(routeReducer, initialState, initialRouteState);
+  const api = useNaruApi();
+  const { t, ready } = useTime();
+  const { active, from, to } = state;
+  const hasInitial = initialState !== undefined;
+
+  useEffect(() => {
+    // 마운트 뒤 URL 의 ?from=&to= 를 넣는다 (TimeProvider 의 ?t= 와 같은 방식)
+    if (hasInitial) return;
+    const od = odFromLocation(window.location.search);
+    if (od.from || od.to) dispatch({ type: "setOd", ...od });
+  }, [hasInitial]);
+
+  useEffect(() => {
+    if (!fetchEnabled || !ready || !active || !from || !to) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      dispatch({ type: "request", at: t });
+      api
+        .route({ from: latLngParam(from), to: latLngParam(to), departAt: t }, controller.signal)
+        .then((route) => dispatch({ type: "receive", at: t, route }))
+        .catch((e: unknown) => {
+          if (controller.signal.aborted) return;
+          const code = e instanceof NaruApiError ? (e.body?.error.code ?? null) : null;
+          const msg = e instanceof Error ? e.message : "경로를 받지 못했다";
+          dispatch({ type: "fail", error: msg, code });
+        });
+    }, debounceMs);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [api, t, ready, active, from, to, fetchEnabled, debounceMs]);
+
+  const value = useMemo(() => state, [state]);
+  return (
+    <RouteStateCtx.Provider value={value}>
+      <RouteDispatchCtx.Provider value={dispatch}>{children}</RouteDispatchCtx.Provider>
+    </RouteStateCtx.Provider>
+  );
+}
+
+export function useRoute(): RouteState {
+  const v = useContext(RouteStateCtx);
+  if (!v) throw new Error("RouteProvider 밖에서 useRoute 호출");
+  return v;
+}
+
+export function useRouteDispatch(): Dispatch<RouteAction> {
+  const v = useContext(RouteDispatchCtx);
+  if (!v) throw new Error("RouteProvider 밖에서 useRouteDispatch 호출");
+  return v;
 }
