@@ -444,6 +444,8 @@ describe("주소·검색 (T5.8)", () => {
       null,
     ]);
     expect(routeReducer(editing, { type: "edit", which: null }).editing).toBeNull();
+    // 입력 중에 '내 위치' 를 누르면 입력은 끝난다
+    expect(routeReducer(editing, { type: "locate", which: "from" }).editing).toBeNull();
   });
 
   it("주소(named)는 그 점일 때만 받는다, 바꾸기는 이름도 바꾼다", () => {

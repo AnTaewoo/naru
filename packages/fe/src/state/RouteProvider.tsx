@@ -173,8 +173,9 @@ export function routeReducer(state: RouteState, action: RouteAction): RouteState
         errorCode: action.code,
       };
     case "locate":
+      // 입력 중이었으면 입력은 끝난다 (T5.8)
       return state.active
-        ? { ...state, locate: { which: action.which, status: "locating" } }
+        ? { ...state, locate: { which: action.which, status: "locating" }, editing: null }
         : state;
     case "located": {
       const l = state.locate;
