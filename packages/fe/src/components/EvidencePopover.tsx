@@ -2,6 +2,7 @@
 
 import { Fragment, useMemo } from "react";
 import {
+  AVOIDED_STATUS_KO,
   EVIDENCE_KO,
   STATUS_KO,
   TYPE_KO,
@@ -114,7 +115,7 @@ export function EvidencePopover({ route }: { route: RouteResponse }) {
               className={styles.badge}
               style={{ background: STATUS_BG[g.status], color: STATUS_COLOR[g.status] }}
             >
-              {STATUS_KO[g.status]}
+              {AVOIDED_STATUS_KO[g.status] ?? STATUS_KO[g.status]}
             </span>
             {g.type && <span className={`${styles.badge} ${styles.gray}`}>{TYPE_KO[g.type]}</span>}
           </div>

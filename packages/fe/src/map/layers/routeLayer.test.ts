@@ -20,7 +20,7 @@ import {
   type LngLat,
 } from "./routeLayer";
 
-const ROUTES = ["route_0430", "route_0745", "route_1330"] as const;
+const ROUTES = ["route_0430", "route_0745", "route_1330", "route_1107_1500"] as const;
 
 function lengthM(coords: LngLat[]): number {
   let total = 0;
@@ -99,7 +99,7 @@ describe("routeLayer — 지하보도 구간·입구", () => {
   });
 });
 
-// 같은 기록: 07:45·04:30 은 원래 길(baseline 31점)과 경로가 다르고, 13:30 은 둘이 같다 (기록을 열어 좌표 배열 비교)
+// 같은 기록: 07:45·11/7 15:00 은 원래 길과 경로가 다르고, 04:30·13:30 은 둘이 같다 (기록을 열어 좌표 배열 비교)
 describe("routeLayer — 경로 실선·원래 길 점선", () => {
   it("07:45 — 실선 = route.coordinates 28점, 점선 = baseline 31점", () => {
     const route = recordedRoute("route_0745");
@@ -119,7 +119,9 @@ describe("routeLayer — 경로 실선·원래 길 점선", () => {
     const route = recordedRoute("route_1330");
     expect(routeLine(route).features).toHaveLength(1);
     expect(baselineLine(route).features).toEqual([]);
-    expect(baselineLine(recordedRoute("route_0430")).features).toHaveLength(1);
+    // 04:30 은 창 밖이라 원래 길 그대로(ADR-011 A), 11/7 15:00 은 예정 집회를 피해 원래 길과 다르다
+    expect(baselineLine(recordedRoute("route_0430")).features).toEqual([]);
+    expect(baselineLine(recordedRoute("route_1107_1500")).features).toHaveLength(1);
     expect(routeLine(null).features).toEqual([]);
     expect(baselineLine(null).features).toEqual([]);
   });

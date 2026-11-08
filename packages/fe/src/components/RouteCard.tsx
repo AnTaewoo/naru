@@ -27,6 +27,9 @@ export interface OriginalCard {
   /** 피한 횡단보도에 확인(confirmed)이 있으면 지금 못 가는 길 */
   blocked: boolean;
   crosswalks: number;
+  /** 상태별 횡단보도 수 — confirmed "통제 중" / scheduled "공지상 통제 시간 · 현장 확인 전" (ADR-011 A) */
+  confirmed: number;
+  scheduled: number;
   /** 가장 늦은 해제 시각. 하나라도 종료 미정이면 null */
   until: string | null;
 }
@@ -57,13 +60,26 @@ export function originalCard(route: RouteResponse): OriginalCard | null {
       if (u && (!until || new Date(u).getTime() > new Date(until).getTime())) until = u;
     }
   }
+  const ids = (status: string) =>
+    new Set(route.avoided.filter((a) => a.status === status).map((a) => a.crosswalk_id)).size;
   return {
     minutes: minutesOf(route.baseline.duration_s),
     distance: distanceKo(route.baseline.distance_m),
     blocked: route.avoided.some((a) => a.status === "confirmed"),
     crosswalks: new Set(route.avoided.map((a) => a.crosswalk_id)).size,
+    confirmed: ids("confirmed"),
+    scheduled: ids("scheduled"),
     until,
   };
+}
+
+/** 원래 길 카드 둘째 줄 — "횡단보도 통제 중 2곳 · 08:30 해제", 예정이면 "공지상 통제 시간 1곳 · 현장 확인 전" */
+export function originalFactsKo(orig: OriginalCard): string {
+  const parts: string[] = [];
+  if (orig.confirmed > 0) parts.push(`통제 중 ${orig.confirmed}곳`);
+  if (orig.scheduled > 0) parts.push(`공지상 통제 시간 ${orig.scheduled}곳 · 현장 확인 전`);
+  const until = orig.until ? `${hhmm(orig.until)} 해제` : "종료 미정";
+  return `횡단보도 ${parts.join(" · ")} · ${until}`;
 }
 
 /** 경로가 건너는 첫 지하보도·육교 — 이름이 없으면 종류 라벨 */
@@ -112,7 +128,7 @@ export function RouteCard() {
                 aria-label="원래 길"
               >
                 <span className={`${styles.badge} ${orig.blocked ? styles.stop : styles.slow}`}>
-                  {orig.blocked ? "지금 못 감" : "통제 예정"}
+                  {orig.blocked ? "지금 못 감" : "공지상 통제 시간"}
                 </span>
                 <div className={styles.t}>
                   {orig.minutes}
@@ -120,10 +136,7 @@ export function RouteCard() {
                   <span>{orig.distance}</span>
                 </div>
                 <div className={styles.facts}>
-                  <span>
-                    횡단보도 {orig.crosswalks}곳 통제{orig.blocked ? "" : " 예정"} ·{" "}
-                    {orig.until ? `${hhmm(orig.until)} 해제` : "종료 미정"}
-                  </span>
+                  <span>{originalFactsKo(orig)}</span>
                 </div>
               </article>
             )}

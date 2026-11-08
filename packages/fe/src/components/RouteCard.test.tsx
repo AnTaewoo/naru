@@ -1,7 +1,8 @@
 // 길찾기 화면 — 순수 함수(카드·레그·근거) + 렌더(Provider 초기 state 에 recorded 응답, 네트워크 없음)
-// 기대값은 recorded naru_api/route_{0430,0745,1330}.json·closures_0745.json 을 열어 확인한 값:
+// 기대값은 recorded naru_api/route_{0430,0745,1330,1107_1500}.json·closures_0745.json 을 열어 확인한 값:
 // 07:45 경로 700 s·839.6 m(지하보도 1·횡단보도 1·계단 2), 원래 길 674 s·808.3 m, 피한 횡단보도 2곳(확인, 08:08·08:30 해제, 확신도 0.9)
-// 13:30 경로 = 원래 길 674 s(횡단보도 레그 2), 피한 곳 없음. 04:30 경로 705 s·846.3 m(횡단보도 레그 3), 예정 1곳(08:30)
+// 13:30·04:30 경로 = 원래 길 674 s(횡단보도 레그 2), 피한 곳 없음 — 04:30 은 출발지 05:00 전이라 창 밖(ADR-011 A)
+// 11/7 15:00 세종대로 935 s·1,122.5 m(시청 지하보도), 원래 길 871 s·1,044.9 m, 예정 1곳(16:00까지)
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
@@ -24,6 +25,8 @@ const T430 = "2026-03-15T04:30:00+09:00";
 const r0745 = recordedRoute("route_0745");
 const r1330 = recordedRoute("route_1330");
 const r0430 = recordedRoute("route_0430");
+const r1107 = recordedRoute("route_1107_1500");
+const T1107 = "2026-11-07T15:00:00+09:00";
 const fc0745 = recordedClosures("closures_0745");
 const q = recorded("route_0745").query ?? {};
 const od = odFromLocation(`?from=${q["from"] ?? ""}&to=${q["to"] ?? ""}`);
@@ -82,6 +85,8 @@ describe("카드·레그·근거 (순수)", () => {
       distance: "808m",
       blocked: true,
       crosswalks: 2,
+      confirmed: 2,
+      scheduled: 0,
       until: "2026-03-15T08:30:00+09:00",
     });
     expect(
@@ -94,23 +99,43 @@ describe("카드·레그·근거 (순수)", () => {
     );
   });
 
-  it("13:30 — 피한 통제가 없으면 원래 길 카드 없음. 04:30 — 예정 1곳이라 막힘은 아님", () => {
+  it("13:30·04:30 — 피한 통제가 없으면 원래 길 카드 없음 (04:30 은 창 밖이라 원래 길, ADR-011 A)", () => {
     expect(originalCard(r1330)).toBeNull();
     expect(fastestCard(r1330, T1330)).toMatchObject({ minutes: 11, arrive: "13:41" });
     expect(fastestCard(r1330, T1330).facts).toEqual([{ kind: "crosswalk", count: 2 }]);
-    const early = originalCard(r0430);
-    expect(early).toMatchObject({ blocked: false, crosswalks: 1, minutes: 11 });
+    expect(originalCard(r0430)).toBeNull();
     expect(fastestCard(r0430, T430)).toMatchObject({
-      minutes: 12,
-      distance: "846m",
-      arrive: "04:42",
+      minutes: 11,
+      distance: "808m",
+      arrive: "04:41",
     });
+  });
+
+  it("11/7 15:00 — 예정 집회 1곳(공지 창 안)을 시청 지하보도로 피함: 막힘은 아니고 공지상 통제 시간", () => {
+    const orig = originalCard(r1107);
+    expect(orig).toEqual({
+      minutes: 15,
+      distance: "1.0km",
+      blocked: false,
+      crosswalks: 1,
+      confirmed: 0,
+      scheduled: 1,
+      until: "2026-11-07T16:00:00+09:00",
+    });
+    expect(fastestCard(r1107, T1107)).toMatchObject({
+      minutes: 16,
+      distance: "1.1km",
+      arrive: "15:16",
+    });
+    expect(routeCrossing(r1107)).toBe("시청 지하보도");
     expect(
       routeNoteKo({
-        ...(early ?? { crosswalks: 0, until: null, blocked: false }),
-        crossing: routeCrossing(r0430),
+        ...(orig ?? { crosswalks: 0, until: null, blocked: false }),
+        crossing: routeCrossing(r1107),
       }),
-    ).toBe("횡단보도 1곳이 곧 통제될 예정이라 피해 가는 길을 골랐어요.");
+    ).toBe(
+      "횡단보도 1곳이 16:00까지 공지상 통제 시간(현장 확인 전)이라 시청 지하보도로 건너는 길을 골랐어요.",
+    );
   });
 
   it("LegList 07:45 — 레그 7행, 이름 있는 지하보도, 거리는 m 반올림", () => {
@@ -167,7 +192,7 @@ describe("RouteCard 렌더", () => {
     const orig = screen.getByRole("article", { name: "원래 길" });
     expect(orig.textContent).toContain("지금 못 감");
     expect(orig.textContent).toContain("11분");
-    expect(orig.textContent).toContain("횡단보도 2곳 통제 · 08:30 해제");
+    expect(orig.textContent).toContain("횡단보도 통제 중 2곳 · 08:30 해제");
     expect(
       screen.getByText(
         "횡단보도 2곳이 08:30까지 막혀 있어 광화문(세종문화회관) 지하보도로 건너는 길을 골랐어요.",
@@ -202,6 +227,35 @@ describe("RouteCard 렌더", () => {
     expect(screen.queryByRole("article", { name: "원래 길" })).toBeNull();
     expect(screen.queryByRole("button", { name: "통제 근거" })).toBeNull();
     expect(screen.getByText("이 시각엔 경로에 걸린 통제가 없어요.")).toBeDefined();
+  });
+
+  it("11/7 15:00 — 원래 길 카드·통제 근거가 '공지상 통제 시간 · 현장 확인 전'", () => {
+    render(
+      <Providers at={T1107} route={ready(r1107, T1107)}>
+        <RouteCard />
+      </Providers>,
+    );
+    const orig = screen.getByRole("article", { name: "원래 길" });
+    expect(orig.textContent).toContain("공지상 통제 시간");
+    expect(orig.textContent).toContain("횡단보도 공지상 통제 시간 1곳 · 현장 확인 전 · 16:00 해제");
+    fireEvent.click(screen.getByRole("button", { name: "통제 근거" }));
+    expect(screen.getByRole("region", { name: "통제 근거" }).textContent).toContain(
+      "공지상 통제 시간 · 현장 확인 전",
+    );
+  });
+
+  it("오류 — 그래프 밖(recorded error_out_of_coverage, 잠실)", () => {
+    const err = recorded("error_out_of_coverage").body as ErrorBody;
+    expect(err.error.code).toBe("out_of_coverage");
+    render(
+      <Providers
+        at={T745}
+        route={{ status: "error", error: err.error.message, errorCode: err.error.code }}
+      >
+        <RouteCard />
+      </Providers>,
+    );
+    expect(screen.getByText("이 위치는 아직 길찾기 범위(종로·중구) 밖이에요")).toBeDefined();
   });
 
   it("오류 — 실제 Flask 오류 코드(invalid_query)를 한국어 문구로", () => {

@@ -136,10 +136,11 @@ export function routeNoteKo(p: {
 }): string {
   if (p.crosswalks === 0) return "이 시각엔 경로에 걸린 통제가 없어요.";
   const via = p.crossing ? `${p.crossing}${josaRo(p.crossing)} 건너는` : null;
-  if (!p.blocked) {
-    return `횡단보도 ${p.crosswalks}곳이 곧 통제될 예정이라 ${via ?? "피해 가는"} 길을 골랐어요.`;
-  }
   const until = p.until ? `${hhmm(p.until)}까지 ` : "";
+  if (!p.blocked) {
+    // 예정만 피했다 — 공지 창 안이라 피했지만 현장 확인은 아직 (ADR-011 A)
+    return `횡단보도 ${p.crosswalks}곳이 ${until}공지상 통제 시간(현장 확인 전)이라 ${via ?? "피해 가는"} 길을 골랐어요.`;
+  }
   return `횡단보도 ${p.crosswalks}곳이 ${until}막혀 있어 ${via ?? "돌아가는"} 길을 골랐어요.`;
 }
 
@@ -169,6 +170,13 @@ export function evidenceTextKo(e: Evidence, t: string): string {
 export const ROUTE_ERROR_KO: Record<string, string> = {
   no_route: "이 시각엔 갈 수 있는 길을 찾지 못했어요",
   invalid_query: "출발·도착을 다시 골라 주세요",
+  out_of_coverage: "이 위치는 아직 길찾기 범위(종로·중구) 밖이에요", // ADR-011, INTERFACE §6
+};
+
+/** 경로가 피한 통제의 상태 (ADR-011 A) — confirmed 는 막힘, scheduled 는 공지상 시간이라 피했을 뿐 */
+export const AVOIDED_STATUS_KO: Partial<Record<Status, string>> = {
+  confirmed: "통제 중",
+  scheduled: "공지상 통제 시간 · 현장 확인 전",
 };
 
 export function routeErrorKo(code: string | null): string {

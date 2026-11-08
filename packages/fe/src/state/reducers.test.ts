@@ -145,7 +145,6 @@ const T745 = "2026-03-15T07:45:00+09:00";
 const T1330 = "2026-03-15T13:30:00+09:00";
 const q745 = recorded("route_0745").query ?? {};
 const r0745 = recordedRoute("route_0745");
-const r0430 = recordedRoute("route_0430");
 
 describe("routeReducer", () => {
   const od = odFromLocation(`?t=${T745}&from=${q745["from"] ?? ""}&to=${q745["to"] ?? ""}`);
@@ -219,8 +218,8 @@ describe("길찾기 라벨", () => {
   it("distanceKo — 1 km 아래는 m 반올림, 넘으면 km 소수 한 자리", () => {
     expect(distanceKo(r0745.distance_m)).toBe("840m"); // 839.6
     expect(distanceKo(r0745.baseline.distance_m)).toBe("808m"); // 808.3
-    // 두 기록 경로를 이어 걸은 거리 839.6 + 846.3 = 1685.9 m
-    expect(distanceKo(r0745.distance_m + r0430.distance_m)).toBe("1.7km");
+    // route_1107_1500 (11/7 15:00 세종대로 우회) 1,122.5 m
+    expect(distanceKo(recordedRoute("route_1107_1500").distance_m)).toBe("1.1km");
   });
 
   it("josaRo — 받침 없거나 ㄹ 받침이면 '로', 그 밖은 '으로', 한글로 안 끝나면 '(으)로'", () => {
