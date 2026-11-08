@@ -1,7 +1,7 @@
 """로컬 Flask 응답을 FE 테스트 입력으로 기록 — `make record-naru-api` (T3.4).
 
 실제 앱(create_app, 개발 DB naru)에 기록된 코스 배치를 POST 하고 /route·/closures·
-/closures/events(T5.4, 개발 DB 에 있는 통제 전부)·오류 응답을
+/closures/events(T5.4, 개발 DB 에 있는 통제 전부)·/geocode/*(T5.8, 카카오 기록 재생)·오류 응답을
 `data/recorded/naru_api/<name>.json` 에 그대로 둔다 (real-data-testing §4.2). 토큰은 .env
 NARU_INTERNAL_TOKEN (파일에 남기지 않는다). 좌표는 카카오 기록(광화문교보빌딩·덕수궁 대한문).
 """
@@ -30,6 +30,16 @@ TIMES = {"0430": "04:30", "0745": "07:45", "1330": "13:30"}  # 통제 전 / 중 
 # T5.5 회귀 — 태우가 2026-11-08 실서버에 보낸 요청 그대로 (lat,lng)
 SEJONG = ("37.56368,126.97230", "37.56368,126.98193")  # 11/7 15:00 세종대로 건너기 (예정 집회 안)
 JAMSIL = ("37.5133,127.0980", "37.5145,127.1035")  # 그래프 밖 → out_of_coverage
+# T5.8 지오코딩 — 앱은 카카오 기록 재생(geocode_source=recorded, live 없음).
+# near = FE 지도 기본 중심
+NEAR = "37.5675,126.9775"
+SEARCHES = {"kyobo": "교보빌딩", "deoksugung": "덕수궁", "cityhall": "시청"}
+REVERSES = {
+    "kyobo": KYOBO,
+    "daehanmun": DAEHANMUN,
+    "sejong_from": SEJONG[0],
+    "sejong_to": SEJONG[1],
+}
 
 
 def record(out: Path, name: str, method: str, path: str, resp: TestResponse, **req: object) -> None:
@@ -45,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="로컬 Flask 응답 기록 (FE 테스트 입력)")
     ap.add_argument("--recorded", type=Path, default=Path("data/recorded"))
     args = ap.parse_args(argv)
-    settings = Settings()
+    settings = Settings(geocode_source="recorded")
     if not settings.internal_token:
         raise SystemExit("NARU_INTERNAL_TOKEN 없음 — .env 에 채운다")
     cfg = Config(str(BE_DIR / "alembic.ini"))
@@ -95,6 +105,24 @@ def main(argv: list[str] | None = None) -> int:
     resp = client.get("/route", query_string=q)
     record(out, "error_invalid_query", "GET", "/route", resp, query=q)
     record(out, "error_not_found", "GET", "/nope", client.get("/nope"))
+
+    # 지오코딩 (INTERFACE §7) — 카카오 기록에 있는 요청만. 잠실은 기록이 없어 503 그대로
+    for key, word in SEARCHES.items():
+        q = {"q": word, "near": NEAR}
+        resp = client.get("/geocode/search", query_string=q)
+        record(out, f"geocode_search_{key}", "GET", "/geocode/search", resp, query=q)
+    for key, latlng in REVERSES.items():
+        lat, lng = latlng.split(",")
+        q = {"lat": lat, "lng": lng}
+        resp = client.get("/geocode/reverse", query_string=q)
+        record(out, f"geocode_reverse_{key}", "GET", "/geocode/reverse", resp, query=q)
+    lat, lng = JAMSIL[0].split(",")
+    q = {"lat": lat, "lng": lng}
+    resp = client.get("/geocode/reverse", query_string=q)
+    record(out, "error_geocode_unavailable", "GET", "/geocode/reverse", resp, query=q)
+    q = {"q": "시"}
+    resp = client.get("/geocode/search", query_string=q)
+    record(out, "error_geocode_query", "GET", "/geocode/search", resp, query=q)
 
     commit = subprocess.run(
         ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=False
