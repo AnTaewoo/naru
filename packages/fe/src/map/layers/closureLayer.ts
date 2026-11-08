@@ -18,8 +18,10 @@ export interface ClosurePointProps {
   window_end: string | null;
   confidence: number;
   approx: boolean;
-  /** 확인(빨강) "naru-x" ×, 예정(노랑) "naru-bang" ! — 목업 범례. 그 밖엔 표식 없음 */
+  /** 확인(빨강) "naru-x" ×, 예정(노랑) "naru-bang" ! — 시안 범례. 그 밖엔 표식 없음 */
   icon: string;
+  /** 이 횡단보도에 걸린 후보 수 — 같은 횡단보도가 여러 구간에 걸릴 수 있다 */
+  candidates: number;
 }
 
 export interface ClosurePointFeature {
@@ -43,32 +45,63 @@ function isPoint(f: Feature): f is Feature & { geometry: { type: "Point" } } {
   return f.geometry.type === "Point";
 }
 
-/** 횡단보도(Point) Feature 만 — Polygon(예정 구역)은 zoneLayer 가 맡는다 */
+/** 한 횡단보도의 상태가 여럿이면 앞쪽이 이긴다: 확인 > 예정 > 예정 구역 > 해제 */
+export const STATUS_SEVERITY: Record<Status, number> = {
+  confirmed: 0,
+  scheduled: 1,
+  zone_scheduled: 2,
+  released: 3,
+};
+
+/** 같은 무게면 늦게 풀리는 쪽 — end 가 없으면(종료 미정) 가장 늦은 것으로 본다 */
+function endKey(end: string | null): number {
+  return end ? new Date(end).getTime() : Number.POSITIVE_INFINITY;
+}
+
+function wins(a: ClosurePointProps, b: ClosurePointProps): boolean {
+  const d = STATUS_SEVERITY[a.status] - STATUS_SEVERITY[b.status];
+  return d < 0 || (d === 0 && endKey(a.window_end) > endKey(b.window_end));
+}
+
+/**
+ * 횡단보도(Point) 하나에 점 하나. /closures 는 (후보, 횡단보도)마다 Feature 라서 같은 횡단보도가 여러 번
+ * 올 수 있다(코스 구간이 겹치는 교차로) — 가장 무거운 상태로 합친다. Polygon(예정 구역)은 zoneLayer 몫
+ */
 export function closurePoints(fc: FeatureCollection): ClosurePointCollection {
-  const features: ClosurePointFeature[] = [];
+  const byCrosswalk = new Map<string, ClosurePointFeature>();
   for (const f of fc.features) {
     if (!isPoint(f)) continue;
     const [lng, lat] = f.geometry.coordinates;
     if (typeof lng !== "number" || typeof lat !== "number") continue;
     const p = f.properties;
-    features.push({
+    const id = p.crosswalk_id ?? `${lng},${lat}`;
+    const props: ClosurePointProps = {
+      crosswalk_id: p.crosswalk_id ?? "",
+      status: p.status,
+      color: STATUS_COLOR[p.status],
+      reason: p.reason,
+      window_end: (p.window["end"] as string | null | undefined) ?? null,
+      confidence: p.confidence,
+      approx: p.approx ?? false,
+      icon: iconOf(p.status),
+      candidates: 1,
+    };
+    const prev = byCrosswalk.get(id);
+    if (prev && !wins(props, prev.properties)) {
+      prev.properties.candidates += 1;
+      continue;
+    }
+    props.candidates = (prev?.properties.candidates ?? 0) + 1;
+    byCrosswalk.set(id, {
       type: "Feature",
       geometry: { type: "Point", coordinates: [lng, lat] },
-      properties: {
-        crosswalk_id: p.crosswalk_id ?? "",
-        status: p.status,
-        color: STATUS_COLOR[p.status],
-        reason: p.reason,
-        window_end: (p.window["end"] as string | null | undefined) ?? null,
-        confidence: p.confidence,
-        approx: p.approx ?? false,
-        icon: iconOf(p.status),
-      },
+      properties: props,
     });
   }
-  return { type: "FeatureCollection", features };
+  return { type: "FeatureCollection", features: [...byCrosswalk.values()] };
 }
 
+/** 지도·칩·시트 부제의 개수 — 횡단보도는 곳 단위(합친 뒤), 예정 구역은 구역 단위 */
 export function countByStatus(fc: FeatureCollection): Record<Status, number> {
   const out: Record<Status, number> = {
     scheduled: 0,
@@ -76,7 +109,8 @@ export function countByStatus(fc: FeatureCollection): Record<Status, number> {
     released: 0,
     zone_scheduled: 0,
   };
-  for (const f of fc.features) out[f.properties.status] += 1;
+  for (const f of closurePoints(fc).features) out[f.properties.status] += 1;
+  for (const f of fc.features) if (f.geometry.type === "Polygon") out[f.properties.status] += 1;
   return out;
 }
 

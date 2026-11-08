@@ -63,7 +63,7 @@ describe("ClosureSheet", () => {
       </Providers>,
     );
     expect(screen.getByText("오늘 통제")).toBeDefined();
-    expect(screen.getByText(/횡단보도 55곳 통제 중, 24곳 예정/)).toBeDefined();
+    expect(screen.getByText(/횡단보도 45곳 통제 중, 19곳 예정/)).toBeDefined(); // 곳 단위(64곳)
     expect(screen.getByText("마라톤 1구간 세종대로 사거리~숭례문 오거리")).toBeDefined();
     expect(screen.queryByText(/^marathon /)).toBeNull(); // 코드값은 화면에 안 나온다
     expect(screen.getAllByText(/뒤 해제/).length).toBeGreaterThan(0); // confirmed 행 배지

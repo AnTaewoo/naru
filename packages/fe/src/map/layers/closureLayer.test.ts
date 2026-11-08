@@ -1,4 +1,5 @@
-// recorded /closures (2026-03-15 광화문 bbox: 04:30 예정 5 · 07:45 확인 55+예정 24 · 13:30 없음)
+// recorded /closures (2026-03-15 광화문 bbox). 07:45 는 후보×횡단보도 79건이 횡단보도 64곳 — 12곳이 두 구간에 걸린다
+// (2026-11-08 recorded 를 열어 확인). 곳 단위로 확인 45 · 예정 19. 04:30 예정 5곳, 13:30 없음
 import { describe, expect, it } from "vitest";
 import { recordedClosures } from "../../test/recorded";
 import { COLORS } from "../colors";
@@ -14,15 +15,19 @@ import {
 import { ZONE_LAYER_IDS, zoneLayers, zonePolygons } from "./zoneLayer";
 
 describe("closureLayer", () => {
-  it("07:45 — feature 79, 확인 55 빨강 ×, 예정 24 노랑 !", () => {
+  it("07:45 — 횡단보도 64곳(후보×횡단보도 79건), 확인 45 빨강 ×, 예정 19 노랑 !", () => {
     const fc = recordedClosures("closures_0745");
+    expect(fc.features).toHaveLength(79);
     const pts = closurePoints(fc);
-    expect(pts.features).toHaveLength(79);
+    expect(pts.features).toHaveLength(64);
+    expect(new Set(pts.features.map((f) => f.properties.crosswalk_id)).size).toBe(64);
+    expect(pts.features.reduce((n, f) => n + f.properties.candidates, 0)).toBe(79);
+    expect(pts.features.filter((f) => f.properties.candidates > 1)).toHaveLength(12);
     const by = countByStatus(fc);
-    expect(by.confirmed).toBe(55);
-    expect(by.scheduled).toBe(24);
+    expect(by.confirmed).toBe(45);
+    expect(by.scheduled).toBe(19);
     const confirmed = pts.features.filter((f) => f.properties.status === "confirmed");
-    expect(confirmed).toHaveLength(55);
+    expect(confirmed).toHaveLength(45);
     expect(new Set(confirmed.map((f) => f.properties.color))).toEqual(new Set([COLORS.stop]));
     expect(new Set(confirmed.map((f) => f.properties.icon))).toEqual(new Set([ICON_IDS.x]));
     const scheduled = pts.features.filter((f) => f.properties.status === "scheduled");
@@ -36,6 +41,26 @@ describe("closureLayer", () => {
       expect(lat).toBeLessThan(37.58);
       expect(f.properties.crosswalk_id.startsWith("06-")).toBe(true);
       expect(f.properties.reason.startsWith("marathon ")).toBe(true);
+    }
+  });
+
+  it("겹친 횡단보도 — 가장 무거운 상태, 같은 무게면 늦게 풀리는 쪽", () => {
+    const fc = recordedClosures("closures_0745");
+    const raw = new Map<string, { status: string; end: string | null }[]>();
+    for (const f of fc.features) {
+      const p = f.properties;
+      const list = raw.get(p.crosswalk_id ?? "") ?? [];
+      list.push({ status: p.status, end: (p.window["end"] as string | null) ?? null });
+      raw.set(p.crosswalk_id ?? "", list);
+    }
+    for (const f of closurePoints(fc).features) {
+      const all = raw.get(f.properties.crosswalk_id) ?? [];
+      expect(all).toHaveLength(f.properties.candidates);
+      if (all.some((x) => x.status === "confirmed")) {
+        expect(f.properties.status).toBe("confirmed");
+        const ends = all.filter((x) => x.status === "confirmed").map((x) => x.end ?? "");
+        expect(f.properties.window_end).toBe([...ends].sort().at(-1));
+      }
     }
   });
 
