@@ -37,6 +37,13 @@ from naru_contracts.enums import (
     Status,
 )
 from naru_contracts.errors import ErrorBody
+from naru_contracts.geocode_api import (
+    GeocodeReverseQuery,
+    GeocodeReverseResponse,
+    GeocodeSearchQuery,
+    GeocodeSearchResponse,
+    Place,
+)
 from naru_contracts.route import Avoided, Baseline, Leg, RouteQuery, RouteResponse
 
 __all__ = [
@@ -55,6 +62,10 @@ __all__ = [
     "Evidence",
     "EvidenceKind",
     "FeatureCollection",
+    "GeocodeReverseQuery",
+    "GeocodeReverseResponse",
+    "GeocodeSearchQuery",
+    "GeocodeSearchResponse",
     "Geometry",
     "GeometryKind",
     "Impact",
@@ -62,6 +73,7 @@ __all__ = [
     "LegKind",
     "LineGeom",
     "NoticeRef",
+    "Place",
     "PlacePoint",
     "PointGeom",
     "RoadClass",

@@ -4,7 +4,8 @@
 §3 `/closures` 예시는 자리표시자(`...`)가 있어 JSON이 아니다 — 2026-11-07 태우에게 보고, 검증 안 함.
 §1.1 요청 예시도 candidates 가 자리표시자라 §1 후보를 끼워서 검증한다.
 §3.1 `/closures/events` 예시(v0.8, ADR-010)는 2026-11-08 개발 DB 의 실제 사건 두 개
-(bbox 는 소수 4자리).
+(bbox 는 소수 4자리). §7 지오코딩 예시(v0.11, ADR-011 B)는 2026-11-08 카카오 로컬 기록
+(recorded kakao/local, MANIFEST) 에서 BE 가 만드는 응답.
 """
 
 from __future__ import annotations
@@ -27,6 +28,10 @@ from naru_contracts import (
     ErrorBody,
     Evidence,
     EvidenceKind,
+    GeocodeReverseQuery,
+    GeocodeReverseResponse,
+    GeocodeSearchQuery,
+    GeocodeSearchResponse,
     Geometry,
     GeometryKind,
     Impact,
@@ -67,9 +72,9 @@ def _json(i: int) -> dict[str, Any]:
     return data
 
 
-def test_document_has_seven_json_blocks() -> None:
-    # §1.1·§3.1 은 ### 소제목이라 상위 § 로 잡힌다
-    assert [s for s, _ in BLOCKS] == ["§1", "§1", "§1", "§2", "§3", "§3", "§6"]
+def test_document_has_nine_json_blocks() -> None:
+    # §1.1·§3.1·§7.1·§7.2 는 ### 소제목이라 상위 § 로 잡힌다
+    assert [s for s, _ in BLOCKS] == ["§1", "§1", "§1", "§2", "§3", "§3", "§6", "§7", "§7"]
 
 
 def test_closure_candidate_example() -> None:  # §1
@@ -130,6 +135,7 @@ def test_error_body_example() -> None:  # §6
         "not_found",
         "no_route",
         "out_of_coverage",  # v0.9, ADR-011 그래프 밖 — 그래프에 붙일 거리 150 m 초과
+        "geocode_unavailable",  # v0.11, ADR-011 B — 카카오 로컬을 못 불렀다 (503)
         "internal",
     }
 
@@ -320,3 +326,44 @@ def test_closure_events_rules() -> None:  # §3.1 — 순서·bbox·개수, 질�
         ClosureEventsResponse.model_validate({"events": [], "coverage": [127.0, 37.6, 126.9, 37.5]})
     assert ClosureEventsQuery().bbox is None
     assert ClosureEventsQuery.model_validate({"bbox": "126.965,37.555,126.990,37.580"}).bbox
+
+
+def test_geocode_examples() -> None:  # §7 v0.11, ADR-011 B
+    found = GeocodeSearchResponse.model_validate(_json(7))
+    kyobo, foundation = found.places
+    # 카카오 기록(q=교보빌딩, near 126.98,37.57, 반경 5 km 정확도 순)의 1·2위
+    assert (kyobo.id, kyobo.name, kyobo.address) == (
+        "24020019",
+        "광화문교보빌딩",
+        "서울 종로구 종로 1",
+    )
+    assert kyobo.coord == (126.9779039768265, 37.5709686446227)  # = route_0745 출발점
+    assert foundation.name == "교보재단빌딩"
+    assert GeocodeSearchResponse.model_validate(found.model_dump(mode="json")) == found
+    rev = GeocodeReverseResponse.model_validate(_json(8))
+    assert rev.label == "종로구 종로 1" and rev.road_address == "서울특별시 종로구 종로 1"
+    assert rev.address == "서울 종로구 종로1가 1"
+
+
+def test_geocode_rules() -> None:  # §7 — 검색어 2~50자(앞뒤 공백 뺌), near 선택, 결과 10개까지
+    assert GeocodeSearchQuery.model_validate({"q": "  시청 "}).q == "시청"
+    assert GeocodeSearchQuery.model_validate({"q": "시청"}).near is None
+    for bad in ("시", "   시  ", "가" * 51):
+        with pytest.raises(ValidationError):
+            GeocodeSearchQuery.model_validate({"q": bad})
+    place = _json(7)["places"][0]
+    with pytest.raises(ValidationError):
+        GeocodeSearchResponse.model_validate({"places": [place] * 11})
+    with pytest.raises(ValidationError):
+        GeocodeSearchResponse.model_validate({"places": [{**place, "coord": [126.97]}]})
+    q = GeocodeReverseQuery.model_validate({"lat": "37.5709686446227", "lng": "126.9779039768265"})
+    assert (q.lat, q.lng) == (37.5709686446227, 126.9779039768265)
+    for lat, lng in (("91", "126.97"), ("37.57", "181"), ("nan", "126.97"), ("37.57", "")):
+        with pytest.raises(ValidationError):
+            GeocodeReverseQuery.model_validate({"lat": lat, "lng": lng})
+    # 주소가 없는 점은 셋 다 null, label 은 주소에서만 나온다
+    assert GeocodeReverseResponse(label=None, road_address=None, address=None).label is None
+    with pytest.raises(ValidationError, match="label"):
+        GeocodeReverseResponse(label="중구", road_address=None, address=None)
+    with pytest.raises(ValidationError, match="label"):
+        GeocodeReverseResponse(label=None, road_address=None, address="서울 중구 남대문로2가 9-9")

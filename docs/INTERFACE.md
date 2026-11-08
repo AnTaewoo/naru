@@ -1,4 +1,4 @@
-# INTERFACE.md — 파트 간 계약 v0.10
+# INTERFACE.md — 파트 간 계약 v0.11
 
 파트 경계의 단일 기준. 스키마를 바꾸면 **이 파일 먼저** 고치고, 하위호환이 깨지면 버전을 올린다. 변경은 ADR + 태우 승인.
 코드 구현은 `packages/contracts`(`naru_contracts`, pydantic v2) 하나뿐이다. 테스트가 이 문서의 예시 JSON 블록을 그대로 파싱하므로, 예시를 고치면 코드도 고쳐야 한다. FE 타입은 `make schema`로 생성한다.
@@ -171,8 +171,33 @@ ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, �
 ```json
 {"error": {"code": "invalid_query", "message": "depart_at: 오프셋 없는 시각", "field": "depart_at"}}
 ```
-- `code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, internal}`. HTTP 400 / 401 / 404 / 422(`no_route`·`out_of_coverage`) / 500. Flask `error_view`(View 계층)가 만든다.
+- `code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, geocode_unavailable, internal}`. HTTP 400 / 401 / 404 / 422(`no_route`·`out_of_coverage`) / 503(`geocode_unavailable`) / 500. Flask `error_view`(View 계층)가 만든다.
 - `out_of_coverage` (v0.9, ADR-011): 출발·도착을 보행망 노드에 붙일 거리가 150 m(`max_snap_m`)를 넘는다. `field` = `from` 또는 `to`.
+- `geocode_unavailable` (v0.11, ADR-011 B): 카카오 로컬을 못 불렀다 — 서버 키 없음·카카오 오류·시간 초과(재생 모드면 기록 없음). FE 는 검색이면 "검색을 못 했어요", 주소면 "선택한 위치".
+
+## §7 BE → FE: 지오코딩 (v0.11, ADR-011 B)
+BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKAO_REST_KEY` 에만 — 브라우저·응답·로그에 없다. FE 는 `/api/geocode/*` 로만 부른다.
+
+### §7.1 `GET /geocode/search?q=&near=lat,lng`
+- `q`: 앞뒤 공백을 뺀 2~50자. `near`(선택) `"lat,lng"` — 있으면 그 점 반경 5 km 안에서 정확도 순(BE 가 near 를 소수 2자리, 약 1 km 로 맞춘다), 없으면 전국 정확도 순. 최대 10개, 없으면 `"places": []`
+```json
+{
+  "places": [
+    {"id": "24020019", "name": "광화문교보빌딩", "address": "서울 종로구 종로 1",
+     "coord": [126.9779039768265, 37.5709686446227]},
+    {"id": "492201422", "name": "교보재단빌딩", "address": "서울 종로구 경희궁1길 1",
+     "coord": [126.971610332329, 37.5707060102746]}
+  ]
+}
+```
+- 2026-11-08 기록(`q=교보빌딩&near=37.5675,126.9775`)의 앞 두 개. `id` = 카카오 장소 id, `address` = 도로명 주소(없으면 지번, 카카오 표기 그대로), `coord` = [lng, lat]
+
+### §7.2 `GET /geocode/reverse?lat=&lng=`
+```json
+{"label": "종로구 종로 1", "road_address": "서울특별시 종로구 종로 1", "address": "서울 종로구 종로1가 1"}
+```
+- 2026-11-08 기록(광화문교보빌딩 점 37.5709686, 126.9779040). `label` = 화면용 짧은 주소 — 도로명 주소에서 시·도를 뺀 것, 도로명이 없으면 지번에서(예: "중구 남대문로2가 9-9"). 주소가 없는 점이면 셋 다 null 이고 FE 는 "선택한 위치"
+- 오류: `q`·`near`·`lat`·`lng` 형식이 틀리면 400 `invalid_query`(field = 그 이름). 카카오를 못 부르면 503 `geocode_unavailable`(§6)
 
 ## 변경 이력
 | 날짜 | 버전 | 변경 | 누가 |
@@ -188,3 +213,4 @@ ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, �
 | 2026-11-08 | v0.8 | §3.1 `GET /closures/events` 추가 — DB 통제를 (reason, window) 사건으로 묶은 목록, 상태 없음, 시작 늦은 순 (ADR-010) | 태우 승인 |
 | 2026-11-08 | v0.9 | §5 예정은 공지 창 안에서만 횡단보도당 +300초(×3 폐지), §6 `out_of_coverage`(422, 붙임 150 m 초과) (ADR-011 A) | 태우 승인 |
 | 2026-11-08 | v0.10 | §3.1 응답에 `coverage`(보행망 bbox) 필수 (ADR-011 C 의 앞부분, data_as_of 는 뒤에) | 태우 승인 |
+| 2026-11-08 | v0.11 | §7 지오코딩 `GET /geocode/search`·`GET /geocode/reverse` 추가, §6 `geocode_unavailable`(503) (ADR-011 B) | 태우 승인 |
