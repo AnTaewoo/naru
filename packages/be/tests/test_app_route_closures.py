@@ -1,6 +1,8 @@
 """T3.4a — create_app(naru_test).test_client(): 실제 도보망·실제 MySQL 로 GET /route, GET /closures.
 
 코스 후보 상태(04:00 기준, 전부 scheduled)를 저장해 두고 시각별로 묻는다. 기대값은 T3.1~T3.3.
+T5.4 — GET /closures/events (INTERFACE §3.1, ADR-010): 저장한 상태를 테스트가 직접
+(reason, window) 로 묶은 것과 비교한다.
 """
 
 from collections.abc import Iterator
@@ -17,7 +19,14 @@ from flask.testing import FlaskClient
 from naru_be.app import create_app
 from naru_be.config import Settings
 from naru_be.controllers._deps import NaruModels
-from naru_contracts import ErrorBody, FeatureCollection, RouteResponse, Status
+from naru_contracts import (
+    ClosureEventsResponse,
+    ClosureState,
+    ErrorBody,
+    FeatureCollection,
+    RouteResponse,
+    Status,
+)
 
 KST = timezone(timedelta(hours=9))
 BE_DIR = Path(__file__).resolve().parents[1]
@@ -117,3 +126,68 @@ def test_errors_follow_interface_section_6(client: FlaskClient) -> None:
     resp = client.get("/nope")
     assert resp.status_code == 404
     assert ErrorBody.model_validate(resp.get_json()).error.code == "not_found"
+
+
+EventKey = tuple[str, datetime | None, datetime | None]
+
+
+def expected_events(
+    states: list[ClosureState], bbox: str | None = None
+) -> dict[EventKey, list[ClosureState]]:
+    """입력 상태를 (reason, window) 로 직접 묶는다 — /closures/events 의 기대값.
+
+    bbox 면 그 안의 상태만.
+    """
+    w, s, e, n = (float(x) for x in bbox.split(",")) if bbox else (-180.0, -90.0, 180.0, 90.0)
+    groups: dict[EventKey, list[ClosureState]] = {}
+    for st in states:
+        if w <= st.lng <= e and s <= st.lat <= n:
+            groups.setdefault((st.reason, st.window.start, st.window.end), []).append(st)
+    return groups
+
+
+def test_closure_events_group_by_reason_window(
+    client: FlaskClient, course_world: CourseWorld
+) -> None:  # §3.1, ADR-010
+    resp = client.get("/closures/events")
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    body = ClosureEventsResponse.model_validate(resp.get_json())  # 시작 늦은 순도 검증된다
+    got = {(ev.reason, ev.window.start, ev.window.end): ev for ev in body.events}
+    groups = expected_events(course_world.states)
+    assert set(got) == set(groups)
+    for key, states in groups.items():
+        ev = got[key]
+        assert ev.crosswalks == len({st.crosswalk_id for st in states})
+        lngs, lats = [st.lng for st in states], [st.lat for st in states]
+        assert ev.bbox == pytest.approx((min(lngs), min(lats), max(lngs), max(lats)), abs=1e-7)
+        assert ev.approx is False
+    # 1구간 — 개발 DB 를 같은 키로 SELECT 한 값과 같다 (2026-11-08): 횡단보도 6곳, 07:20~08:08
+    seg1 = got[
+        (
+            "marathon 1구간 세종대로 사거리~숭례문 오거리",
+            datetime(2026, 3, 15, 7, 20, tzinfo=KST),
+            datetime(2026, 3, 15, 8, 8, tzinfo=KST),
+        )
+    ]
+    assert seg1.crosswalks == 6
+    assert resp.get_json()["events"][0]["window"]["start"].endswith("+09:00")
+    assert "세종대로" in resp.get_data(as_text=True)  # 한글 그대로
+
+
+def test_closure_events_bbox_and_errors(client: FlaskClient, course_world: CourseWorld) -> None:
+    resp = client.get("/closures/events", query_string={"bbox": GWANGHWAMUN})
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    inside = ClosureEventsResponse.model_validate(resp.get_json()).events
+    groups = expected_events(course_world.states, GWANGHWAMUN)
+    assert {(ev.reason, ev.window.start, ev.window.end) for ev in inside} == set(groups)
+    counts = {(ev.reason, ev.window.start): ev.crosswalks for ev in inside}
+    for (reason, start, _), states in groups.items():
+        assert counts[(reason, start)] == len({st.crosswalk_id for st in states})
+    # bbox 는 상태를 먼저 거른다 — 광화문 밖으로 이어지는 구간은 개수가 준다
+    everything = ClosureEventsResponse.model_validate(client.get("/closures/events").get_json())
+    full = {(ev.reason, ev.window.start): ev.crosswalks for ev in everything.events}
+    assert any(n < full[key] for key, n in counts.items())
+    # bbox 원소 수 틀림 → 400 field bbox (INTERFACE §6)
+    resp = client.get("/closures/events", query_string={"bbox": "1,2,3"})
+    assert resp.status_code == 400
+    assert ErrorBody.model_validate(resp.get_json()).error.field == "bbox"
