@@ -441,3 +441,31 @@ describe("주소·검색 (T5.8)", () => {
     expect(swapped.names.from).toBeNull();
   });
 });
+
+describe("원래 길 보기 (T5.11)", () => {
+  // recorded route_0745: 통제 중 2곳을 피함(원래 길 카드 있음), route_1330: 피한 곳 없음
+  const od = odFromLocation(`?from=${q745["from"] ?? ""}&to=${q745["to"] ?? ""}`);
+  const both = routeReducer(initialRouteState(), { type: "setOd", from: od.from, to: od.to });
+  const ready = routeReducer(both, { type: "receive", at: T745, route: r0745 });
+
+  it("카드를 누르면 원래 길·가장 빠른 길을 오간다 — 처음은 가장 빠른 길", () => {
+    expect(ready.view).toBe("fastest");
+    const original = routeReducer(ready, { type: "view", view: "original" });
+    expect(original.view).toBe("original");
+    expect(routeReducer(original, { type: "view", view: "fastest" }).view).toBe("fastest");
+  });
+
+  it("새 출발·도착이거나 피한 통제가 없는 경로가 오면 가장 빠른 길로 돌아간다", () => {
+    const original = routeReducer(ready, { type: "view", view: "original" });
+    expect(routeReducer(original, { type: "receive", at: T745, route: r0745 }).view).toBe(
+      "original",
+    );
+    const r1330 = recordedRoute("route_1330");
+    expect(r1330.avoided).toHaveLength(0);
+    expect(routeReducer(original, { type: "receive", at: T1330, route: r1330 }).view).toBe(
+      "fastest",
+    );
+    expect(routeReducer(original, { type: "swap" }).view).toBe("fastest");
+    expect(routeReducer(original, { type: "close" }).view).toBe("fastest");
+  });
+});

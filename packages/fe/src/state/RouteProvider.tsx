@@ -20,6 +20,8 @@ import { useTime } from "./TimeProvider";
 // Provider 4/4 — 길찾기: 출발·도착과 /api/route 결과. t·출발·도착이 바뀌면 다시 받는다 (이전 요청은 Abort)
 export type RouteStatus = "idle" | "loading" | "ready" | "error";
 export type OdField = "from" | "to";
+/** 지도·카드에서 고른 길 (T5.11) — 원래 길은 피한 통제가 있을 때만 */
+export type RouteView = "fastest" | "original";
 
 /** 내 위치 찾기 (T5.7) — 어느 칸을 채우려는지와 진행. 거부·실패·범위 밖이면 칸은 비우고 안내 */
 export type LocateStatus = "locating" | "denied" | "unavailable" | "outside";
@@ -57,6 +59,8 @@ export interface RouteState {
   names: { from: PlaceName | null; to: PlaceName | null };
   /** 입력 중인 칸 (T5.8) — 그동안 지도를 누르면 이 칸에 넣는다 */
   editing: OdField | null;
+  /** 고른 길 (T5.11) — 원래 길 카드를 누르면 original */
+  view: RouteView;
 }
 
 export type RouteAction =
@@ -74,7 +78,8 @@ export type RouteAction =
   | { type: "locateFail"; reason: "denied" | "unavailable" }
   | { type: "edit"; which: OdField | null }
   | { type: "choose"; which: OdField; point: LngLat; name: string }
-  | { type: "named"; which: OdField; point: LngLat; text: string | null };
+  | { type: "named"; which: OdField; point: LngLat; text: string | null }
+  | { type: "view"; view: RouteView };
 
 export function initialRouteState(partial: Partial<RouteState> = {}): RouteState {
   return {
@@ -90,6 +95,7 @@ export function initialRouteState(partial: Partial<RouteState> = {}): RouteState
     mine: null,
     names: { from: null, to: null },
     editing: null,
+    view: "fastest",
     ...partial,
   };
 }
@@ -112,6 +118,7 @@ function withOd(state: RouteState, from: LngLat | null, to: LngLat | null): Rout
     errorCode: null,
     locate: null,
     editing: null,
+    view: "fastest",
   };
 }
 
@@ -163,6 +170,8 @@ export function routeReducer(state: RouteState, action: RouteAction): RouteState
         at: action.at,
         error: null,
         errorCode: null,
+        // 피한 통제가 없으면 원래 길 카드도 없다 (T5.11)
+        view: action.route.avoided.length > 0 ? state.view : "fastest",
       };
     case "fail":
       return {
@@ -208,6 +217,8 @@ export function routeReducer(state: RouteState, action: RouteAction): RouteState
         ? { ...next, locate: state.locate }
         : next;
     }
+    case "view":
+      return state.view === action.view ? state : { ...state, view: action.view };
     case "named":
       // 주소는 그 점일 때만 — 그새 칸이 바뀌었으면 버린다
       if (!same(state[action.which], action.point)) return state;
