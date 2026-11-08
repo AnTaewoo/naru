@@ -59,7 +59,8 @@ test("홈 → 길찾기 → 지도를 두 번 눌러 출발·도착 → 경로 �
   await expect(page.getByRole("img", { name: "도착 지점" })).toBeVisible();
   await expect(page.getByRole("article", { name: "가장 빠른 길" })).toBeVisible();
   await page.getByRole("button", { name: "뒤로" }).click();
-  await expect(page.getByText("오늘 통제", { exact: true })).toBeVisible();
+  // 홈으로 — 기준 시각이 3/15 라 시트 제목은 날짜(T5.4). 길찾기 바가 다시 보이면 홈이다
+  await expect(page.getByRole("button", { name: "길찾기" })).toBeVisible();
   await expect(page.getByRole("img", { name: "출발 지점" })).toHaveCount(0);
   expect(ownErrors(errors)).toEqual([]);
 });
