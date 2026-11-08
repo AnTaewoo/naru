@@ -1,6 +1,7 @@
 """로컬 Flask 응답을 FE 테스트 입력으로 기록 — `make record-naru-api` (T3.4).
 
-실제 앱(create_app, 개발 DB naru)에 기록된 코스 배치를 POST 하고 /route·/closures·오류 응답을
+실제 앱(create_app, 개발 DB naru)에 기록된 코스 배치를 POST 하고 /route·/closures·
+/closures/events(T5.4, 개발 DB 에 있는 통제 전부)·오류 응답을
 `data/recorded/naru_api/<name>.json` 에 그대로 둔다 (real-data-testing §4.2). 토큰은 .env
 NARU_INTERNAL_TOKEN (파일에 남기지 않는다). 좌표는 카카오 기록(광화문교보빌딩·덕수궁 대한문).
 """
@@ -69,6 +70,9 @@ def main(argv: list[str] | None = None) -> int:
         q2 = {"bbox": GWANGHWAMUN, "at": at}
         resp = client.get("/closures", query_string=q2)
         record(out, f"closures_{key}", "GET", "/closures", resp, query=q2)
+
+    # 통제 사건 목록 (INTERFACE §3.1) — 개발 DB 에 들어 있는 배치(코스·공지) 전부가 실린다
+    record(out, "closure_events", "GET", "/closures/events", client.get("/closures/events"))
 
     q = {"from": KYOBO, "to": DAEHANMUN, "depart_at": "2026-03-15T07:45:00"}
     resp = client.get("/route", query_string=q)
