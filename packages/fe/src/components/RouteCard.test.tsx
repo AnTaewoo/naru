@@ -295,7 +295,28 @@ describe("RoutePanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "뒤로" }));
     expect(screen.getByRole("button", { name: "길찾기" })).toBeDefined(); // 홈의 길찾기 바로
     fireEvent.click(screen.getByRole("button", { name: "길찾기" }));
-    expect(screen.getByText("지도를 눌러 출발을 고르세요")).toBeDefined();
+    // 다시 켜면 출발은 내 위치부터 찾는다 (T5.7) — 도착은 지도로
+    expect(screen.getByRole("button", { name: "출발 내 위치 찾는 중…" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "도착 지도를 눌러 도착을 고르세요" })).toBeDefined();
+  });
+
+  it("내 위치 (T5.7) — 받은 칸은 '내 위치', 칸 옆 버튼은 그 칸을 찾는다(찾는 중 표시)", () => {
+    render(
+      <Providers at={T745} route={{ mine: od.from }}>
+        <RoutePanel />
+      </Providers>,
+    );
+    expect(screen.getByRole("button", { name: "출발 내 위치" })).toBeDefined();
+    const to = coordLabel(od.to ?? [0, 0]);
+    expect(screen.getByRole("button", { name: `도착 ${to}` })).toBeDefined();
+    const toMine = screen.getByRole("button", { name: "도착을 내 위치로" });
+    expect(toMine.getAttribute("aria-busy")).toBe("false");
+    fireEvent.click(toMine);
+    expect(screen.getByRole("button", { name: "도착 내 위치 찾는 중…" })).toBeDefined();
+    expect(toMine.getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByRole("button", { name: "출발을 내 위치로" }).getAttribute("aria-busy")).toBe(
+      "false",
+    );
   });
 });
 
