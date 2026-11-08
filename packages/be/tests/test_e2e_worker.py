@@ -12,7 +12,7 @@ T6.1: 기록 돌발(OA-13315 2026-11-07 15:40, 53건) → 집회 후보 9 → �
 import logging
 import time
 from collections.abc import Iterator
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
@@ -203,3 +203,33 @@ def test_loop_counts_failures_per_source(app: Flask, caplog: pytest.LogCaptureFi
         ("WARNING", "incident", 2),
         ("ERROR", "incident", 3),  # 연속 3회
     ]
+
+
+KST = timezone(timedelta(hours=9))
+
+
+def test_bus_round_saves_positions_for_notice_windows(app: Flask, worker: IngestWorker) -> None:
+    """T6.2 — 11/7 15:30 공지 통제 r04·r01 창 안 → 근처 노선 6개(기록 재생) → bus_positions."""
+    models: NaruModels = app.extensions["naru"]
+    worker.run_once()  # 코스·공지 (이미 있으면 멱등)
+    models.bus_intake.repo.truncate()
+    w, _ = _worker(app)  # NARU_BUS_SOURCE 기본 recorded — 노선마다 가장 최근 기록
+    at = datetime(2026, 11, 7, 15, 30, tzinfo=KST)
+    # 횡단보도 100 m 안 정류소가 많은 순(raw OA-1095): r04 종로09·종로11·1711, r01 160·260·270.
+    # 공지 출처만 본다 — 코스·돌발 사건은 실제 근거가 있어 쿼터를 쓰지 않는다
+    watched = ["100900003", "100900007", "100100185", "100100033", "100100042", "100100046"]
+    assert w.bus.watched(at) == watched
+    out = w.bus_round(at)
+    # 2026-11-08 18:38·18:44 기록: 종로09 5 · 종로11 4 · 1711 11 · 160 20 · 260 17 · 270 18 대
+    accepted = [(r.batch_id.split("-")[1], r.accepted) for r in out]
+    assert accepted == list(zip(watched, (5, 4, 11, 20, 17, 18), strict=True))
+    assert models.bus_intake.repo.count() == 75
+    again = w.bus_round(at)  # 같은 응답 다시 — (노선, 차량, dataTm) 같으면 저장 안 함
+    assert [r.accepted for r in again] == [0] * 6 and models.bus_intake.repo.count() == 75
+    # 17:00 — r04·r01 끝+30분(16:30)이 지나 창 밖이면 아무 노선도 부르지 않는다
+    assert w.bus.watched(datetime(2026, 11, 7, 17, 0, tzinfo=KST)) == []
+
+
+def test_bus_positions_need_token(app: Flask) -> None:
+    resp = app.test_client().post("/internal/bus-positions", json={})
+    assert resp.status_code == 401
