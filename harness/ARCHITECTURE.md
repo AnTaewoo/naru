@@ -4,7 +4,7 @@
 스택: ADR-006 (Next.js · Flask MVC · MySQL · Context Provider) + ADR-007 (공지 파서 = Claude API). 규약: `docs/CONVENTIONS.md`. 계약: `docs/INTERFACE.md` v0.5.
 
 ## 원칙
-1. 통제 위치는 **지오메트리**(코스 폴리라인·돌발 링크·리졸버가 찾은 좌표)와 **센서**(버스 이탈)에서 온다.
+1. 통제 위치는 **지오메트리**(코스 폴리라인·돌발 링크·리졸버가 찾은 좌표)에서 온다. **센서**(버스 위치)는 위치를 만들지 않고 기존 통제의 확신도만 고친다 (ADR-013).
 2. LLM(Claude API)은 공지 문장에서 **표현과 구간만** 뽑는다 — spans(TIME·ROAD·INTERSECTION·POI·ADDRESS)와 segments(from/to/via/road/window). 좌표는 지명사전(리졸버)이 찾고, 구간의 선은 BE가 도로 그래프로 만든다. 모델이 만든 좌표는 계약(`PlacePoint`)에 들어올 수 없다.
 3. 모든 폐쇄는 `scheduled → confirmed → released` 상태기계를 거치고, 모든 전이에 evidence가 남는다.
 4. 사용자 요청 경로(`/route`, `/closures`)에는 외부 API 호출이 없다.
@@ -28,7 +28,7 @@
 | TOPIS 공지 · 서울시 보도자료 · 언론 보도 | 텍스트 | TOPIS 2유형(비상업) | NoticeParser |
 | 서울시 교차로·횡단보도 위치, 도로명코드, 카카오 Local API | 정규형 → 좌표 | 공공누리 · 카카오 100,000/일 | Resolver(지명사전) |
 | TOPIS 실시간 돌발정보 | 링크 ID | 1유형 | IncidentIngestor |
-| 서울시 버스위치정보 · 노선 정류장 마스터 | sectionId·posX/posY·dataTm | 개발 1,000/일 → 운영 상향 | BusDeviationDetector, RouteSectionIndex |
+| 서울시 버스위치정보 · 노선 경로·정류소 마스터 | vehId·gpsX/gpsY·sectOrd·stopFlag·dataTm | 개발 1,000/일(일 상한 900) → 운영 상향 | BusPoller(AI) → BE BusCorrection (ADR-013) |
 | 서울 실시간 도시데이터 · S-DoT | 장소 121곳 5분 · 센서 10분 | 공개 | CongestionWatcher |
 | 서울시 도보 네트워크·횡단보도·지하도·육교·역 | 노드·링크 | 1유형 | PedGraph, CrosswalkIndex |
 | TMAP 보행자 API | 경로 | 1,000/일 무료 | 그래프 QA 샘플링만 |
@@ -48,10 +48,9 @@
 | `CandidateBuilder` | `build(parsed) -> list[ClosureCandidate]` | segments → `SegmentGeom`(양 끝 풀린 것만), 나머지 spans → `PointGeom`. confidence는 출처·시간 명시 여부 규칙 |
 | `ZoneMatcher` | `match(zone_name) -> ZoneGeom` | 지역명(여의도·광화문 일대) → 폴리곤. v1 |
 | `IncidentIngestor` | `pull() -> list[ClosureCandidate]` | TOPIS 돌발 → link_ids |
-| `RouteSectionIndex` | `sections(route_id) -> list[Section]` | 노선 → 정상 section 시퀀스 |
-| `BusDeviationDetector` | `poll() -> list[ClosureCandidate]` | 건너뜀·폴리라인 이탈. 같은 section 2대↑ → confirmed, 복귀 → released |
+| `BusPoller` | `poll() -> BusPositionBatch` | 통제 창(시작 1시간 전 ~ 끝+30분) 노선 최대 3개를 60초마다 → 원문 기록 → `POST /internal/bus-positions`. 판단 없음, 후보를 만들지 않는다 (ADR-013, T6.2) |
 | `CongestionWatcher` | `watch(zone) -> CongestionSpike \| None` | confidence 승격만 (보류, ADR-002) |
-| `IngestWorker` | `run_forever()` | 스케줄: 공지 5분 · 돌발 1분 · 혼잡 5분 · 버스 통제창 ±30분 15초 / 밖 5분. 일 호출 예산 |
+| `IngestWorker` | `run_forever()` (`--loop`) | 스케줄: 코스 1회 · 공지 5분 · 돌발(OA-13315) 5분 · 공지 게시판 10분(T6.4) · 버스 60초(통제 창만, T6.2) · 혼잡 보류. 소스마다 격리, 연속 3회 실패면 ERROR. 일 상한 LLM 200·버스 900. 웹 페이지는 같은 곳 10분 이상, 키로 쓰는 공개 API 는 그 한도 (ADR-011 E·ADR-013 H) |
 | `CandidatePublisher` | `publish(batch: CandidateBatch) -> None` | httpx → `POST /internal/candidates` |
 
 ### BE — `packages/be` (`naru_be`) · Flask MVC
@@ -63,6 +62,7 @@
 | `route_controller` | `GET /route` | `RoutePlanner.plan(query)` | `route_view.render` |
 | `closure_controller` | `GET /closures` | `ClosureRepository.active_horizon(t, bbox)` → `ClosureEngine.restate(states, t)` | `closure_view.render` |
 | `candidate_controller` | `POST /internal/candidates` | `CandidateIntake.accept(batch)` | 202 + 처리 건수 |
+| `bus_controller` | `POST /internal/bus-positions` | `BusIntake.accept(batch)` | 202 (ADR-013, T6.2) |
 
 **Model** — 데이터와 도메인 로직. Flask를 모른다.
 | 클래스 | 시그니처 | 역할 |
@@ -71,6 +71,8 @@
 | `RoadGraph` | `shortest_path(points, road=None) -> LineString` | 표준노드링크(또는 도보망) NetworkX. road가 있으면 그 도로명 링크만 |
 | `ClosureEngine` | `apply(candidate, crosswalk_ids) -> list[ClosureState]` · `transition(prev, evidence)` | 상태기계 |
 | `CandidateIntake` | `accept(batch) -> IntakeResult` | 후보 → CrosswalkIndex → ClosureEngine → Repository |
+| `BusIntake` | `accept(batch) -> int` | 버스 위치 적재(`bus_positions`) → 영향 받는 후보의 보정 계열(`bus_corrections`) 다시 계산 (ADR-013, T6.2·T6.3) |
+| `BusCorrection` | `correction(candidate_id, at) -> Correction` | 최근 20분 관측 → 항목 합 [−0.30, +0.25] → clamp(base + 합, 0, 0.95), bus_skip 은 20분 안에서만, 정상 통과 2번(20분 간격)이면 해제. 읽을 때 적용 (ADR-013, T6.3) |
 | `ClosureStateEntity` | SQLAlchemy ORM, 테이블 `closure_states` | crosswalk_id, status, confidence, window_start/end(UTC), evidence(JSON), lng/lat |
 | `ClosureRepository` | `upsert(state)` · `active_at(t, bbox)` · `active_horizon(t, bbox)`(t~t+60분 안 시작 포함, `/route`·`/closures` 공통) `-> list[ClosureState]` | DB 접근은 여기만 |
 | `PedGraph` | `edge.kind ∈ {sidewalk, crosswalk, underpass, overpass, stairs, elevator, station}` | NetworkX 인메모리 |
@@ -104,7 +106,7 @@
 ② 공지 문장 ─→ NoticeParser(Claude API) ─→ Resolver(지명사전) ─→ CandidateBuilder ─┤
                  spans + segments        정규형 → PlacePoint     segment / point 후보
 ③ TOPIS 돌발 ─→ IncidentIngestor ────────────────────────┼→ ClosureCandidate → CandidatePublisher
-④ 버스 위치 ─→ BusDeviationDetector (+RouteSectionIndex) ─┤                         │
+                                                          │                         │
 ⑤ 장소 혼잡 ─→ CongestionWatcher ─────────────────────────┘          ⑥ POST /internal/candidates
                                                                                     ▼
                          [C] candidate_controller → [M] CandidateIntake → CrosswalkIndex(from_point / from_line / from_segment+RoadGraph) → ClosureEngine → ClosureRepository(MySQL)
@@ -113,6 +115,9 @@
            [C] closure_controller → [M] ClosureRepository.active_horizon → ClosureEngine.restate → [V] closure_view              ⑧
                                                                                     ▼
                  Next.js /api/* rewrites → NaruApiClient → Time/Closure/Route Provider → MapView · LegList
+
+④ 버스 위치 ─→ BusPoller ─→ POST /internal/bus-positions ─→ [C] bus_controller → [M] BusIntake(bus_positions) → BusCorrection
+                 버스는 후보를 만들지 않는다. ⑦·⑧ 이 읽을 때 그 시각의 보정으로 확신도를 고친다 (ADR-013)
 ```
 
 ## ClosureState 상태기계
@@ -120,11 +125,11 @@
 |---|---|---|---|---|
 | `scheduled` (conf ≥ 0.7) | 예정 | 코스 시각표, 돌발 예고, 공지 | 횡단보도에 닿는 시각이 공지 창 안이면 횡단보도당 +300초, 창 밖은 정상 (ADR-011 A) | 노랑 점, 피한 통제는 "공지상 통제 시간 · 현장 확인 전" |
 | `scheduled` (conf < 0.7) | 예정 | 〃 | 무시 | 노랑 점만 |
-| `confirmed` (conf ≥ 0.8) | 확인 | 버스 이탈 ≥2대, 돌발 발생, 코스 시각표 시작 | 제외 | 빨강 점, 자동 우회 |
-| `released` | 해제 | 버스 복귀, 시각표 종료+30분 | 정상 | 회색 점, 30분 후 제거 |
+| `confirmed` (conf ≥ 0.8) | 확인 | 돌발 발생, 코스 시각표 시작, 버스 2대 이탈(bus_skip — 보정 후 ≥ 0.8, 20분 안에서만, ADR-013) | 제외 | 빨강 점, 자동 우회 |
+| `released` | 해제 | 시각표·공지 종료+30분, 버스 정상 통과 −0.30 이 20분 간격 2번(ADR-013) | 정상 | 회색 점, 30분 후 제거 |
 | `zone_scheduled` | 예정 구역 | 지역명만 있는 공지 (ZoneMatcher), `impact: unknown` 후보가 도로 30 m 규칙으로 승격되지 않은 경우 (ADR-008) | 무시 | 보라 빗금만 |
 
-전이: `scheduled → confirmed → released`. `zone_scheduled`는 라우팅과 무관. 혼잡 급등은 `scheduled`의 confidence만 올린다. 전이 로직은 Model(`ClosureEngine`)에만 있다. 임계값은 `naru_be/config.py`.
+전이: `scheduled → confirmed → released`. `zone_scheduled`는 라우팅과 무관. 혼잡 급등은 `scheduled`의 confidence만 올린다. 버스는 읽을 때 확신도를 보정한다(최근 20분, 합 [−0.30, +0.25], 최종 clamp 0~0.95 — 저장값은 base_confidence, ADR-013). 전이 로직은 Model(`ClosureEngine`)에만 있다. 임계값은 `naru_be/config.py`.
 
 ## 보류 중인 결정 (ADR 필요)
 - 로컬 모델 사후학습으로 전환 — 해커톤 이후, `naru-reader` 실측 결과로 ADR-007 개정
