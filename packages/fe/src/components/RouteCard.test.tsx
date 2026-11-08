@@ -327,6 +327,38 @@ describe("RoutePanel", () => {
   });
 });
 
+describe("칸 입력 (T5.8)", () => {
+  it("칸을 누르면 그 칸이 검색 입력칸 — 두 글자 전엔 안내, 닫기·Esc 로 돌아간다", () => {
+    render(
+      <Providers at={T745} route={{}}>
+        <RoutePanel />
+      </Providers>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "도착 선택한 위치" }));
+    const input = screen.getByRole("searchbox", { name: "도착 검색" });
+    expect(document.activeElement).toBe(input);
+    expect(input.getAttribute("placeholder")).toBe("도착 검색 또는 지도 누르기");
+    expect(screen.getByRole("status").textContent).toBe("두 글자 이상 입력하거나 지도를 누르세요");
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    expect(screen.queryByRole("searchbox")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "출발 선택한 위치" }));
+    fireEvent.keyDown(screen.getByRole("searchbox", { name: "출발 검색" }), { key: "Escape" });
+    expect(screen.queryByRole("searchbox")).toBeNull();
+  });
+
+  it("홈 검색창 — 입력하면 결과 칸이 열리고 길찾기 버튼은 그대로", () => {
+    render(
+      <Providers at={T745} route={{ active: false, from: null, to: null }}>
+        <RoutePanel />
+      </Providers>,
+    );
+    const input = screen.getByRole("searchbox", { name: "장소·주소 검색" });
+    fireEvent.change(input, { target: { value: "교" } });
+    expect(screen.getByRole("status").textContent).toBe("두 글자 이상 입력하세요");
+    expect(screen.getByRole("button", { name: "길찾기" })).toBeDefined();
+  });
+});
+
 describe("내 위치 안내 (T5.7)", () => {
   const note = (route: Partial<RouteState>) => {
     const { unmount } = render(
