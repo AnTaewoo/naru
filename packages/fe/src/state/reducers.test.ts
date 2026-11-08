@@ -302,10 +302,12 @@ describe("근거 문장 (통제 근거 말투, 태우 2026-11-08)", () => {
 });
 
 describe("내 위치 (T5.7)", () => {
-  // 출발·도착 = recorded route_0745 질의(카카오 광화문교보빌딩·덕수궁 대한문)
+  // 출발·도착 = recorded route_0745 질의(카카오 광화문교보빌딩·덕수궁 대한문), 가운데 점 = 그 경로 좌표[13]
   const od = odFromLocation(`?from=${q745["from"] ?? ""}&to=${q745["to"] ?? ""}`);
   const kyobo: LngLat = od.from ?? [0, 0];
   const daehanmun: LngLat = od.to ?? [0, 0];
+  const [midLng, midLat] = (r0745.route.coordinates[13] ?? []) as number[];
+  const mid: LngLat = [midLng ?? 0, midLat ?? 0];
   // 범위 밖 — 태우가 실서버에 보낸 잠실 요청 (recorded naru_api/error_out_of_coverage.json 의 from)
   const jamsil = parseLatLng(recorded("error_out_of_coverage").query?.["from"]) ?? [0, 0];
 
@@ -320,5 +322,65 @@ describe("내 위치 (T5.7)", () => {
     expect(inBbox(jamsil, coverage)).toBe(false);
     expect(asBbox4([1, 2, 3])).toBeNull();
     expect(asBbox4([1, 2, "3", 4])).toBeNull();
+  });
+
+  it("길찾기를 켜면 출발은 내 위치부터 — 받으면 출발이 내 위치, 찾는 중 지도를 누르면 그 점, 늦은 위치는 버린다", () => {
+    const opened = routeReducer(initialRouteState(), { type: "open" });
+    expect(opened.locate).toEqual({ which: "from", status: "locating" });
+    const got = routeReducer(opened, { type: "located", point: kyobo, coverage });
+    expect(got.from).toEqual(kyobo);
+    expect(got.mine).toEqual(kyobo);
+    expect(got.locate).toBeNull();
+    const picked = routeReducer(opened, { type: "pick", point: mid });
+    expect(picked.from).toEqual(mid);
+    expect(picked.locate).toBeNull();
+    expect(routeReducer(picked, { type: "located", point: kyobo, coverage })).toBe(picked);
+    // URL(?from=) 로 출발이 정해져 들어오면 찾지 않는다
+    const fromUrl = routeReducer(initialRouteState(), { type: "setOd", from: kyobo, to: null });
+    expect(fromUrl.locate).toBeNull();
+    expect(routeReducer(fromUrl, { type: "open" }).locate).toBeNull();
+    expect(routeReducer(got, { type: "close" })).toEqual(initialRouteState());
+  });
+
+  it("거부·실패·범위 밖이면 칸은 비우고 안내 — 지도로 채우면 안내가 사라진다. coverage 를 못 받았으면 막지 않는다", () => {
+    const opened = routeReducer(initialRouteState(), { type: "open" });
+    const denied = routeReducer(opened, { type: "locateFail", reason: "denied" });
+    expect(denied.locate).toEqual({ which: "from", status: "denied" });
+    expect(denied.from).toBeNull();
+    const failed = routeReducer(opened, { type: "locateFail", reason: "unavailable" });
+    expect(failed.locate).toEqual({ which: "from", status: "unavailable" });
+    const outside = routeReducer(opened, { type: "located", point: jamsil, coverage });
+    expect(outside.locate).toEqual({ which: "from", status: "outside" });
+    expect(outside.from).toBeNull();
+    expect(outside.mine).toBeNull();
+    const picked = routeReducer(outside, { type: "pick", point: kyobo });
+    expect(picked.from).toEqual(kyobo);
+    expect(picked.locate).toBeNull();
+    // 찾는 중이 아니면 결과를 버린다
+    expect(routeReducer(denied, { type: "located", point: kyobo, coverage })).toBe(denied);
+    expect(routeReducer(picked, { type: "locateFail", reason: "denied" })).toBe(picked);
+    // 범위를 아직 모르면 그대로 넣는다 — BE /route 가 out_of_coverage 로 답한다
+    const unknown = routeReducer(opened, { type: "located", point: jamsil, coverage: null });
+    expect(unknown.from).toEqual(jamsil);
+  });
+
+  it("칸 옆 내 위치 버튼 — 그 칸만 바꾼다. 다른 칸을 지도로 채워도 찾기는 계속, 길찾기가 꺼져 있으면 무시", () => {
+    const s0 = initialRouteState();
+    expect(routeReducer(s0, { type: "locate", which: "from" })).toBe(s0);
+    const both = routeReducer(s0, { type: "setOd", from: mid, to: daehanmun });
+    const toMine = routeReducer(both, { type: "locate", which: "to" });
+    expect(toMine.locate).toEqual({ which: "to", status: "locating" });
+    expect(toMine.to).toEqual(daehanmun); // 받기 전엔 그대로
+    const done = routeReducer(toMine, { type: "located", point: kyobo, coverage });
+    expect(done.to).toEqual(kyobo);
+    expect(done.from).toEqual(mid);
+    const empty = routeReducer(s0, { type: "setOd", from: null, to: null });
+    const waiting = routeReducer(empty, { type: "locate", which: "to" });
+    const pickedFrom = routeReducer(waiting, { type: "pick", point: mid });
+    expect(pickedFrom.from).toEqual(mid);
+    expect(pickedFrom.locate).toEqual({ which: "to", status: "locating" });
+    const swapped = routeReducer(done, { type: "swap" });
+    expect(swapped.from).toEqual(kyobo);
+    expect(swapped.mine).toEqual(kyobo); // 바꿔도 내 위치는 기억한다 (칸 이름 "내 위치")
   });
 });
