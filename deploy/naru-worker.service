@@ -4,6 +4,8 @@
 # 키·토큰은 .env (SEOUL_OPENDATA_KEY, DATA_GO_KR_KEY, NARU_INTERNAL_TOKEN — BE 와 같은 값).
 # 노선 경로(getRoutePath)를 다른 키로 받으면 DATA_GO_KR_ROUTE_KEY.
 # --live(T6.4): 기록 없는 TOPIS 공지 글을 Claude 로 — ANTHROPIC_API_KEY, 한 번 10·하루 NARU_LLM_DAILY_CAP(200)
+# 경찰청 '오늘의 주요집회' PDF(T6.6): data/raw/notices/smpa/inbox/ 에 넣으면 1분 안에 읽어 보내고
+#   data/raw/notices/smpa/<집회 날짜>.pdf 로 옮긴다(처리 기록 inbox_manifest.jsonl, 읽을 수 없으면 inbox/failed/)
 [Unit]
 Description=Naru AI worker (--loop --live: course once, notices/TOPIS incidents 5 min, TOPIS notice posts 10 min, buses 60 s)
 After=network-online.target naru.service
