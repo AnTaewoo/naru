@@ -2,9 +2,10 @@
 #   sudo cp deploy/naru-worker.service /etc/systemd/system/ && sudo systemctl daemon-reload
 #   sudo systemctl enable --now naru-worker && journalctl -u naru-worker -f
 # 키·토큰은 .env (SEOUL_OPENDATA_KEY, DATA_GO_KR_KEY, NARU_INTERNAL_TOKEN — BE 와 같은 값).
-# 노선 경로(getRoutePath)를 다른 키로 받으면 DATA_GO_KR_ROUTE_KEY
+# 노선 경로(getRoutePath)를 다른 키로 받으면 DATA_GO_KR_ROUTE_KEY.
+# --live(T6.4): 기록 없는 TOPIS 공지 글을 Claude 로 — ANTHROPIC_API_KEY, 한 번 10·하루 NARU_LLM_DAILY_CAP(200)
 [Unit]
-Description=Naru AI worker (--loop: course once, notices/TOPIS incidents 5 min, buses 60 s in notice windows)
+Description=Naru AI worker (--loop --live: course once, notices/TOPIS incidents 5 min, TOPIS notice posts 10 min, buses 60 s)
 After=network-online.target naru.service
 Wants=network-online.target
 
@@ -18,7 +19,8 @@ Environment=PATH=/home/antaewoo/miniconda3/bin:/home/antaewoo/.local/bin:/usr/lo
 Environment=NARU_BE_URL=http://127.0.0.1:5050
 Environment=NARU_INCIDENT_SOURCE=live
 Environment=NARU_BUS_SOURCE=live
-ExecStart=/home/antaewoo/miniconda3/bin/uv run python -m naru_ai.worker --loop
+Environment=NARU_TOPIS_SOURCE=live
+ExecStart=/home/antaewoo/miniconda3/bin/uv run python -m naru_ai.worker --loop --live
 Restart=on-failure
 RestartSec=10
 TimeoutStopSec=20

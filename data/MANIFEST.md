@@ -81,6 +81,8 @@
 - 출처: 서울 열린데이터광장 OA-22861 서울 교통정보시스템(TOPIS) 공지사항 https://data.seoul.go.kr/dataList/OA-22861/S/1/datasetView.do — Open API `NoticeList`, **xml만** (json은 ERROR-301), 한 번에 1,000건. 라이선스 공공누리 2유형(출처표시·상업적 이용 금지)
 - 필드(실제, xml 소문자): `bdwr_seq, bdwr_rtng_cd, bdwr_rtng_nm, bdwr_div_cd, bdwr_div_nm, bdwr_ttl_nm, bdwr_cts(HTML 이스케이프된 리치텍스트), update_date, create_date("2026-11-06 11:31:55"), url(https://topis.seoul.go.kr/notice/openNoticeView.do?blbdDivCd=02&bdwrSeq=…)`
 - 300건 범위: create_date 2026-05-08 ~ 2026-11-06. 분류 통제안내 154 · 버스안내 104 · (그 외 정책·기상·기타 42는 문장으로 안 씀)
+- 파일: `data/recorded/topis_notice/20261108T192013.json` (83,365 B, sha256 `78eb77cea8f658b8b966b7520db340c24890df15b7b75d7a1dd1cc5f9fdc18ce`) — 2026-11-08 19:20:13 KST, `scripts/build_notices.py` 의 `record_topis(…, 30)` 1회(T6.4 시작 때 게시판과 비교 — 최신 글 6301 로 같다). 30행: 통제안내 10 · 버스안내 18 · 기타안내 2, create_date 2026-10-26 ~ 2026-11-06. `sentences.jsonl` 은 다시 만들지 않았다(T0.5 줄 단위 문장은 그대로)
+- 운영(T6.4): 워커 `NARU_TOPIS_SOURCE=live` 가 10분마다 최신 50건을 받아 내용이 바뀔 때만 `<ts>_NoticeList.json` 으로 더한다(같으면 마지막 기록을 가리킨다). 글 하나 = 파서 문장 하나(`topis-<번호>-u<고친 시각>`)
 
 ### notices/sentences.jsonl (T0.5 산출, `uv run python scripts/build_notices.py`)
 - 파일: `data/raw/notices/sentences.jsonl` (1,923,366 B, 2,821행, sha256 `d69c8115fe9c3fc3dabb8cc63d0082285eedd5812f4563ed5ef37d9b42e2dbd5`; 2026-11-08 `scripts/append_fewshot_sentences.py` 로 프롬프트 v2 예시 원문 11행(N001·N006·N009·N011·N045·N049·N059·N067·N070·N099·N100, fields.fewshot) 추가. news 2행(N099·N100) 출처 URL 은 태우 확인 econovill 756361) + `sentences_meta.json`. git에 올리지 않는다(.gitignore `data/raw/notices/*.jsonl|*.json`) — raw 규칙. 다시 만들려면 PDF + recorded로 `uv run python scripts/build_notices.py`
@@ -103,7 +105,7 @@
 
 | api | 최초 기록 | 파일 수 | 비고 |
 |---|---|---|---|
-| topis_notice | 2026-11-07 | 1 | TOPIS 공지 NoticeList 최신 300건 (xml). 아래 "recorded/topis_notice" |
+| topis_notice | 2026-11-07 | 2 | TOPIS 공지 NoticeList 최신 300건 (xml) + 2026-11-08 최신 30건(T6.4). 운영 워커가 10분마다 바뀔 때만 더한다. 아래 "recorded/topis_notice" |
 | incident | 2026-11-07 | 4 | TOPIS 돌발 — AccMainCode 13 · AccSubCode 43 · AccInfo 53행 (`make record API=incident`). 2026-11-08 AccInfo 1(워커 live 경로 확인, T6.1). 운영 워커(`NARU_INCIDENT_SOURCE=live`)가 5분마다 내용이 바뀔 때만 더한다 |
 | links | 2026-11-07 | 14 | 돌발 링크 4개의 LinkInfo + LinkVerInfo (`make record API=links --limit 4`) + 2026-11-08 집회 링크 3개(`--links`, T6.1). 운영 워커는 처음 보는 링크만 받아 더한다 |
 | rtd | 2026-11-07 | 1 | 실시간 도시데이터 citydata 광화문·덕수궁 (json, 175 KB) |
@@ -195,6 +197,8 @@
 - 파일 형식: `api, model, prompt_version, sentence_id, called_at, request{system, messages, tool}, response(Message 원문), usage, elapsed_ms`. 키 없음. 시스템 프롬프트 11,072 토큰이 캐시됨(2·3번째 호출 cache_read)
 - `notice_v1/` 202개 (2026-11-07~08, 1차): sentences.jsonl 문장 5건(T4.1 3 + T4.4 r01·r04 — v1 few-shot 문장, 워커 e2e 용), 라벨 케이스 K-001~K-034 34건 + 합성 C-* 163건(T4.3 평가, `scripts/record_llm.py --ids all --max-calls`, 합성 봉투는 source news·published_at 2026-11-07T00:00+09:00 고정). 호출 합계 202회, 캐시 제외 입력 ≈ 95k·출력 ≈ 110k 토큰(≈ $0.09)
 - `notice_v2/` 39개 (2026-11-08, 태우의 프롬프트 v2·라벨 교체 뒤 재기록): 라벨 K-001~K-034 34건 + 문장 5건(r01·r04·r06·1109-r01·1109-r02). 호출 39회, 캐시 제외 입력 ≈ 15k·출력 ≈ 19k 토큰(≈ $0.01). 합성 163건은 v2 로 미기록
+- `notice_v2/` + TOPIS 공지 글 6건 (2026-11-08 19:26 KST, T6.4 — 워커 `topis_batch` live 경로, `max_calls=6`): `topis-6299-u202611061014`·`topis-6293-u202611052048`·`topis-6289-u202611051429`·`topis-6288-u202611051420`·`topis-6275-u202611051124`·`topis-6264-u202610271009` (topis_notice/20261108T192013.json 에서 11/8 19:30 에 볼 글). 호출 6회, 입력 4,129 + 캐시 생성 11,324·읽기 56,620, 출력 3,759 토큰(usage 합). 운영 워커(`--live`)가 새 글·고친 글마다 더한다(한 번 10·하루 `NARU_LLM_DAILY_CAP` 200, 하루 수는 그날 쓴 파일 수)
+- `notice_v2/` + TOPIS 공지 글 22건 (2026-11-08 19:54~19:55 KST, T6.4 — 같은 경로, 볼 글을 고르는 기준 시각만 2026-10-26 으로 둬 같은 기록 30행 중 통제안내·버스안내 28건의 나머지 전부, 태우 2026-11-08 "기록은 유료여도 $50까지"): 6301·6300·6298·6297·6295·6294·6287·6286·6283·6281·6279·6277·6269·6268·6267·6266·6265·6263·6262·6261·6260·6258 (`topis-<번호>-u<update_date 분>`). 호출 22회, 실패 0, 입력 14,680 + 캐시 생성 11,324·읽기 237,804, 출력 14,389 토큰(usage 합, Haiku 5.5 단가 $0.10/$0.50 per MTok·캐시 읽기 0.1×·쓰기 1.25× 로 ≈ $0.013, 앞 6건 ≈ $0.004). 재생하면 후보는 6300(세종대로 3)·6281(서초 1)·6267·6262(올림픽공원 점 1씩) — test_topis_feed
 
 ### recorded/candidates/notice (공지 → ClosureCandidate, T4.2)
 - 출처: `make record-candidates SOURCE=notice` → `scripts/record_candidates.py`. 기록된 LLM 응답 3건(recorded/llm) 재생 → 정렬기 → 리졸버(OA-23081 교차로명 + 카카오 기록 재생) → CandidateBuilder. live 호출 없음. 파일 `data/recorded/candidates/notice/20261107T211233.json` sha256 2a3d3a74b3ab…, 후보 3개
