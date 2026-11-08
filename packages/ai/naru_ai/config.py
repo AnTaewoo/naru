@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     topis_record: Path | None = Field(default=None, validation_alias="NARU_TOPIS_RECORD")
     topis_interval_s: int = Field(default=600, validation_alias="NARU_TOPIS_INTERVAL_S")  # 10분
     topis_size: int = Field(default=50, validation_alias="NARU_TOPIS_SIZE")  # 최신 50건
+    # T6.6 경찰청 '오늘의 주요집회' PDF inbox — 없으면 <data>/raw/notices/smpa (그 아래 inbox/)
+    smpa_dir: Path | None = Field(default=None, validation_alias="NARU_SMPA_DIR")
+    smpa_interval_s: int = Field(default=60, validation_alias="NARU_SMPA_INTERVAL_S")  # 1분
     # T6.2 버스 위치 (ADR-013 D·G). recorded = 노선별 가장 최근 기록 재생, live = 호출 + 기록
     bus_source: Literal["live", "recorded"] = Field(
         default="recorded", validation_alias="NARU_BUS_SOURCE"

@@ -1,4 +1,4 @@
-"""IngestWorker — 코스·공지·TOPIS 돌발·TOPIS 공지를 후보로 BE 에 (ARCHITECTURE AI, T4.4·T6.1·T6.4).
+"""IngestWorker — 코스·공지·돌발·TOPIS 공지·경찰청 PDF → 후보 → BE (ARCHITECTURE AI, T4.4·T6).
 
     uv run python -m naru_ai.worker --once          # 코스·공지 1회 (시연, make dev 로 BE 띄운 뒤)
     uv run python -m naru_ai.worker --loop          # 소스별: 코스 1회 · 공지·돌발 5분 · 버스 60초
@@ -10,7 +10,8 @@ NARU_INCIDENT_SOURCE=live 면 OA-13315 를 불러 원문을 기록하고, 아니
 공지 통제 창에만 근처 노선 위치를 받아 POST /internal/bus-positions (NARU_BUS_SOURCE, 하루 상한).
 TOPIS 공지(T6.4)는 NARU_TOPIS_SOURCE=live 면 NoticeList 를 10분마다 불러 기록하고,
 기록 없는 글(새 글·고친 글)은 --live 일 때만 Claude 로 — 한 번 NARU_LLM_MAX_CALLS ·
-하루 NARU_LLM_DAILY_CAP (ADR-011 D).
+하루 NARU_LLM_DAILY_CAP (ADR-011 D). 경찰청 '오늘의 주요집회' PDF(T6.6)는 태우가 smpa/inbox/ 에
+넣으면 1분 안에 같은 방식으로 읽어 보내고 smpa/<집회 날짜>.pdf 로 옮긴다(SmpaInbox).
 batch_id 는 내용(돌발은 원문) 해시라 같은 배치를 다시 보내도 BE 가 멱등 처리한다.
 --loop 는 소스마다 따로 돈다 — 한 소스가 실패해도 다른 소스는 계속, 연속 3회 실패면 ERROR.
 """
@@ -23,7 +24,7 @@ import json
 import logging
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -39,6 +40,8 @@ from naru_ai.notice.candidates import CandidateBuilder
 from naru_ai.notice.gazetteer import Gazetteer
 from naru_ai.notice.parser import NoticeParser
 from naru_ai.notice.resolver import KakaoRecords, Resolver
+from naru_ai.notice.smpa_inbox import SmpaInbox
+from naru_ai.notice.source import NoticeSentence
 from naru_ai.notice.topis_feed import TopisNotices, post_sentences
 from naru_ai.publish import CandidatePublisher
 from naru_ai.signal.bus_feed import BusApi, RoutePaths
@@ -76,6 +79,25 @@ class _Source:
     done: bool = False
 
 
+@dataclass
+class _Parsed:
+    """_parse_notices 결과 — 후보와 문장 ID(파싱함·기다림), live·건너뜀 수."""
+
+    candidates: list[ClosureCandidate] = field(default_factory=list)
+    parsed: list[str] = field(default_factory=list)
+    waiting: list[str] = field(default_factory=list)
+    live: int = 0
+    skipped: int = 0
+
+    def counts(self) -> dict[str, int]:
+        return {
+            "live": self.live,
+            "waiting": len(self.waiting),
+            "skipped": self.skipped,
+            "candidates": len(self.candidates),
+        }
+
+
 def live_budget(max_calls: int, daily_cap: int, saved_today: int) -> int:
     """한 번에 live 로 파싱할 수 — 한 번 상한과 하루 남은 수 중 작은 쪽, 음수면 0 (ADR-011 D)."""
     return max(0, min(max_calls, daily_cap - saved_today))
@@ -110,7 +132,7 @@ class IngestWorker:
         self.parser = NoticeParser(settings, self.recorder, client=client)
         self.builder = CandidateBuilder(Resolver(gazetteer, KakaoRecords(recorded)))
         self.client = client
-        self.topis_failed: set[str] = set()  # 이 프로세스에서 다시 안 부를 글(버전) — topis_batch
+        self.parse_failed: set[str] = set()  # 이 프로세스에서 다시 안 부를 문장(버전) — TOPIS·smpa
         self.live_budget = client.max_calls if client is not None else 0
         live_seoul = "live" in (settings.incident_source, settings.topis_source)
         seoul = (
@@ -128,6 +150,7 @@ class IngestWorker:
             settings.topis_record,
             settings.topis_size,
         )
+        self.smpa = SmpaInbox(settings.smpa_dir or raw / "notices" / "smpa")
         links = LinkBook(recorded / "links", api.fetch_link if api is not None else None)
         self.incident_ingestor = IncidentIngestor(links)
         bus_key = settings.data_go_kr_key.get_secret_value()
@@ -164,6 +187,7 @@ class IngestWorker:
             _Source(
                 "topis", settings.topis_interval_s, lambda now: self._send(self.topis_batch(now))
             ),
+            _Source("smpa", settings.smpa_interval_s, self.smpa_round),
             _Source("bus", settings.bus_interval_s, self.bus_round),
         ]
 
@@ -241,60 +265,89 @@ class IngestWorker:
         )
 
     def topis_batch(self, now: datetime | None = None) -> CandidateBatch | None:
-        """TOPIS 통제·버스 공지(T6.4) — 볼 글을 파싱한다. 기록이 있으면 재생, 없으면 live:
-        한 번(10분)에 max_calls 까지, 하루 NARU_LLM_DAILY_CAP 까지(ADR-011 D). 남은 글은 다음 번.
-        글 하나가 실패하면(응답 검증·시각 형식·거절·잘림) 그 글만 빼고 이 프로세스에서는 다시
-        안 부른다 — 기록이 안 남는 거절·잘림을 10분마다 다시 사지 않게. 고친 글은 새 ID 다."""
+        """TOPIS 통제·버스 공지(T6.4) — 볼 글을 파싱해 후보로 (_parse_notices)."""
         now = now or datetime.now(UTC)
         feed = self.topis.fetch()
         sentences = post_sentences(feed.raw, feed.received_at, now)
+        ref = feed.path.as_posix()
+        got = self._parse_notices(sentences, {s.sentence_id: ref for s in sentences}, now)
+        log.info(
+            "topis notices",
+            extra={"posts": len(sentences), **got.counts(), "record": feed.path.name},
+        )
+        return self._notice_batch("topis", got)
+
+    def smpa_round(self, now: datetime) -> list[Response]:
+        """경찰청 PDF inbox (T6.6) — 볼 PDF 의 행 → 후보 → BE. inbox PDF 는 남은 행이 없고 보낸
+        뒤에만 옮긴다(보내다 실패하면 그대로 두고 다음 번). 같은 날짜의 더 새 PDF 가 있으면 바로."""
+        scan = self.smpa.scan(now)
+        for path in scan.duplicates:
+            self.smpa.set_aside(path, now)
+        sentences = [s for pdf in scan.publish for s in pdf.sentences]
+        refs = {s.sentence_id: pdf.dest.as_posix() for pdf in scan.publish for s in pdf.sentences}
+        got = self._parse_notices(sentences, refs, now)
+        log.info(
+            "smpa notices",
+            extra={
+                "pdfs": [p.dest.name for p in scan.publish],
+                "rows": len(sentences),
+                **got.counts(),
+                "inbox": len(scan.inbox),
+                "duplicates": len(scan.duplicates),
+            },
+        )
+        responses = self._send(self._notice_batch("smpa", got))
+        for pdf in scan.inbox:
+            ids = [s.sentence_id for s in pdf.sentences]
+            if pdf in scan.publish and any(i in got.waiting for i in ids):
+                continue  # 남은 행은 다음 번 live — 다 읽은 뒤 옮긴다
+            self.smpa.archive(pdf, now, [i for i in ids if i in self.parse_failed])
+        return responses
+
+    def _parse_notices(
+        self, sentences: list[NoticeSentence], refs: dict[str, str], now: datetime
+    ) -> _Parsed:
+        """문장 → 후보. 기록이 있으면 재생, 없으면 live: 한 번 max_calls 까지, 하루
+        NARU_LLM_DAILY_CAP 까지(ADR-011 D), 남은 문장은 다음 번(waiting). 문장 하나가 실패하면
+        (응답 검증·시각 형식·거절·잘림) 그 문장만 빼고 이 프로세스에서는 다시 안 부른다 — 기록이 안
+        남는 거절·잘림을 다시 사지 않게. 고친 글·PDF 는 새 ID 다."""
         budget = self._live_budget(now)
-        candidates: list[ClosureCandidate] = []
-        parsed_ids: list[str] = []
-        live = waiting = skipped = 0
+        got = _Parsed()
         for s in sentences:
-            if s.sentence_id in self.topis_failed:
-                skipped += 1
+            if s.sentence_id in self.parse_failed:
+                got.skipped += 1
                 continue
             if not self.recorder.exists(s.sentence_id):
-                if budget <= live:
-                    waiting += 1
+                if budget <= got.live:
+                    got.waiting.append(s.sentence_id)
                     continue
-                live += 1
+                got.live += 1
             try:
                 parsed = self.parser.parse(NoticeEnvelope.from_sentence(s.to_json()))
-                candidates.extend(self.builder.build(parsed, feed.path.as_posix()))
+                got.candidates.extend(self.builder.build(parsed, refs[s.sentence_id]))
             except (ValueError, LLMRefusalError, LLMTruncatedError) as e:  # ValidationError 포함
-                self.topis_failed.add(s.sentence_id)
-                skipped += 1
+                self.parse_failed.add(s.sentence_id)
+                got.skipped += 1
                 log.warning(
-                    "topis post skipped",
+                    "notice sentence skipped",
                     extra={"sentence_id": s.sentence_id, "error": str(e)[:300]},
                 )
                 continue
-            parsed_ids.append(s.sentence_id)
-        log.info(
-            "topis notices",
-            extra={
-                "posts": len(sentences),
-                "live": live,
-                "waiting": waiting,
-                "skipped": skipped,
-                "candidates": len(candidates),
-                "record": feed.path.name,
-            },
-        )
-        if not candidates:
+            got.parsed.append(s.sentence_id)
+        return got
+
+    def _notice_batch(self, prefix: str, got: _Parsed) -> CandidateBatch | None:
+        if not got.candidates:
             return None
         # 후보 ID 에는 글 버전이 없어(고친 글이 덮는다) 버전 붙은 문장 ID 를 같이 넣는다 —
         # 고친 글이 같은 후보 ID 를 내도 새 배치가 되게 (BE 는 같은 batch_id 를 건너뛴다)
-        parts = [*parsed_ids, *(c.candidate_id for c in candidates)]
+        parts = [*got.parsed, *(c.candidate_id for c in got.candidates)]
         parts += [self.recorder.model, self.recorder.prompt_version]
         return CandidateBatch(
-            batch_id=_batch_id("topis", parts),
+            batch_id=_batch_id(prefix, parts),
             produced_at=datetime.now(UTC),
             producer="notice",
-            candidates=candidates,
+            candidates=got.candidates,
         )
 
     def _live_budget(self, now: datetime) -> int:
