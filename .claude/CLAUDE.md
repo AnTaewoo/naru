@@ -35,6 +35,7 @@ Task 하나를 끝까지 하고, **보고하고, 멈춘다.** 태우가 "다음"
 - 공지 텍스트는 실제 서울경찰청·TOPIS·보도 공지에서, 건마다 `source_url`·`published_at`·`fetched_at` 필수.
 - 테스트 기대값은 데이터를 열어 확인한 값만, 옆에 확인 방법 주석. 예: `# data/raw/seoul_crosswalks_<date>.csv 행 1234, 교차로명 '세종대로사거리'`
 - 외부 API 쿼터(TMAP 1,000/일, 버스 개발계정 1,000/일, Anthropic 월 한도). live 호출은 Task당 10회 이하, 반복은 recorded.
+- 위 "Task당 10회"는 개발·테스트 규칙이다. 운영 워커(`naru_ai.worker --loop`)의 Claude live 파싱은 하루 상한 `NARU_LLM_DAILY_CAP`(기본 200, 넘으면 다음 날로)을 따르고, 응답은 전부 `data/recorded/llm/`에 기록한다 (ADR-011 D).
 - 유일한 예외: 순수 수학 함수의 단위 테스트는 실데이터에서 뽑은 좌표를 상수로 써도 된다. 출처 주석 필수.
 - 목업(`docs/mockups/`)의 숫자·좌표·문장도 예시다. 코드·테스트에 가져오지 않는다.
 

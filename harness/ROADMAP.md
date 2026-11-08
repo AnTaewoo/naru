@@ -242,10 +242,44 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 🧑 태우: 영상 촬영, 포스터 A0, 보고서 결과 칸 채우기(T4.3 표, 사용성 테스트)
 
 ### T5.4 통제 불러오기 ★ (태우 2026-11-08)
-- status: DOING
+- status: DONE
 - depends: T5.3
 - 산출: BE `GET /closures/events`(ADR-010, INTERFACE v0.8 §3.1 — DB 통제를 (사유, 창) 사건으로 묶어 창·횡단보도 수·범위), FE 하단 시트 "통제 불러오기"(날짜별 목록 → 누르면 그 시작 시각·그 범위로, 지금 통제가 없으면 빈 칸에 안내 버튼), 슬라이더 "지금", 시트 제목 날짜("3월 15일 통제"). 공개 반영은 태우(tmux `make serve` 재시작)
 - 테스트: naru_test 코스 상태로 사건 API, recorded `closure_events.json` → 날짜 묶음·렌더, e2e 홈(지금, 통제 0) → 불러오기 → 3/15 → 길찾기 지하보도 우회 → 지금
+
+> T5.5~T5.10·T6.1~T6.6 — 태우가 naru.antaewoo.com 을 실제로 눌러 보고 실서버 API 를 직접 불러서 나온 문제(2026-11-08). 결정 A–E 는 ADR-011. 순서대로 Task 하나씩 → 보고(iPhone 13 크기 스크린샷 1장) → "다음". 붙여 준 번호 T5.4~T5.9 는 한 칸씩 밀었다(T5.4 는 통제 불러오기, 태우 결정)
+
+### T5.5 라우터 정확성 ★ (최우선)
+- status: DOING
+- depends: T5.4
+- 산출: 결정 A — scheduled 통제는 횡단보도에 닿는 시각이 공지 창 안일 때만 횡단보도당 +300초 페널티(상수, 하드 차단 아님), 창 밖은 보통 간선이고 "예정 ×3"은 없앤다. confirmed 는 지금처럼 차단. avoided[] 의 status 로 FE 가 confirmed "통제 중" / scheduled "공지상 통제 시간 · 현장 확인 전"을 나눈다. 상태기계는 그대로, 라우터 비용만. 그래프 밖 좌표: 그래프에 붙일 때 거리 상한 150 m(상수), 넘으면 `out_of_coverage`(지금은 먼 노드에 붙여 엉뚱한 경로)
+- 테스트: 회귀 3개로 고정 — ① from=37.5133,127.0980 to=37.5145,127.1035 depart_at=2026-03-15T10:00+09:00 → OUT_OF_COVERAGE(지금 16.9 km·14,118초) ② 11/7 15:00 세종대로 건너기 37.56368,126.97230 → 37.56368,126.98193 → 우회 생김, avoided 에 scheduled ③ 3/15 07:45 광화문 37.57148,126.97475 → 37.57148,126.97982 → 지금처럼 광화문 지하보도
+
+### T5.6 하단 시트 + 지도 맞춤 ★
+- status: TODO
+- depends: T5.5
+- 산출: 손잡이를 pointer 이벤트로 드래그(touch-action: none, user-select: none — 지금은 끌면 글자만 선택된다). 단계 3개: 접힘(약 96px) / 절반 / 전체, 놓으면 가까운 단계로. 손잡이 탭은 접힘↔절반. 경로를 찾으면 시트를 접힘으로 내리고 경로 전체에 fitBounds(padding 위 = 검색창, 아래 = 시트 높이 — 지금은 지도가 140px 띠로 줄고 경로가 화면 밖). 이벤트를 누르면 그 이벤트 횡단보도 전체에 fitBounds(지금은 서울 전체로 줌아웃되고 지점이 시트 뒤에 가려짐). 모바일에서 하단 푸터 숨김(지도 attribution 에 고지 링크가 이미 있음), 지도 로딩 중 회색 대신 로딩 표시
+
+### T5.7 내 위치 ★
+- status: TODO
+- depends: T5.6
+- 산출: maplibre GeolocateControl + 출발 기본값 "내 위치"(거부·실패 시 지도 탭). 출발·도착 칸 옆 "내 위치" 버튼. 커버리지 밖이면 안내
+
+### T5.8 주소·검색 ★ (결정 B)
+- status: TODO
+- depends: T5.7
+- 산출: 지도 탭으로 고른 점은 `/geocode/reverse` 로 도로명 주소 표시, 좌표는 화면에 안 보이게, 실패 시 "선택한 위치". 출발·도착 칸을 진짜 입력칸으로 — 2글자 이상, 300ms 디바운스로 `/geocode/search`, 결과에서 고르면 칸에 들어감. 맨 위 검색창 결과마다 "출발" "도착" 버튼
+- 테스트: `data/recorded/kakao/` 재생
+
+### T5.9 통제 목록 ★
+- status: TODO
+- depends: T5.8
+- 산출: 제목은 원문 대신 파서 결과로 — "시의회~숭례문오거리 집회 → 광화문·고용노동청 행진", 둘째 줄 "5만 명 · 태평로". 원문은 상세의 "공지 원문 보기". 이벤트 횡단보도 수는 화면 영역 말고 이벤트 전체 기준(지금은 지도를 옮기면 31곳→20곳). "오늘 통제"는 오늘일 때만, 아니면 "3월 15일 통제". "지금" 배지는 실제 오늘·현재 시각일 때만. 다가오는 것 먼저, 지난 건 "지난 통제" 묶음. 목록 위에 data_as_of "TOPIS 13:25 · 경찰청 11/8 공지 기준", 30분 넘게 안 바뀌었으면 회색 경고(결정 C)
+
+### T5.10 경로 상세 ★
+- status: TODO
+- depends: T5.9
+- 산출: legs 횡단보도에 이름 — 횡단보도 데이터 열을 열어 보고 교차로·위치명이 있으면 그걸로, 없으면 도로명. 있는 열만 쓴다. 경로가 하나면 위쪽 "11분 가장 빠른 길" 탭 줄 숨김
 
 ### PC-5 (태우) — 11/16 제출
 - [ ] 배포 링크에서 라이브로 경로가 나온다 (외부 API 호출 없이)
@@ -254,8 +288,42 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 
 ---
 
-## P6 — 실시간 신호 (해커톤 이후, M2)
-T6.1 RouteSectionIndex · T6.2 BusDeviationDetector(집회 당일 기록 필요, 없으면 fail) · T6.3 IncidentIngestor · T6.4 버스 폴링 스케줄·운영계정. 내용은 v0.4 P4 그대로.
+## P6 — 운영 워커·실시간 신호 (태우 2026-11-08: 실서버 점검 뒤 당김)
+
+### T6.1 워커 상시 실행 + TOPIS 실시간 돌발
+- status: TODO
+- depends: T5.10
+- 계기(실서버 확인): `/api/closures/events` 가 7건뿐(11/7 집회 2, 3/15 마라톤 5구간), 11/8 서울 전체 0건. `make serve` 의 워커가 `--once` 로 기록 5건만 재생(live 0)하고 끝난다
+- 산출: `naru_ai.worker --loop` — 소스별 주기 실행, 한 소스 실패가 다른 소스를 안 막음, 연속 3회 실패면 ERROR 로그. batch_id 는 원문 해시(같은 내용이면 멱등). 첫 소스: OA-13315 5분마다 → 원문 기록(결정 E) → IncidentIngestor → POST /internal/candidates. 기존 notice 후보와 같은 링크·시간이면 confirmed 증거로 붙는지 확인. `deploy/naru-worker.service`(naru.service 와 같은 형식: User=antaewoo, WorkingDirectory, PATH 에 uv 경로, ExecStart=uv run python -m naru_ai.worker --loop, Restart=on-failure). 설치 명령은 보고에 적는다. `make serve` 에서는 워커를 안 띄운다(서비스 분리)
+- 🧑 태우: 서비스 설치
+
+### T6.2 TOPIS 통제 공지 게시판
+- status: TODO
+- depends: T6.1
+- 산출: https://topis.seoul.go.kr/notice/openNoticeList.do 를 10분마다(robots 허용 확인됨: /visit/, /map/openTotalMap.do 만 금지). 새 글만 → 원문 기록 → notice_v2 live 파싱(결정 D) → 후보 발행. 기존 N045·N046 문장이 이 게시판 형식이다 — 파싱 결과가 cases 와 같은 형식인지 확인
+
+### T6.3 추가 소스 확인 (구현 말고 보고만)
+- status: TODO
+- depends: T6.2
+- 산출: 각각 한 번만 호출해서 응답 구조·서울 도심 집회 포함 여부·좌표 유무·라이선스를 표로 보고. 쓸지는 태우가 정한다 — TOPIS 통제지도 https://topis.seoul.go.kr/map/openControlMap.do 가 내부적으로 부르는 AJAX 엔드포인트와 응답(좌표가 있는지), 서울 실시간 도시데이터 OA-21285 의 사고통제현황(OA-13315 와 중복인지), 경찰청_교통돌발정보서비스(data.go.kr 15088841 — 서울 도심 집회가 나오는지, 고속도로·국도뿐인지)
+
+### T6.4 경찰청 PDF inbox
+- status: TODO
+- depends: T6.3
+- 산출: smpa 는 robots.txt 가 막혀 있어 자동 수집 안 한다. `data/raw/notices/smpa/inbox/` 에 태우가 PDF 를 넣으면 워커가 새 파일을 감지 → 표 추출 → notice_v2 live 파싱 → 후보 발행 → 처리한 파일은 `data/raw/notices/smpa/<날짜>.pdf` 로 옮기고 MANIFEST 갱신
+
+### T6.5 커버리지 확장 판단 (보고)
+- status: TODO
+- depends: T6.4
+- 산출: 서울 전체 도보망+노드링크 그래프의 적재 시간·메모리·/route 응답 시간을 실측해서 보고(홈서버 32GB). 적재 60초·4GB 이내면 전체로, 넘으면 도심+마라톤 코스 주변 버퍼 — 숫자 보고 태우가 정한다. 마라톤 15구간 중 5구간만 들어간 것도 이것 때문인지 확인
+
+### T6.6 마감
+- status: TODO
+- depends: T6.5
+- 산출: VWorld 키 넣으면 타일 교체(그 전까진 OSM). docker-compose MySQL 포트 127.0.0.1:3307:3306. 2026 JTBC 서울마라톤(11/1) 교통통제 안내(news.seoul.go.kr)로 코스 시각표 추가 가능한지 보고 — 3/15 보다 최근이라 시연용
+
+### P6 이후 (해커톤 이후, M2)
+RouteSectionIndex · BusDeviationDetector(집회 당일 기록 필요, 없으면 fail) · 버스 폴링 스케줄·운영계정. 내용은 v0.4 P4 그대로. (IncidentIngestor 는 T6.1 로 당김)
 
 ## P7 — 현장 실증 (2027-03)
 현장 데이터 규칙(`data/raw/field/<YYYYMMDD>/`: smpa.pdf, topis_notices.json, track.gpx, photos/<HHMMSS>_*.jpg, notes.md + 같은 시각 recorded)은 v0.4와 같다. 예측 통제 vs 관측 대조 → 보고서.
