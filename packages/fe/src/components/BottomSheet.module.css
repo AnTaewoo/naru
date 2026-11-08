@@ -58,6 +58,21 @@
   background: #d6d6d6;
 }
 
+/* 맨 아래 고지 줄 (T5.12) — 펼쳤을 때만 그린다. 넓은 화면은 푸터에 같은 링크가 있다 */
+.legal {
+  flex: none;
+  align-self: center;
+  padding: 2px 8px 8px;
+  font-size: 11px;
+  color: var(--naru-muted);
+}
+
+@media (min-width: 641px) {
+  .legal {
+    display: none;
+  }
+}
+
 .body {
   flex: 1;
   min-height: 0;

@@ -235,14 +235,9 @@ export function MapView({ visible }: MapViewProps) {
       setNotice(outside ? MAP_OUTSIDE_KO : null);
     });
     map.addControl(geolocate, "top-right");
-    // 출처 표기는 늘 펼쳐 두고 위쪽에 — 아래 모서리는 하단 시트가 덮는다. 고지 전문은 /licenses
-    map.addControl(
-      new AttributionControl({
-        compact: false,
-        customAttribution: '<a href="/licenses">오픈소스 고지</a>',
-      }),
-      "top-right",
-    );
+    // 출처 표기는 타일 출처 한 줄만, 늘 펼쳐 두고 위쪽에 — 아래 모서리는 하단 시트가 덮는다. OSM 타일은
+    // 숨기거나 ⓘ로 접을 수 없다(OSMF 타일 정책 §2). 고지 링크는 시트 맨 아래 줄·푸터 (T5.12)
+    map.addControl(new AttributionControl({ compact: false }), "top-right");
     map.on("load", () => {
       for (const id of Object.values(ICON_IDS)) {
         const image = renderIcon(id);

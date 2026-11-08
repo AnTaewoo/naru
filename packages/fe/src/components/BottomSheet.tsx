@@ -127,6 +127,12 @@ export function BottomSheet({
         <span className={styles.bar} />
       </button>
       <div className={styles.body}>{children}</div>
+      {stage !== "collapsed" && (
+        // 오픈소스·데이터 고지 — 지도 출처 칸에서 옮겨 왔다(T5.12). 데스크톱은 푸터에 있어 CSS 로 숨긴다
+        <a className={styles.legal} href="/licenses">
+          오픈소스·데이터 고지
+        </a>
+      )}
     </section>
   );
 }

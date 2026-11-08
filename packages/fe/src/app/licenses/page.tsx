@@ -1,4 +1,4 @@
-// (server) 오픈소스·데이터 고지 — 빌드 때 한 번 만든다. 지도 출처 칸·푸터에서 온다 (태우 2026-11-08)
+// (server) 오픈소스·데이터 고지 — 빌드 때 한 번 만든다. 하단 시트 맨 아래 줄(모바일)·푸터에서 온다 (태우 2026-11-08, T5.12)
 import Link from "next/link";
 import { runtimeNotices } from "./notices";
 import styles from "./page.module.css";

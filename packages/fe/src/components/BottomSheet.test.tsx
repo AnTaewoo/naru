@@ -59,6 +59,14 @@ describe("BottomSheet 렌더", () => {
     expect(sheet.dataset.stage).toBe("half");
   });
 
+  it("고지 줄 — 펼치면 맨 아래 '오픈소스·데이터 고지' → /licenses, 접힘에선 없다 (T5.12)", () => {
+    render(<Harness initial="collapsed" />);
+    expect(screen.queryByRole("link", { name: "오픈소스·데이터 고지" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "시트 높이" }));
+    const link = screen.getByRole("link", { name: "오픈소스·데이터 고지" });
+    expect(link.getAttribute("href")).toBe("/licenses");
+  });
+
   it("전체에서 탭 → 접힘", () => {
     render(<Harness initial="full" />);
     fireEvent.click(screen.getByRole("button", { name: "시트 높이" }));
