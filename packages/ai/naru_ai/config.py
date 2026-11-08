@@ -54,6 +54,18 @@ class Settings(BaseSettings):
     bus_daily_cap: int = Field(default=900, validation_alias="NARU_BUS_DAILY_CAP")  # 개발계정 1,000
     bus_routes_per_event: int = Field(default=3, validation_alias="NARU_BUS_ROUTES_PER_EVENT")
     data_go_kr_key: SecretStr = Field(default=SecretStr(""), validation_alias="DATA_GO_KR_KEY")
+    # 2순위 TOPIS 집회·행사 돌발 — 기준 데이터, 돌발마다 노선 1개 (태우 2026-11-08)
+    bus_incident_interval_s: int = Field(
+        default=120, validation_alias="NARU_BUS_INCIDENT_INTERVAL_S"
+    )
+    bus_incident_daily_cap: int = Field(default=300, validation_alias="NARU_BUS_INCIDENT_DAILY_CAP")
+    bus_incident_calls_each: int = Field(
+        default=30, validation_alias="NARU_BUS_INCIDENT_CALLS_EACH"
+    )  # 돌발 하나 하루 30회(약 1시간) — 300회를 몇 건이 다 쓰지 않게
+    # 노선 경로 getRoutePath(노선정보조회 15000193). 따로 받은 키가 있으면, 없으면 DATA_GO_KR_KEY
+    data_go_kr_route_key: SecretStr = Field(
+        default=SecretStr(""), validation_alias="DATA_GO_KR_ROUTE_KEY"
+    )
 
     @property
     def recorded_llm_dir(self) -> Path:

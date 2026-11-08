@@ -29,7 +29,8 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
-from naru_ai.signal.bus_feed import BusApi, parse_bus_positions
+from naru_ai.ingest.topis_api import KST
+from naru_ai.signal.bus_feed import BusApi, RoutePathError, RoutePaths, parse_bus_positions
 from naru_contracts import (
     BusPositionBatch,
     ClosureEventsResponse,
@@ -151,19 +152,33 @@ class BusPoller:
         api: BusApi,
         events: Callable[[], ClosureEventsResponse],
         closures: Callable[[str, datetime], FeatureCollection],
+        incidents: Callable[[], list[IncidentTarget]] | None = None,
+        paths: RoutePaths | None = None,
+        *,
         per_event: int = 3,
         daily_cap: int = 900,
+        incident_cap: int = 300,
+        incident_every_s: int = 120,
+        incident_each: int = 30,
     ) -> None:
         self.stops = stops
         self.api = api
         self.events = events
         self.closures = closures
+        self.incidents = incidents or (lambda: [])
+        self.paths = paths
         self.per_event = per_event
         self.daily_cap = daily_cap
+        self.incident_cap = incident_cap
+        self.incident_every_s = incident_every_s
+        self.incident_each = incident_each
         self._picked: dict[tuple[str, str], list[str]] = {}
+        self._incident_pick: dict[str, str | None] = {}
+        self._incident_calls: dict[tuple[str, str], int] = defaultdict(int)  # (날짜, 돌발)
+        self._last_incident: dict[str, datetime] = {}
 
     def watched(self, now: datetime) -> list[str]:
-        """지금 볼 노선 — 창 안 공지 통제마다 근처 노선, 겹치면 한 번."""
+        """1순위 — 창 안 공지 통제마다 근처 노선, 겹치면 한 번."""
         routes: list[str] = []
         for ev in self.events().events:
             start = ev.window.start
@@ -186,22 +201,76 @@ class BusPoller:
             routes.extend(r for r in self._picked[key] if r not in routes)
         return routes
 
+    def incident_routes(self, now: datetime, taken: Sequence[str]) -> list[tuple[str, str]]:
+        """2순위 — 지금 걸린 집회·행사 돌발마다 노선 1개: (노선, 돌발 key)."""
+        live = [t for t in self.incidents() if t.start <= now <= (t.end or t.start + OPEN_END)]
+        live.sort(key=lambda t: (not t.rally, -t.start.timestamp(), t.key))
+        used = set(taken) | {r for r in self._incident_pick.values() if r}
+        out: list[tuple[str, str]] = []
+        for t in live:
+            if t.key not in self._incident_pick:
+                route = next((r for r in self.stops.near_line(t.coords) if r not in used), None)
+                self._incident_pick[t.key] = route
+                log.info("bus incident route", extra={"incident": t.key, "route": route})
+                if route:
+                    used.add(route)
+            route = self._incident_pick[t.key]
+            if route and route not in taken:
+                out.append((route, t.key))
+        return out
+
     def batches(self, now: datetime) -> list[BusPositionBatch]:
+        day = now.astimezone(KST).strftime("%Y%m%d")
         out: list[BusPositionBatch] = []
-        for route in self.watched(now):
+        notice = self.watched(now)
+        for route in notice:
             if self.api.live and self.api.calls_today(now) >= self.daily_cap:
                 log.warning("bus daily cap", extra={"cap": self.daily_cap})
                 break
-            rec = self.api.call(route)
-            digest = hashlib.sha1(rec.raw.encode("utf-8")).hexdigest()[:12]
-            out.append(
-                BusPositionBatch(
-                    batch_id=f"bus-{route}-{digest}",
-                    produced_at=now,
-                    route_id=route,
-                    ref=rec.path.as_posix(),
-                    called_at=rec.received_at,
-                    positions=parse_bus_positions(rec.raw),
-                )
-            )
+            out.extend(self._poll(route, "notice", now))
+        for route, key in self.incident_routes(now, notice):
+            last = self._last_incident.get(route)
+            if last is not None and (now - last).total_seconds() < self.incident_every_s:
+                continue
+            if self._incident_calls[(day, key)] >= self.incident_each:
+                continue
+            if self.api.live and (
+                self.api.calls_today(now, "incident") >= self.incident_cap
+                or self.api.calls_today(now) >= self.daily_cap
+            ):
+                log.warning("bus incident cap", extra={"cap": self.incident_cap})
+                break
+            got = self._poll(route, "incident", now)
+            self._last_incident[route] = now
+            if got:
+                self._incident_calls[(day, key)] += 1
+                out.extend(got)
+        for b in out:
+            self._ensure_path(b.route_id, now)
         return out
+
+    def _poll(self, route: str, kind: str, now: datetime) -> list[BusPositionBatch]:
+        try:
+            rec = self.api.call(route, kind)
+        except FileNotFoundError:  # 기록 재생인데 그 노선 기록이 없다 — 지어내지 않고 건너뛴다
+            log.info("bus record missing", extra={"route": route, "kind": kind})
+            return []
+        digest = hashlib.sha1(rec.raw.encode("utf-8")).hexdigest()[:12]
+        return [
+            BusPositionBatch(
+                batch_id=f"bus-{route}-{digest}",
+                produced_at=now,
+                route_id=route,
+                ref=rec.path.as_posix(),
+                called_at=rec.received_at,
+                positions=parse_bus_positions(rec.raw),
+            )
+        ]
+
+    def _ensure_path(self, route: str, now: datetime) -> None:
+        if self.paths is None:
+            return
+        try:
+            self.paths.ensure(route, now)
+        except RoutePathError as exc:  # 경로가 없어도 위치 수집은 계속 (그날 다시 안 부름)
+            log.warning("route path", extra={"route": route, "error": str(exc)})

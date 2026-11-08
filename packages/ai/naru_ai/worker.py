@@ -25,8 +25,8 @@ from pathlib import Path
 
 from naru_ai.config import Settings
 from naru_ai.ingest.course import CourseIngestor
-from naru_ai.ingest.incident import IncidentIngestor, parse_accinfo
-from naru_ai.ingest.topis_api import IncidentFeed, LinkBook, SeoulOpenApi
+from naru_ai.ingest.incident import EVENT_TYPE, RALLY, Incident, IncidentIngestor, parse_accinfo
+from naru_ai.ingest.topis_api import IncidentFeed, LinkBook, SeoulOpenApi, lnglat_5181
 from naru_ai.llm.client import AnthropicClient
 from naru_ai.llm.prompt import NoticeEnvelope
 from naru_ai.llm.recorder import LLMRecorder
@@ -36,8 +36,8 @@ from naru_ai.notice.gazetteer import Gazetteer
 from naru_ai.notice.parser import NoticeParser
 from naru_ai.notice.resolver import KakaoRecords, Resolver
 from naru_ai.publish import CandidatePublisher
-from naru_ai.signal.bus_feed import BusApi
-from naru_ai.signal.bus_poller import BusPoller, RouteStops
+from naru_ai.signal.bus_feed import BusApi, RoutePaths
+from naru_ai.signal.bus_poller import BusPoller, IncidentTarget, RouteStops
 from naru_contracts import (
     BusPositionBatchResponse,
     CandidateBatch,
@@ -113,13 +113,21 @@ class IngestWorker:
         bus_key = settings.data_go_kr_key.get_secret_value()
         if settings.bus_source == "live" and not bus_key:
             raise ValueError("DATA_GO_KR_KEY 없음 — 버스 live 를 쓸 수 없다")
+        live_bus = settings.bus_source == "live"
+        route_key = settings.data_go_kr_route_key.get_secret_value() or bus_key
+        self._incident_rows: list[Incident] = []
         self.bus = BusPoller(
             RouteStops.load(_latest(raw, "bus_routes_*") / "OA-1095.xlsx"),
-            BusApi(recorded, bus_key if settings.bus_source == "live" else None),
+            BusApi(recorded, bus_key if live_bus else None),
             publisher.events,
             publisher.closures,
-            settings.bus_routes_per_event,
-            settings.bus_daily_cap,
+            self.incident_targets,
+            RoutePaths(raw, route_key if live_bus else None),
+            per_event=settings.bus_routes_per_event,
+            daily_cap=settings.bus_daily_cap,
+            incident_cap=settings.bus_incident_daily_cap,
+            incident_every_s=settings.bus_incident_interval_s,
+            incident_each=settings.bus_incident_calls_each,
         )
         self.sources = [
             _Source("course", None, lambda _: self._send(self.course_batch())),
@@ -192,6 +200,7 @@ class IngestWorker:
         """TOPIS 돌발 — 범위 안 집회가 없어도 빈 배치를 보낸다(수신 시각이 data_as_of 가 된다)."""
         feed = self.incidents.fetch()
         rows = parse_accinfo(feed.raw)
+        self._incident_rows = rows  # 버스 2순위(집회·행사 돌발)가 쓴다
         candidates = self.incident_ingestor.build(rows, feed.path.as_posix(), feed.received_at)
         log.info(
             "incidents",
@@ -203,6 +212,21 @@ class IngestWorker:
             producer="incident",
             candidates=candidates,
         )
+
+    def incident_targets(self) -> list[IncidentTarget]:
+        """버스 2순위 — 가장 최근 돌발 원문의 집회·행사(A10), 같은 링크·시각은 하나 (T6.2)."""
+        groups: dict[tuple[str, datetime, datetime | None], list[Incident]] = {}
+        for i in self._incident_rows:
+            if i.acc_type == EVENT_TYPE and i.start is not None:
+                groups.setdefault((i.link_id, i.start, i.end), []).append(i)
+        out: list[IncidentTarget] = []
+        for (link_id, start, end), group in groups.items():
+            first = min(group, key=lambda i: int(i.acc_id))
+            link = self.incident_ingestor.links.get(link_id)
+            coords = link.coords if link else (lnglat_5181(first.x, first.y),)
+            rally = any(i.acc_dtype == RALLY for i in group)
+            out.append(IncidentTarget(first.acc_id, rally, start, end, tuple(coords)))
+        return out
 
     # --- 실행 ---------------------------------------------------------------------
     def _publish(self, batch: CandidateBatch) -> CandidateBatchResponse:
