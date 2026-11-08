@@ -28,6 +28,13 @@ export interface LocateState {
   status: LocateStatus;
 }
 
+/** 칸에 보일 이름 (T5.8) — 그 점을 검색으로 골랐으면 장소 이름, 지도로 골랐으면 주소(label).
+ * text null = 주소 없음·실패 → "선택한 위치". point 가 칸의 점과 다르면 지난 이름이다 */
+export interface PlaceName {
+  point: LngLat;
+  text: string | null;
+}
+
 export interface RouteState {
   /** 길찾기 화면을 켰나 — 켜져 있을 때만 지도 누르기가 출발·도착을 고른다 */
   active: boolean;
@@ -46,6 +53,10 @@ export interface RouteState {
   locate: LocateState | null;
   /** 마지막으로 받은 내 위치(보행망 안) — 이 점인 칸은 "내 위치" 라고 쓴다 */
   mine: LngLat | null;
+  /** 칸 이름 (T5.8) — 좌표는 화면에 안 쓴다 */
+  names: { from: PlaceName | null; to: PlaceName | null };
+  /** 입력 중인 칸 (T5.8) — 그동안 지도를 누르면 이 칸에 넣는다 */
+  editing: OdField | null;
 }
 
 export type RouteAction =
@@ -60,7 +71,10 @@ export type RouteAction =
   | { type: "fail"; error: string; code: string | null }
   | { type: "locate"; which: OdField }
   | { type: "located"; point: LngLat; coverage: Bbox4 | null }
-  | { type: "locateFail"; reason: "denied" | "unavailable" };
+  | { type: "locateFail"; reason: "denied" | "unavailable" }
+  | { type: "edit"; which: OdField | null }
+  | { type: "choose"; which: OdField; point: LngLat; name: string }
+  | { type: "named"; which: OdField; point: LngLat; text: string | null };
 
 export function initialRouteState(partial: Partial<RouteState> = {}): RouteState {
   return {
@@ -74,6 +88,8 @@ export function initialRouteState(partial: Partial<RouteState> = {}): RouteState
     errorCode: null,
     locate: null,
     mine: null,
+    names: { from: null, to: null },
+    editing: null,
     ...partial,
   };
 }
@@ -95,6 +111,7 @@ function withOd(state: RouteState, from: LngLat | null, to: LngLat | null): Rout
     error: null,
     errorCode: null,
     locate: null,
+    editing: null,
   };
 }
 
@@ -112,7 +129,9 @@ export function routeReducer(state: RouteState, action: RouteAction): RouteState
       return initialRouteState();
     case "pick": {
       if (!state.active) return state;
-      const which: OdField | null = !state.from ? "from" : !state.to ? "to" : null;
+      // 입력 중인 칸이 있으면 그 칸(T5.8), 아니면 빈 칸 차례로
+      const which: OdField | null =
+        state.editing ?? (!state.from ? "from" : !state.to ? "to" : null);
       if (!which) return state; // 둘 다 골랐으면 무시 — 다시 고르려면 칸을 누르거나 뒤로
       const next = withField(state, which, action.point);
       // 찾던 칸을 지도로 채웠으면 찾기를 멈추고(늦은 위치는 버림), 다른 칸이면 계속 찾는다
@@ -127,7 +146,10 @@ export function routeReducer(state: RouteState, action: RouteAction): RouteState
         action.which === "to" ? null : state.to,
       );
     case "swap":
-      return withOd(state, state.to, state.from);
+      return {
+        ...withOd(state, state.to, state.from),
+        names: { from: state.names.to, to: state.names.from },
+      };
     case "setOd":
       if (state.active && same(state.from, action.from) && same(state.to, action.to)) return state;
       return withOd(state, action.from, action.to);
@@ -169,6 +191,29 @@ export function routeReducer(state: RouteState, action: RouteAction): RouteState
         ? { ...state, locate: { ...l, status: action.reason } }
         : state;
     }
+    case "edit":
+      return state.active ? { ...state, editing: action.which } : state;
+    case "choose": {
+      // 검색으로 고른 장소 (T5.8) — 칸 이름은 장소 이름. 홈에서 고르면 길찾기가 켜진다
+      const name: PlaceName = { point: action.point, text: action.name };
+      const next = {
+        ...withField(state, action.which, action.point),
+        names: { ...state.names, [action.which]: name },
+      };
+      // 홈에서 도착을 고르면 출발은 내 위치부터(T5.7 기본값). 다른 칸을 찾던 중이면 계속
+      if (!state.active && action.which === "to" && !state.from)
+        return { ...next, locate: FROM_MINE };
+      return state.locate && state.locate.which !== action.which
+        ? { ...next, locate: state.locate }
+        : next;
+    }
+    case "named":
+      // 주소는 그 점일 때만 — 그새 칸이 바뀌었으면 버린다
+      if (!same(state[action.which], action.point)) return state;
+      return {
+        ...state,
+        names: { ...state.names, [action.which]: { point: action.point, text: action.text } },
+      };
   }
 }
 
@@ -201,6 +246,30 @@ export function latLngParam(p: LngLat): string {
 export function odFromLocation(search: string): { from: LngLat | null; to: LngLat | null } {
   const q = new URLSearchParams(search);
   return { from: parseLatLng(q.get("from")), to: parseLatLng(q.get("to")) };
+}
+
+/** 지도·주소창으로 정한 칸의 주소 (T5.8) — 그 점의 이름이 없을 때만 /geocode/reverse.
+ * 실패·주소 없음은 text null("선택한 위치"). 내 위치인 칸은 묻지 않는다 */
+function useReverseName(
+  which: OdField,
+  p: LngLat | null,
+  name: PlaceName | null,
+  mine: LngLat | null,
+  enabled: boolean,
+  dispatch: Dispatch<RouteAction>,
+) {
+  const api = useNaruApi();
+  useEffect(() => {
+    if (!enabled || !p || same(p, mine) || (name && same(name.point, p))) return;
+    const controller = new AbortController();
+    api
+      .geocodeReverse({ lat: p[1], lng: p[0] }, controller.signal)
+      .then((r) => dispatch({ type: "named", which, point: p, text: r.label }))
+      .catch(() => {
+        if (!controller.signal.aborted) dispatch({ type: "named", which, point: p, text: null });
+      });
+    return () => controller.abort();
+  }, [api, which, p, name, mine, enabled, dispatch]);
 }
 
 const RouteStateCtx = createContext<RouteState | null>(null);
@@ -259,6 +328,9 @@ export function RouteProvider({
   useEffect(() => {
     coverageRef.current = coverage;
   }, [coverage]);
+
+  useReverseName("from", from, state.names.from, state.mine, fetchEnabled, dispatch);
+  useReverseName("to", to, state.names.to, state.mine, fetchEnabled, dispatch);
 
   // 내 위치 (T5.7) — 권한을 묻고 받으면 그 칸에. 찾는 동안 지도로 고르면 reducer 가 결과를 버린다
   useEffect(() => {

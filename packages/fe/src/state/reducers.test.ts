@@ -14,6 +14,7 @@ import {
   whenKo,
   windowKo,
 } from "../i18n/ko";
+import { parseGeocodeSearch, placeLngLat } from "../api/naruApiClient";
 import type { LngLat } from "../map/layers/routeLayer";
 import type { ErrorBody } from "../types/contracts";
 import { recorded, recordedClosures, recordedEvents, recordedRoute } from "../test/recorded";
@@ -382,5 +383,84 @@ describe("내 위치 (T5.7)", () => {
     const swapped = routeReducer(done, { type: "swap" });
     expect(swapped.from).toEqual(kyobo);
     expect(swapped.mine).toEqual(kyobo); // 바꿔도 내 위치는 기억한다 (칸 이름 "내 위치")
+  });
+});
+
+describe("주소·검색 (T5.8)", () => {
+  // recorded naru_api/geocode_search_*.json (카카오 기록 재생): '교보빌딩' 1위 광화문교보빌딩,
+  // '덕수궁' 3위 덕수궁 대한문 — route_0745 의 출발·도착과 같은 좌표
+  const kyobo = parseGeocodeSearch(recorded("geocode_search_kyobo").body).places[0];
+  const daehanmun = parseGeocodeSearch(recorded("geocode_search_deoksugung").body).places[2];
+  const kyoboAt = kyobo ? placeLngLat(kyobo) : null;
+  const daehanmunAt = daehanmun ? placeLngLat(daehanmun) : null;
+  if (!kyobo || !daehanmun || !kyoboAt || !daehanmunAt) throw new Error("기록 장소가 없다");
+  const q = odFromLocation(`?from=${q745["from"] ?? ""}&to=${q745["to"] ?? ""}`);
+
+  it("검색 1위·3위는 route_0745 출발·도착점 — 장소 좌표가 질의 좌표와 같다", () => {
+    expect([kyobo.name, daehanmun.name]).toEqual(["광화문교보빌딩", "덕수궁 대한문"]);
+    expect(kyoboAt).toEqual(q.from);
+    expect(daehanmunAt).toEqual(q.to);
+  });
+
+  it("홈 검색에서 도착을 고르면 길찾기가 켜지고 출발은 내 위치부터 — 출발을 고르면 찾지 않는다", () => {
+    const s0 = initialRouteState();
+    expect([s0.names, s0.editing]).toEqual([{ from: null, to: null }, null]);
+    const toPlace = routeReducer(s0, {
+      type: "choose",
+      which: "to",
+      point: daehanmunAt,
+      name: daehanmun.name,
+    });
+    expect(toPlace.active).toBe(true);
+    expect(toPlace.to).toEqual(daehanmunAt);
+    expect(toPlace.names.to).toEqual({ point: daehanmunAt, text: "덕수궁 대한문" });
+    expect(toPlace.locate).toEqual({ which: "from", status: "locating" });
+    const fromPlace = routeReducer(s0, {
+      type: "choose",
+      which: "from",
+      point: kyoboAt,
+      name: kyobo.name,
+    });
+    expect([fromPlace.active, fromPlace.from, fromPlace.locate]).toEqual([true, kyoboAt, null]);
+  });
+
+  it("칸을 누르면 입력 중 — 지도를 누르면 그 칸에(둘 다 차 있어도), 검색으로 고르면 장소 이름", () => {
+    const both = routeReducer(initialRouteState(), { type: "setOd", from: q.from, to: q.to });
+    expect(routeReducer(initialRouteState(), { type: "edit", which: "to" }).editing).toBeNull();
+    const editing = routeReducer(both, { type: "edit", which: "from" });
+    expect(editing.editing).toBe("from");
+    const tapped = routeReducer(editing, { type: "pick", point: daehanmunAt });
+    expect([tapped.from, tapped.to, tapped.editing]).toEqual([daehanmunAt, q.to, null]);
+    expect(routeReducer(both, { type: "pick", point: daehanmunAt })).toBe(both); // 입력 중이 아니면 무시
+    const chosen = routeReducer(routeReducer(both, { type: "edit", which: "to" }), {
+      type: "choose",
+      which: "to",
+      point: kyoboAt,
+      name: kyobo.name,
+    });
+    expect([chosen.to, chosen.names.to?.text, chosen.editing]).toEqual([
+      kyoboAt,
+      "광화문교보빌딩",
+      null,
+    ]);
+    expect(routeReducer(editing, { type: "edit", which: null }).editing).toBeNull();
+  });
+
+  it("주소(named)는 그 점일 때만 받는다, 바꾸기는 이름도 바꾼다", () => {
+    const both = routeReducer(initialRouteState(), { type: "setOd", from: q.from, to: q.to });
+    // recorded naru_api/geocode_reverse_kyobo.json 의 label
+    const named = routeReducer(both, {
+      type: "named",
+      which: "from",
+      point: kyoboAt,
+      text: "종로구 종로 1",
+    });
+    expect(named.names.from).toEqual({ point: kyoboAt, text: "종로구 종로 1" });
+    expect(
+      routeReducer(both, { type: "named", which: "from", point: daehanmunAt, text: "x" }),
+    ).toBe(both); // 그새 칸이 바뀌었으면 버린다
+    const swapped = routeReducer(named, { type: "swap" });
+    expect(swapped.names.to).toEqual({ point: kyoboAt, text: "종로구 종로 1" });
+    expect(swapped.names.from).toBeNull();
   });
 });
