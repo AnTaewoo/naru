@@ -7,6 +7,13 @@
   background: #e9ecef;
 }
 
+/* 모바일은 푸터가 없으니 화면 전체 (T5.6) */
+@media (max-width: 640px) {
+  .app {
+    height: 100dvh;
+  }
+}
+
 /* 지도 컨트롤(확대·출처)은 위에 뜬 UI 아래로 — 홈은 길찾기 바·칩 아래(시안 01 의 오른쪽 버튼 자리),
    길찾기는 출발·도착 패널 아래. 출처 글자가 칩·패널에 가리지 않게 */
 .app[data-mode="home"] :global(.maplibregl-ctrl-top-right) {

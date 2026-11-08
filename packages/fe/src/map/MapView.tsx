@@ -10,7 +10,8 @@ import {
   type FilterSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
+import { SHEET_COLLAPSED_PX } from "../components/BottomSheet";
 import { useClosureDispatch, useClosures } from "../state/ClosureProvider";
 import { useRoute, useRouteDispatch } from "../state/RouteProvider";
 import type { FeatureCollection, RouteResponse, Status } from "../types/contracts";
@@ -32,10 +33,10 @@ import {
   crossingSegments,
   entranceLayers,
   entranceMarkers,
-  lineCoordinates,
   routeBounds,
   routeLayers,
   routeLine,
+  routeOdKey,
   type LngLat,
 } from "./layers/routeLayer";
 import { ZONE_SOURCE_ID, zoneLayers, zonePolygons } from "./layers/zoneLayer";
@@ -97,13 +98,10 @@ function applyRoute(map: MapLibreMap, route: RouteResponse | null) {
   if (entrances instanceof GeoJSONSource) void entrances.setData(entranceMarkers(route));
 }
 
-/** 경로의 첫·끝 좌표 = 출발·도착 (ADR-009 접근 구간 포함). 새 출발·도착의 첫 경로에만 지도를 맞춘다 */
-function odKey(route: RouteResponse | null): string | null {
-  const coords = route ? lineCoordinates(route.route) : [];
-  return coords.length ? JSON.stringify([coords[0], coords[coords.length - 1]]) : null;
-}
-
-/** 위는 떠 있는 UI 와 그 아래 지도 컨트롤(확대·출처) + 핀 말풍선(약 50px), 아래는 하단 시트가 덮는다 */
+/**
+ * 위는 떠 있는 UI 와 그 아래 지도 컨트롤(확대·출처) + 핀 말풍선(약 50px). 아래는 접힌 시트(96px) —
+ * 경로를 찾거나 통제를 고르면 시트가 접히고 나서 맞춘다 (T5.6)
+ */
 function fitPadding(map: MapLibreMap) {
   const container = map.getContainer();
   const h = container.clientHeight;
@@ -112,12 +110,12 @@ function fitPadding(map: MapLibreMap) {
     ? ctrl.getBoundingClientRect().bottom - container.getBoundingClientRect().top
     : 0;
   const top = Math.round(Math.max(ctrlBottom, 0) + 50);
-  const bottom = Math.max(0, Math.min(Math.round(h * 0.42), h - top - 80));
+  const bottom = Math.max(0, Math.min(SHEET_COLLAPSED_PX + 24, h - top - 80));
   return { top, bottom, left: 40, right: 40 };
 }
 
 function fitRoute(map: MapLibreMap, route: RouteResponse | null, fitted: RefObject<string | null>) {
-  const key = odKey(route);
+  const key = routeOdKey(route);
   const bounds = routeBounds(route);
   if (!key || !bounds || key === fitted.current) return;
   fitted.current = key;
@@ -176,6 +174,8 @@ export function MapView({ visible }: MapViewProps) {
   const fromPin = useRef<Marker | null>(null);
   const toPin = useRef<Marker | null>(null);
   const fitted = useRef<string | null>(null);
+  // 지도 load 전에는 회색 대신 로딩 표시 (T5.6)
+  const [ready, setReady] = useState(false);
   // load 이전에 바뀐 값은 ref 에 두었다가 load 때 한 번에 반영한다
   const closuresRef = useRef(closures);
   const visibleRef = useRef(visible);
@@ -226,6 +226,7 @@ export function MapView({ visible }: MapViewProps) {
       for (const layer of closureLayers()) map.addLayer(layer);
       for (const layer of entranceLayers()) map.addLayer(layer);
       loaded.current = true;
+      setReady(true);
       applyClosures(map, closuresRef.current);
       applyFilter(map, visibleRef.current);
       applyRoute(map, routeRef.current);
@@ -296,7 +297,17 @@ export function MapView({ visible }: MapViewProps) {
     if (map && loaded.current) applyFilter(map, visible);
   }, [visible]);
 
-  return <div ref={container} className={styles.map} role="region" aria-label="지도" />;
+  return (
+    <div className={styles.wrap}>
+      <div ref={container} className={styles.map} role="region" aria-label="지도" />
+      {!ready && (
+        <div className={styles.loading} role="status" aria-label="지도 불러오는 중">
+          <span className={styles.spinner} aria-hidden />
+          지도 불러오는 중…
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default MapView;

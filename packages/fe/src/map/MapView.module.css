@@ -1,7 +1,48 @@
+.wrap {
+  position: absolute;
+  inset: 0;
+}
+
 .map {
   position: absolute;
   inset: 0;
   background: #e9ecef;
+}
+
+/* 지도 load 전 (T5.6) — 회색 바탕 대신 무엇을 기다리는지 보여 준다 */
+.loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #eef0f3;
+  color: #6b7280;
+  font-size: 14px;
+  z-index: 1;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid #d6dbe3;
+  border-top-color: #2d6bff;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
 }
 
 /* 출발·도착 핀 (DOM 마커) — 말풍선 + 꼬리 + 점. 색은 --pin. 클릭은 지도로 흘려보낸다 */

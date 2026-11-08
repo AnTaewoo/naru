@@ -9,3 +9,10 @@
 .footer a {
   color: inherit;
 }
+
+/* 모바일에선 숨긴다 — 고지는 지도 출처 칸의 "오픈소스 고지" 링크에 있다 (T5.6) */
+@media (max-width: 640px) {
+  .footer {
+    display: none;
+  }
+}
