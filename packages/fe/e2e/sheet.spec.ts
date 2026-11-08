@@ -35,6 +35,10 @@ test("경로를 찾으면 시트가 접히고(96px) 출발·도착 핀이 시트
     expect((pin?.y ?? 0) + (pin?.height ?? 0)).toBeLessThanOrEqual(box?.y ?? 0);
   }
   await expect(page.getByRole("contentinfo")).toBeHidden(); // 모바일 푸터 숨김 (고지는 지도 출처 칸)
+  // 경로 종류가 하나라 탭 줄이 없고 출발·도착 패널은 108px (T5.10) — 시트 '전체'·지도 컨트롤 기준
+  await expect(page.getByRole("tablist")).toHaveCount(0);
+  const panel = await page.getByRole("region", { name: "출발·도착" }).boundingBox();
+  expect(Math.round(panel?.height ?? 0)).toBe(108);
   await expect(page.getByRole("status", { name: "지도 불러오는 중" })).toHaveCount(0);
   await page.screenshot({ path: "test-results/iphone13-t56-route.png" });
   expect(ownErrors(errors)).toEqual([]);
@@ -62,10 +66,10 @@ test("손잡이 — 탭은 접힘↔절반, 위로 끌면 전체, 아래로 끌�
     await page.mouse.move(x, y + dy, { steps: 12 });
     await page.mouse.up();
   };
-  await drag(-250); // 절반(332) → 582 쯤 → 전체(664 − 출발·도착 패널 176 = 488)
+  await drag(-250); // 절반(332) → 582 쯤 → 전체(664 − 출발·도착 패널 위 112 = 552, T5.10)
   await expect(sheet).toHaveAttribute("data-stage", "full");
   expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
-  await settled(488); // 손잡이가 패널 아래에 있어 다시 잡을 수 있다
+  await settled(552); // 손잡이가 패널 아래에 있어 다시 잡을 수 있다
   await drag(450); // 전체 → 38 → 접힘(96)
   await expect(sheet).toHaveAttribute("data-stage", "collapsed");
 });

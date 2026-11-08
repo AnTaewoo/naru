@@ -28,7 +28,11 @@ test("길찾기 07:45 — 지하보도로 건너는 경로, 원래 길 막힘, �
   await page.screenshot({ path: "test-results/route-0745.png" });
   await expandSheet(page, "길찾기 결과"); // 경로가 오면 시트가 접힌다(T5.6)
   await page.getByRole("button", { name: "경로 상세" }).click();
-  await expect(page.getByRole("list", { name: "경로 상세" }).getByRole("listitem")).toHaveCount(7);
+  const legs = page.getByRole("list", { name: "경로 상세" });
+  await expect(legs.getByRole("listitem")).toHaveCount(7);
+  // 횡단보도 레그 이름 = OA-23081 교차로명 (T5.10)
+  await expect(legs.getByRole("listitem").nth(5)).toContainText("청계광장");
+  await expect(legs.getByRole("listitem").nth(5)).toContainText("횡단보도");
   await page.getByRole("button", { name: "통제 근거" }).click();
   await expect(page.getByRole("region", { name: "통제 근거" })).toContainText("확신도");
   await page.screenshot({ path: "test-results/route-0745-evidence.png" });

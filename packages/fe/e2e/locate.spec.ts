@@ -75,7 +75,7 @@ test("길찾기를 켜면 출발은 내 위치(교보빌딩) — 지도를 한 �
   await expect(page.getByRole("button", { name: "출발 내 위치" })).toBeVisible();
   await expect(page.getByRole("img", { name: "출발 지점" })).toBeVisible();
   await page.waitForTimeout(1000); // 내 위치로 옮기는 중
-  await tapMap(page, 0.3, 0.4); // 출발·도착 패널(176px) 아래, 절반 시트(332px) 위
+  await tapMap(page, 0.3, 0.4); // 출발·도착 패널(108px) 아래, 절반 시트(332px) 위
   await expect(page.getByRole("img", { name: "도착 지점" })).toBeVisible();
   await expect(page.getByRole("article", { name: "가장 빠른 길" })).toBeVisible();
   expect(ownErrors(errors)).toEqual([]);
