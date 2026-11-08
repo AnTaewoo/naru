@@ -138,7 +138,7 @@ describe("카드·레그·근거 (순수)", () => {
     );
   });
 
-  it("LegList 07:45 — 레그 7행, 이름 있는 지하보도, 거리는 m 반올림", () => {
+  it("LegList 07:45 — 레그 7행, 이름 있는 지하보도·횡단보도(교차로명, T5.10), 거리는 m 반올림", () => {
     const rows = legRows(r0745);
     expect(rows.map((r) => r.title)).toEqual([
       "보도",
@@ -146,10 +146,11 @@ describe("카드·레그·근거 (순수)", () => {
       "광화문(세종문화회관) 지하보도",
       "계단",
       "보도",
-      "횡단보도",
+      "청계광장", // recorded route_0745 legs[5].name — OA-23081 06-0000002137 교차로명
       "보도",
     ]);
     expect(rows[2]?.sub).toBe("지하보도");
+    expect(rows[5]?.sub).toBe("횡단보도");
     expect(rows[0]?.sub).toBeNull();
     expect(rows.map((r) => r.distance)).toEqual(["53m", "9m", "156m", "22m", "96m", "33m", "470m"]);
   });
