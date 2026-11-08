@@ -6,6 +6,9 @@ geometry: point → from_point(30 m) · line → from_line(15 m) · segment → 
 impact unknown 인 point 는 도로 링크 30 m 안이면 blocks 로 승격(evidence detail.rule
 unknown_near_road, ADR-008). 승격해도 confidence 는 그대로라 review_required 는 안 풀린다.
 상태 판정 시각은 적재 시각(지금).
+돌발(source incident)과 공지(smpa·topis·news·seoul_press)가 같은 횡단보도·겹치는 시각이면 공지 후보
+전체에 그 돌발의 topis_incident 근거를 붙인다 — 어느 쪽이 먼저 와도 (T6.1, README '실제 근거').
+같은 배치를 다시 받으면 받은 시각만 새로 한다(돌발 수신 시각 = data_as_of).
 """
 
 from __future__ import annotations
@@ -27,10 +30,14 @@ from naru_contracts import (
     LineGeom,
     PointGeom,
     SegmentGeom,
+    Source,
     ZoneGeom,
 )
 
 log = logging.getLogger(__name__)
+NOTICE_SOURCES = frozenset(
+    s.value for s in (Source.smpa, Source.topis, Source.news, Source.seoul_press)
+)
 
 
 class CandidateIntake:
@@ -51,6 +58,7 @@ class CandidateIntake:
     def accept(self, batch: CandidateBatch) -> IntakeResult:
         done = self.repo.batch_result(batch.batch_id)
         if done is not None:
+            self.repo.touch_batch(batch.batch_id)
             log.info("batch duplicate", extra={"batch_id": batch.batch_id})
             return done
         at = datetime.now(UTC)
@@ -58,9 +66,18 @@ class CandidateIntake:
         for raw in batch.candidates:
             candidate = self.promote_unknown(raw)
             ids = self.crosswalk_ids(candidate)
+            candidate = self.link_incidents(candidate, ids)
             states = self.engine.apply(candidate, ids, at=at)
             meta = CandidateMeta.of(candidate)
             updated += self.repo.upsert_many(states, candidate.candidate_id, meta)
+            if candidate.source is Source.incident and ids:
+                window, _ = self.engine.effective_window(candidate)
+                linked = self.repo.attach(ids, window, NOTICE_SOURCES, list(candidate.evidence))
+                if linked:
+                    log.info(
+                        "incident linked",
+                        extra={"candidate_id": candidate.candidate_id, "notices": linked},
+                    )
             accepted += 1
             review += int(candidate.review_required)
         result = IntakeResult(batch.batch_id, accepted, review, updated)
@@ -70,6 +87,16 @@ class CandidateIntake:
             extra={"batch_id": batch.batch_id, "accepted": accepted, "crosswalks": updated},
         )
         return result
+
+    def link_incidents(self, c: ClosureCandidate, ids: set[str]) -> ClosureCandidate:
+        """공지 후보에 이미 저장된 돌발(같은 횡단보도·겹치는 시각) 근거를 더한다 (T6.1)."""
+        if c.source.value not in NOTICE_SOURCES or not ids:
+            return c
+        window, _ = self.engine.effective_window(c)
+        found = self.repo.linked_evidence(ids, window, Source.incident.value)
+        refs = {e.ref for e in c.evidence}
+        add = [e for e in found if e.ref not in refs]
+        return c.model_copy(update={"evidence": [*c.evidence, *add]}) if add else c
 
     def crosswalk_ids(self, c: ClosureCandidate) -> set[str]:
         g = c.geometry

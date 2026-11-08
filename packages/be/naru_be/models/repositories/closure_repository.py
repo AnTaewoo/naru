@@ -73,6 +73,61 @@ class ClosureRepository:
     def upsert(self, state: ClosureState, candidate_id: str) -> None:
         self.upsert_many([state], candidate_id)
 
+    def attach(
+        self,
+        crosswalk_ids: set[str],
+        window: Window,
+        sources: frozenset[str],
+        evidence: list[Evidence],
+    ) -> list[str]:
+        """같은 횡단보도·겹치는 시각인 그 출처 후보들의 모든 행에 근거를 더한다 (T6.1 — 돌발이
+        공지를 확인). 이미 있는 근거(같은 acc_id)는 건너뛴다. 붙인 후보 ID."""
+        e = ClosureStateEntity
+        start, end = to_utc_naive(window.start), to_utc_naive(window.end)
+        add = [ev.model_dump(mode="json") for ev in evidence]
+        with self._sessions.begin() as s:
+            hits = s.execute(
+                select(e.candidate_id, e.window_start, e.window_end).where(
+                    e.crosswalk_id.in_(crosswalk_ids), e.source.in_(sources)
+                )
+            ).all()
+            linked = sorted({c for c, ws, we in hits if _overlaps(ws, we, start, end)})
+            for row in s.scalars(select(e).where(e.candidate_id.in_(linked))) if linked else ():
+                have = {_ev_key(ev) for ev in row.evidence}
+                new = [ev for ev in add if _ev_key(ev) not in have]
+                if new:
+                    row.evidence = [*row.evidence, *new]
+        return linked
+
+    def linked_evidence(
+        self, crosswalk_ids: set[str], window: Window, source: str
+    ) -> list[Evidence]:
+        """같은 횡단보도·겹치는 시각인 그 출처 행들의 근거 (공지가 돌발보다 늦게 올 때, T6.1).
+        엔진이 붙인 상태 전이·규칙 근거는 빼고, 같은 acc_id 는 한 번."""
+        e = ClosureStateEntity
+        start, end = to_utc_naive(window.start), to_utc_naive(window.end)
+        with self._sessions.begin() as s:
+            rows = s.execute(
+                select(e.window_start, e.window_end, e.evidence).where(
+                    e.crosswalk_id.in_(crosswalk_ids), e.source == source
+                )
+            ).all()
+        out: list[Evidence] = []
+        seen: set[str] = set()
+        for ws, we, evidence in rows:
+            if not _overlaps(ws, we, start, end):
+                continue
+            for ev in evidence:
+                detail = ev.get("detail")
+                engine_made = isinstance(detail, dict) and (
+                    "transition" in detail or "rule" in detail
+                )
+                if engine_made or _ev_key(ev) in seen:
+                    continue
+                seen.add(_ev_key(ev))
+                out.append(Evidence.model_validate(ev))
+        return out
+
     def active_at(self, t: datetime, bbox: Bbox) -> list[ClosureState]:
         """t 에 살아 있는 상태: window_start <= t <= window_end+grace, bbox 안. status 저장값."""
         return self.active_between(t, t, bbox)
@@ -158,6 +213,11 @@ class ClosureRepository:
                 for at in _source_times(key, evidence, notice):
                     if key not in latest or at > latest[key]:
                         latest[key] = at
+        heard = self._last_received(Source.incident.value)  # 돌발은 받은 시각(빈 배치·재전송 포함)
+        if heard is not None and heard > latest.get(Source.incident.value, heard):
+            latest[Source.incident.value] = heard
+        elif heard is not None:
+            latest.setdefault(Source.incident.value, heard)
         kst = {k: v.astimezone(KST) for k, v in latest.items()}
         # 키(ADR-011 C) ↔ 출처: topis_incident = incident(TOPIS 돌발),
         # topis_notice = topis(TOPIS 공지)
@@ -181,6 +241,19 @@ class ClosureRepository:
             return IntakeResult(
                 row.batch_id, row.accepted, row.review_required, row.crosswalks_updated, True
             )
+
+    def touch_batch(self, batch_id: str) -> None:
+        """같은 배치를 다시 받았다 — 받은 시각만 새로 (돌발 수신 시각 = data_as_of, T6.1)."""
+        with self._sessions.begin() as s:
+            row = s.get(CandidateBatchEntity, batch_id)
+            if row is not None:
+                row.received_at = datetime.now(UTC).replace(tzinfo=None, microsecond=0)
+
+    def _last_received(self, producer: str) -> datetime | None:
+        b = CandidateBatchEntity
+        with self._sessions.begin() as s:
+            at = s.scalar(select(func.max(b.received_at)).where(b.producer == producer))
+        return None if at is None else at.replace(tzinfo=UTC)
 
     def save_batch(self, result: IntakeResult, producer: str, produced_at: datetime) -> None:
         produced = to_utc_naive(produced_at)
@@ -274,3 +347,22 @@ def _source_times(source: str, evidence: object, notice: object) -> list[datetim
         if isinstance(at, str):
             out.append(datetime.fromisoformat(at))
     return out
+
+
+def _overlaps(
+    a_start: datetime | None,
+    a_end: datetime | None,
+    b_start: datetime | None,
+    b_end: datetime | None,
+) -> bool:
+    """두 창이 겹치나 (UTC naive, 끝 없음 = 열림)."""
+    return (a_end is None or b_start is None or b_start < a_end) and (
+        b_end is None or a_start is None or a_start < b_end
+    )
+
+
+def _ev_key(ev: dict[str, object]) -> str:
+    """근거 중복 키 — 돌발은 acc_id(원문 기록 파일이 바뀌어도 같은 돌발), 나머지는 종류·ref."""
+    detail = ev.get("detail")
+    acc = detail.get("acc_id") if isinstance(detail, dict) else None
+    return f"{ev.get('kind')}:{acc}" if acc else f"{ev.get('kind')}:{ev.get('ref')}"
