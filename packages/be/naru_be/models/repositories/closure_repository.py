@@ -20,7 +20,7 @@ from naru_be.config import Settings
 from naru_be.models.domain.types import IntakeResult
 from naru_be.models.entities.candidate_batch import CandidateBatchEntity
 from naru_be.models.entities.closure_state import ClosureStateEntity
-from naru_contracts import ClosureState, Evidence, Impact, Status, Window
+from naru_contracts import ClosureEvent, ClosureState, Evidence, Impact, Status, Window
 
 KST = timezone(timedelta(hours=9))
 Bbox = tuple[float, float, float, float]  # minLng, minLat, maxLng, maxLat
@@ -84,6 +84,41 @@ class ClosureRepository:
         )
         with self._sessions.begin() as s:
             return [self._state(row) for row in s.scalars(stmt)]
+
+    def events(self, bbox: Bbox | None = None) -> list[ClosureEvent]:
+        """(reason, window) 사건 묶음 — 서로 다른 횡단보도 수·범위·approx (INTERFACE §3.1, ADR-010).
+
+        bbox 면 그 안의 상태만 묶는다. 순서는 시작 늦은 것 먼저, 시작 없는 것은 끝.
+        """
+        e = ClosureStateEntity
+        stmt = select(
+            e.reason,
+            e.window_start,
+            e.window_end,
+            func.count(func.distinct(e.crosswalk_id)),
+            func.min(e.lng),
+            func.min(e.lat),
+            func.max(e.lng),
+            func.max(e.lat),
+            func.max(e.approx),
+        ).group_by(e.reason, e.window_start, e.window_end)
+        if bbox is not None:
+            stmt = stmt.where(e.lng.between(Decimal(str(bbox[0])), Decimal(str(bbox[2])))).where(
+                e.lat.between(Decimal(str(bbox[1])), Decimal(str(bbox[3])))
+            )
+        stmt = stmt.order_by(e.window_start.is_(None), e.window_start.desc(), e.reason)
+        with self._sessions.begin() as s:
+            rows = s.execute(stmt).all()
+        return [
+            ClosureEvent(
+                reason=reason,
+                window=Window(start=to_kst(start), end=to_kst(end)),
+                crosswalks=int(n),
+                bbox=(float(min_lng), float(min_lat), float(max_lng), float(max_lat)),
+                approx=bool(approx),
+            )
+            for reason, start, end, n, min_lng, min_lat, max_lng, max_lat, approx in rows
+        ]
 
     def count(self) -> int:
         with self._sessions.begin() as s:

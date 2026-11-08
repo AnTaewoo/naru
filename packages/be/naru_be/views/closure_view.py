@@ -11,12 +11,17 @@ from collections.abc import Sequence
 from flask import Response, jsonify
 
 from naru_be.views._time import evidence_kst, kst
-from naru_contracts import ClosureState, FeatureCollection
+from naru_contracts import ClosureEvent, ClosureEventsResponse, ClosureState, FeatureCollection
 from naru_contracts.closures_api import Feature, FeatureProperties, PointGeometry
 
 
 def render(states: Sequence[ClosureState]) -> Response:
     return jsonify(to_collection(states).model_dump(mode="json"))
+
+
+def render_events(events: Sequence[ClosureEvent]) -> Response:
+    """통제 사건 목록 (INTERFACE §3.1). 창은 +09:00 그대로, 계약이 순서를 검증한다."""
+    return jsonify(ClosureEventsResponse(events=list(events)).model_dump(mode="json"))
 
 
 def to_collection(states: Sequence[ClosureState]) -> FeatureCollection:
