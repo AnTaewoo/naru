@@ -1,4 +1,4 @@
-# INTERFACE.md — 파트 간 계약 v0.6
+# INTERFACE.md — 파트 간 계약 v0.7
 
 파트 경계의 단일 기준. 스키마를 바꾸면 **이 파일 먼저** 고치고, 하위호환이 깨지면 버전을 올린다. 변경은 ADR + 태우 승인.
 코드 구현은 `packages/contracts`(`naru_contracts`, pydantic v2) 하나뿐이다. 테스트가 이 문서의 예시 JSON 블록을 그대로 파싱하므로, 예시를 고치면 코드도 고쳐야 한다. FE 타입은 `make schema`로 생성한다.
@@ -75,18 +75,20 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 - 같은 `batch_id`를 다시 보내면 중복 적용하지 않는다(멱등). 재시도 안전.
 - 브라우저에서 부르지 않는다. Next.js rewrites 대상에서 `/internal/*`는 제외한다.
 
-## §2 BE → FE: `GET /route` (v0.6)
+## §2 BE → FE: `GET /route` (v0.7)
 
 **요청** `from=lat,lng` · `to=lat,lng` · `depart_at=ISO8601` · `mode=walk`  (FE는 같은 오리진 `/api/route`로 호출 → Next.js rewrites → Flask `/route`)
 
 **응답**
 ```json
 {
-  "route": {"type": "LineString", "coordinates": [[126.9751, 37.5658], [126.9769, 37.5725]]},
+  "route": {"type": "LineString", "coordinates": [[126.9751, 37.5658], [126.9760, 37.5690], [126.9764, 37.5700], [126.9769, 37.5725]]},
   "duration_s": 840,
   "distance_m": 1120,
   "legs": [
-    {"kind": "underpass", "name": "시청역 지하보도", "distance_m": 120}
+    {"kind": "sidewalk", "name": null, "distance_m": 450, "coord_range": [0, 1]},
+    {"kind": "underpass", "name": "시청역 지하보도", "distance_m": 120, "coord_range": [1, 2]},
+    {"kind": "sidewalk", "name": null, "distance_m": 550, "coord_range": [2, 3]}
   ],
   "avoided": [
     {"crosswalk_id": "<관리번호>", "status": "confirmed", "reason": "세종대로 전면통제", "until": "2027-03-21T11:15:00+09:00", "approx": false,
@@ -102,6 +104,7 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 ```
 - `baseline`은 같은 그래프에서 closures를 끈 경로. FE "통제 전후 비교"에 쓴다. 외부 API 아님.
 - `legs[].kind`로 FE가 아이콘·안내 문구를 고른다.
+- `legs[].coord_range: [i, j]` **필수** (v0.7, ADR-009) — `route.coordinates[i..j]`(양끝 포함)가 그 레그의 선. 레그는 경로를 빈틈없이 나눈다: 첫 레그 `i = 0`, 마지막 레그 `j = len(coordinates) − 1`, 이웃 레그는 경계 점을 공유(`legs[k].j == legs[k+1].i`), `i ≤ j`. 출발점·도착점 ↔ 그래프 노드 접근 구간은 `sidewalk` 레그에 들어가서 `Σ legs[].distance_m = distance_m`(1 m 안). FE는 `underpass`·`overpass` 레그 범위를 남색 터널로, 그 `coordinates[i]`에 입구 마커를 그린다.
 - `avoided[].evidence`는 §1의 evidence를 그대로 전달. `avoided[].approx`는 후보의 `approx` 그대로 (FE "약" 표시).
 
 ## §3 BE → FE: `GET /closures` (v0.6)
@@ -155,3 +158,4 @@ ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, �
 | 2026-11-06 | v0.5 | §1 geometry를 `point / line / segment / zone`으로 재정의, `segment`(from/to/via PlacePoint + road_class)·`notice_ref` 추가, source에 smpa/topis/news/seoul_press, Claude API 확정(ADR-007) | — |
 | 2026-11-07 | v0.6 | §1 `impact`(필수, blocks/unknown)·`toward`·`approx` 추가, unknown이면 confidence ≤ 0.65, §2 `avoided[].approx`, §3 properties `impact`·`approx`, §4 `impact` 행 (ADR-008) | 태우 승인 |
 | 2026-11-07 | v0.6 | §3 `at` 의미 보강: 진행 중 + 60분 안 시작 예정, status는 `at` 기준 재판정 (스키마 변경 없음) | 태우 결정 |
+| 2026-11-08 | v0.7 | §2 `legs[].coord_range` [i, j] 필수(route.coordinates 인덱스, 양끝 포함, 레그가 경로를 빈틈없이 나눔), 접근 구간을 sidewalk 레그로 셈해 Σ legs.distance_m = distance_m (ADR-009) | 태우 승인 |

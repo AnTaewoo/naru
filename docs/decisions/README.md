@@ -4,3 +4,4 @@
 Notion "결정 기록" DB와 동기화한다 (Notion이 팀용, 여기는 코드와 같이 움직이는 사본).
 - ADR-007 공지 파서는 Claude API (승인)
 - ADR-008 공지 파서 v2 출력(impact·toward·approx)을 BE가 받는 규칙 + INTERFACE v0.6 (승인, 2026-11-07)
+- ADR-009 경로 레그가 선의 어디인지 — `legs[].coord_range` + INTERFACE v0.7 (승인, 2026-11-08)
