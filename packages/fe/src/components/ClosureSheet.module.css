@@ -55,14 +55,17 @@
   border-radius: 50%;
 }
 
+/* 파서 제목은 길다 — 두 줄까지 (T5.9) */
 .rowTitle {
   font-size: 15px;
   font-weight: 600;
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   max-width: 100%;
+  line-height: 1.35;
 }
 
 .rowSub {
