@@ -10,6 +10,7 @@ T6.1: 기록 돌발(OA-13315 2026-11-07 15:40, 53건) → 집회 후보 9 → �
 """
 
 import logging
+import shutil
 import time
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta, timezone
@@ -36,6 +37,9 @@ ACCINFO_1107 = "data/recorded/incident/20261107T154053_AccInfo.json"  # 11/7 15:
 # 11/8 19:20 NoticeList — 볼 글 6건, 기록 재생으로 후보 0 (test_topis_feed). 운영 워커가 같은 폴더에
 # 새 기록을 쌓으므로 '가장 최근'이 아니라 이 파일로 고정
 TOPIS_1108 = "data/recorded/topis_notice/20261108T192013.json"
+# 서울경찰청 '오늘의 주요집회' 실제 PDF 3개(태우 2026-11-07 받음) — T6.6 은 임시 폴더로 복사
+SMPA_RAW = Path("data/raw/notices/smpa")
+SMPA_PDFS = [f"2611{d}) 오늘의 주요집회.pdf" for d in ("07(토", "08(일", "09(월")]
 
 
 @pytest.fixture(scope="module")
@@ -182,15 +186,19 @@ def test_incident_receipt_is_data_as_of(app: Flask) -> None:
     assert abs((datetime.now(UTC) - second).total_seconds()) < 5
 
 
-def test_loop_counts_failures_per_source(app: Flask, caplog: pytest.LogCaptureFixture) -> None:
+def test_loop_counts_failures_per_source(
+    app: Flask, caplog: pytest.LogCaptureFixture, tmp_path: Path
+) -> None:
     # 돌발만 live 로, 열린데이터광장 주소는 닫힌 포트 — 실제 연결 거부. 코스·공지는 실제 앱으로 간다
-    # TOPIS 공지(T6.4)는 기록 재생 — 후보가 없어 아무것도 안 보내고 실패도 없다
+    # TOPIS 공지(T6.4)는 기록 재생 — 후보가 없어 아무것도 안 보내고 실패도 없다. 경찰청 PDF
+    # inbox(T6.6)는 빈 임시 폴더 — 운영 inbox 의 PDF 를 테스트가 옮기면 안 된다
     loop, _ = _worker(
         app,
         NARU_INCIDENT_SOURCE="live",
         SEOUL_OPENDATA_KEY="naru-e2e-key",
         NARU_SEOUL_API_URL="http://127.0.0.1:9",
         NARU_TOPIS_RECORD=TOPIS_1108,
+        NARU_SMPA_DIR=str(tmp_path / "smpa"),
     )
     t0 = datetime(2026, 11, 8, 9, 0, tzinfo=UTC)
     with caplog.at_level(logging.WARNING, logger="naru_ai.worker"):
@@ -309,3 +317,30 @@ def test_topis_notice_confirmed_by_incident(app: Flask) -> None:
     assert {p["status"] for p in early} == {Status.scheduled}  # 창 05:00 전
     assert {(p["status"], p["confidence"]) for p in noon} == {(Status.confirmed, 0.8)}
     assert all(_kinds(p) == {"notice", "topis_incident"} for p in noon)
+
+
+def test_smpa_inbox_pdfs_to_closures_then_archived(app: Flask, tmp_path: Path) -> None:
+    # T6.6: 태우가 inbox 에 넣은 실제 PDF 3개(11/7 6행·11/8 3행·11/9 4행, 기준 작성 11/6
+    # 18:00) — 행은 기록 notice_v2 smpa-<날짜>-r<행>-u202611061800 13건 재생 → 후보 10(0.7 미만
+    # 2: 11/7 r05 0.65·11/8 r03 0.45). 보낸 뒤 <날짜>.pdf 로 옮기고, 옮긴 PDF 는 그날까지 다시
+    # 본다(같은 배치)
+    models: NaruModels = app.extensions["naru"]
+    models.repo.truncate()
+    smpa = tmp_path / "smpa"
+    (smpa / "inbox").mkdir(parents=True)
+    for name in SMPA_PDFS:
+        shutil.copy2(SMPA_RAW / name, smpa / "inbox" / name)
+    w, _ = _worker(app, NARU_SMPA_DIR=str(smpa))
+    eve = datetime(2026, 11, 6, 20, 0, tzinfo=KST)
+    first = w.smpa_round(eve)
+    assert [(r.accepted, r.review_required, r.crosswalks_updated) for r in first] == [(10, 2, 38)]
+    assert sorted(p.name for p in smpa.glob("*.pdf")) == [f"2026110{d}.pdf" for d in (7, 8, 9)]
+    assert not list((smpa / "inbox").glob("*.pdf"))
+    assert len((smpa / "inbox_manifest.jsonl").read_text("utf-8").splitlines()) == 3
+    again = w.smpa_round(eve)
+    assert [r.batch_id for r in again] == [r.batch_id for r in first] and models.repo.count() == 38
+    # 11/7 15:30 — r01 동화면세점 고리 13·r04 시의회~숭례문R 24(공지 e2e 와 같은 후보 ID·
+    # 횡단보도 수) + r05 내자R~사직공원 의 끝점(사직공원) 1. 서초·여의도 행은 그래프 밖이라 0
+    at = _features(app, "2026-11-07T15:30:00+09:00")
+    rows = {ref.split("#")[1] for p in at for ref in _refs(p) if "#smpa-" in ref}
+    assert len(at) == 38 and rows == {f"smpa-20261107-r0{i}-u202611061800" for i in (1, 4, 5)}
