@@ -1,5 +1,5 @@
 // e2e 공용 — 콘솔 오류 모으기, 타일 출처가 다른 UI 에 가리지 않았는지
-import { expect, type Page } from "@playwright/test";
+import { expect, type Browser, type CDPSession, type Page } from "@playwright/test";
 
 export function consoleErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -40,4 +40,28 @@ export async function expandSheet(page: Page, name: string) {
     await sheet.getByRole("button", { name: "시트 높이" }).click();
     await expect(sheet).not.toHaveAttribute("data-stage", "collapsed");
   }
+}
+
+/**
+ * 이 페이지의 브라우저 컨텍스트에 위치 권한 '거부'를 건다 (T5.7). Playwright 는 허용만 줄 수 있고,
+ * 헤드리스 Chrome 은 권한을 안 주면 묻기만 하고 끝나지 않는다 — DevTools Protocol 로 거부한다.
+ * 세션을 닫으면(detach) 덮어쓴 권한이 풀리므로 테스트가 끝날 때까지 열어 둔다
+ */
+export async function denyGeolocation(browser: Browser, page: Page): Promise<CDPSession> {
+  const cdp = await browser.newBrowserCDPSession();
+  const { targetInfos } = await cdp.send("Target.getTargets");
+  const ids = new Set(
+    targetInfos
+      .filter((t) => t.type === "page" && t.url === page.url())
+      .map((t) => t.browserContextId),
+  );
+  expect(ids.size).toBe(1);
+  for (const browserContextId of ids) {
+    await cdp.send("Browser.setPermission", {
+      permission: { name: "geolocation" },
+      setting: "denied",
+      browserContextId,
+    });
+  }
+  return cdp;
 }

@@ -48,7 +48,8 @@ test("홈 → 길찾기 → 지도를 두 번 눌러 출발·도착 → 경로 �
   const errors = consoleErrors(page);
   await page.goto("/?t=2026-03-15T07:45:00+09:00");
   await page.getByRole("button", { name: "길찾기" }).click();
-  await expect(page.getByText("지도를 눌러 출발을 고르세요")).toBeVisible();
+  // 출발은 내 위치부터 찾는다(T5.7). 권한 대답이 없으면(헤드리스) 계속 찾는 중 — 지도를 누르면 그 점이 출발
+  await expect(page.getByRole("button", { name: "출발 내 위치 찾는 중…" })).toBeVisible();
   const canvas = page.locator("canvas.maplibregl-canvas");
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
