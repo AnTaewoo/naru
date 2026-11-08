@@ -11,7 +11,13 @@ from collections.abc import Sequence
 from flask import Response, jsonify
 
 from naru_be.views._time import evidence_kst, kst
-from naru_contracts import ClosureEvent, ClosureEventsResponse, ClosureState, FeatureCollection
+from naru_contracts import (
+    ClosureEvent,
+    ClosureEventsResponse,
+    ClosureState,
+    DataAsOf,
+    FeatureCollection,
+)
 from naru_contracts.closures_api import Feature, FeatureProperties, PointGeometry
 
 
@@ -20,10 +26,12 @@ def render(states: Sequence[ClosureState]) -> Response:
 
 
 def render_events(
-    events: Sequence[ClosureEvent], coverage: tuple[float, float, float, float]
+    events: Sequence[ClosureEvent],
+    coverage: tuple[float, float, float, float],
+    data_as_of: DataAsOf,
 ) -> Response:
-    """통제 사건 목록 + 보행망 bbox (INTERFACE §3.1 v0.10). 계약이 순서·범위를 검증한다."""
-    body = ClosureEventsResponse(events=list(events), coverage=coverage)
+    """통제 사건 + 보행망 bbox + 출처별 기준 시각 (INTERFACE §3.1 v0.12). 계약이 검증한다."""
+    body = ClosureEventsResponse(events=list(events), coverage=coverage, data_as_of=data_as_of)
     return jsonify(body.model_dump(mode="json"))
 
 
