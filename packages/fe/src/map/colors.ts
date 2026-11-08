@@ -10,6 +10,8 @@ export const COLORS = {
   zoneBg: "#efeafe",
   blue: "#2d6bff", // 경로·지하보도 입구
   blueBg: "#eaf1ff",
+  tunnel: "#16357f", // 시안 02 "남색 터널" — 지하보도·육교로 길을 건너는 구간 (ADR-009)
+  tunnelDash: "#9cc0ff", // 터널 위 점선
   ok: "#1f9d55", // released — 해제
   okBg: "#e6f6ec",
   gray: "#9a9a9a",

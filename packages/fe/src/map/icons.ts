@@ -1,7 +1,13 @@
-// 지도 아이콘 — 글리프(폰트) 서버 없이 캔버스로 그린다. × 확인 · ! 예정 · 빗금 예정 구역 (목업 01_home 범례)
+// 지도 아이콘 — 글리프(폰트) 서버 없이 캔버스로 그린다. × 확인 · ! 예정 · 빗금 예정 구역 · 파란 계단 지하보도 입구
+// (시안 01_home 범례)
 import { COLORS } from "./colors";
 
-export const ICON_IDS = { x: "naru-x", bang: "naru-bang", hatch: "naru-hatch" } as const;
+export const ICON_IDS = {
+  x: "naru-x",
+  bang: "naru-bang",
+  hatch: "naru-hatch",
+  entrance: "naru-entrance",
+} as const;
 export type IconId = (typeof ICON_IDS)[keyof typeof ICON_IDS];
 
 /** 레티나 대응 — 아이콘은 2배 크기로 그리고 pixelRatio 2 로 등록한다 */
@@ -58,10 +64,37 @@ export const drawHatch: Draw = (ctx, size) => {
   ctx.globalAlpha = 1;
 };
 
+/** 파란 원 + 흰 계단 — 지하보도·육교 입구 (ADR-009: 그 레그의 시작점) */
+export const drawEntrance: Draw = (ctx, size) => {
+  const r = size / 2;
+  ctx.fillStyle = COLORS.blue;
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = size * 0.07;
+  ctx.beginPath();
+  ctx.arc(r, r, r * 0.9, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // 계단 세 칸: 왼쪽 아래 → 오른쪽 위
+  const step = size * 0.16;
+  const x0 = size * 0.26;
+  const y0 = size * 0.72;
+  ctx.lineWidth = size * 0.09;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  for (let k = 0; k < 3; k++) {
+    ctx.lineTo(x0 + step * k, y0 - step * (k + 1));
+    ctx.lineTo(x0 + step * (k + 1), y0 - step * (k + 1));
+  }
+  ctx.stroke();
+};
+
 export const ICON_DRAWS: Record<IconId, { draw: Draw; size: number }> = {
   [ICON_IDS.x]: { draw: drawX, size: ICON_SIZE },
   [ICON_IDS.bang]: { draw: drawBang, size: ICON_SIZE },
   [ICON_IDS.hatch]: { draw: drawHatch, size: HATCH_SIZE },
+  [ICON_IDS.entrance]: { draw: drawEntrance, size: ICON_SIZE },
 };
 
 /** 브라우저에서만 — 캔버스에 그려 ImageData 로. 2D 컨텍스트가 없으면 null */
