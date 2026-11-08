@@ -35,6 +35,8 @@ export interface EvidenceRow {
   when: string;
   text: string;
   kind: EvidenceKind;
+  /** 출처 배지 — 문장이 이미 그 말을 하면(예: "서울경찰청 집회 공지") 같은 말을 또 쓰지 않는다 */
+  source: string | null;
 }
 
 export interface EvidenceGroup {
@@ -87,7 +89,8 @@ export function evidenceGroups(
       const text = evidenceTextKo(e, t);
       const key = `${e.kind}|${e.at}|${text}`;
       if (g.evidence.some((r) => r.key === key)) continue;
-      g.evidence.push({ key, at: e.at, when: whenKo(e.at, t), text, kind: e.kind });
+      const source = text.includes(EVIDENCE_KO[e.kind]) ? null : EVIDENCE_KO[e.kind];
+      g.evidence.push({ key, at: e.at, when: whenKo(e.at, t), text, kind: e.kind, source });
     }
   }
   return [...groups.values()]
@@ -130,7 +133,11 @@ export function EvidencePopover({ route }: { route: RouteResponse }) {
               <Fragment key={e.key}>
                 <span className={styles.when}>{e.when}</span>
                 <span>{e.text}</span>
-                <span className={`${styles.badge} ${styles.gray}`}>{EVIDENCE_KO[e.kind]}</span>
+                {e.source ? (
+                  <span className={`${styles.badge} ${styles.gray}`}>{e.source}</span>
+                ) : (
+                  <span aria-hidden /> // 세 칸 격자를 맞춘다
+                )}
               </Fragment>
             ))}
           </div>
