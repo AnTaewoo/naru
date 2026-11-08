@@ -19,7 +19,13 @@ from naru_contracts.closure import (
     Window,
     ZoneGeom,
 )
-from naru_contracts.closures_api import ClosuresQuery, FeatureCollection
+from naru_contracts.closures_api import (
+    ClosureEvent,
+    ClosureEventsQuery,
+    ClosureEventsResponse,
+    ClosuresQuery,
+    FeatureCollection,
+)
 from naru_contracts.enums import (
     ClosureType,
     EvidenceKind,
@@ -39,6 +45,9 @@ __all__ = [
     "CandidateBatch",
     "CandidateBatchResponse",
     "ClosureCandidate",
+    "ClosureEvent",
+    "ClosureEventsQuery",
+    "ClosureEventsResponse",
     "ClosureState",
     "ClosureType",
     "ClosuresQuery",

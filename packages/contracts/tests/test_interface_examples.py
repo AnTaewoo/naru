@@ -3,6 +3,8 @@
 문서의 ```json 블록을 그대로 model_validate 한다. 문서가 바뀌면(블록 수·예시·enum 표) 여기가 깨진다.
 §3 `/closures` 예시는 자리표시자(`...`)가 있어 JSON이 아니다 — 2026-11-07 태우에게 보고, 검증 안 함.
 §1.1 요청 예시도 candidates 가 자리표시자라 §1 후보를 끼워서 검증한다.
+§3.1 `/closures/events` 예시(v0.8, ADR-010)는 2026-11-08 개발 DB 의 실제 사건 두 개
+(bbox 는 소수 4자리).
 """
 
 from __future__ import annotations
@@ -20,6 +22,8 @@ from naru_contracts import (
     CandidateBatch,
     CandidateBatchResponse,
     ClosureCandidate,
+    ClosureEventsQuery,
+    ClosureEventsResponse,
     ErrorBody,
     Evidence,
     EvidenceKind,
@@ -63,8 +67,9 @@ def _json(i: int) -> dict[str, Any]:
     return data
 
 
-def test_document_has_six_json_blocks() -> None:
-    assert [s for s, _ in BLOCKS] == ["§1", "§1", "§1", "§2", "§3", "§6"]
+def test_document_has_seven_json_blocks() -> None:
+    # §1.1·§3.1 은 ### 소제목이라 상위 § 로 잡힌다
+    assert [s for s, _ in BLOCKS] == ["§1", "§1", "§1", "§2", "§3", "§3", "§6"]
 
 
 def test_closure_candidate_example() -> None:  # §1
@@ -117,7 +122,7 @@ def test_route_response_example() -> None:  # §2
 
 
 def test_error_body_example() -> None:  # §6
-    e = ErrorBody.model_validate(_json(5))
+    e = ErrorBody.model_validate(_json(6))
     assert e.error.code == "invalid_query" and e.error.field == "depart_at"
     assert set(ErrorCode.__args__) == {
         "invalid_query",
@@ -267,3 +272,39 @@ def test_route_legs_must_partition_route() -> None:  # §2 v0.7, ADR-009
         RouteResponse.model_validate({**raw, "legs": [{"kind": "sidewalk", "distance_m": 1120}]})
     # 레그가 없으면 규칙 없음 (출발·도착이 같은 노드)
     assert RouteResponse.model_validate({**raw, "legs": []}).legs == []
+
+
+def test_closure_events_example() -> None:  # §3.1 v0.8, ADR-010
+    r = ClosureEventsResponse.model_validate(_json(5))
+    assert [e.crosswalks for e in r.events] == [31, 6]
+    rally, seg1 = r.events
+    assert rally.reason.startswith("15:00~16:00 시의회~숭례문R")
+    assert seg1.reason == "marathon 1구간 세종대로 사거리~숭례문 오거리"
+    assert seg1.window.start is not None and seg1.window.start.utcoffset() is not None
+    assert seg1.window.start.isoformat() == "2026-03-15T07:20:00+09:00"
+    assert seg1.bbox == (126.9757, 37.5608, 126.9772, 37.5701) and seg1.approx is False
+    assert ClosureEventsResponse.model_validate(r.model_dump(mode="json")) == r
+
+
+def test_closure_events_rules() -> None:  # §3.1 — 순서·bbox·개수, 질의 bbox 는 선택
+    data = _json(5)
+    swapped = {"events": [data["events"][1], data["events"][0]]}
+    with pytest.raises(ValidationError, match="늦은 것 먼저"):
+        ClosureEventsResponse.model_validate(swapped)
+    no_start = {**data["events"][1], "window": {"end": data["events"][1]["window"]["end"]}}
+    ClosureEventsResponse.model_validate(
+        {"events": [data["events"][0], no_start]}
+    )  # start 없으면 끝
+    with pytest.raises(ValidationError, match="늦은 것 먼저"):
+        ClosureEventsResponse.model_validate({"events": [no_start, data["events"][0]]})
+    bad_bbox = {**data["events"][1], "bbox": [126.9772, 37.5608, 126.9757, 37.5701]}
+    with pytest.raises(ValidationError, match="bbox"):
+        ClosureEventsResponse.model_validate({"events": [bad_bbox]})
+    with pytest.raises(ValidationError):
+        ClosureEventsResponse.model_validate({"events": [{**data["events"][1], "crosswalks": 0}]})
+    with pytest.raises(ValidationError):
+        ClosureEventsResponse.model_validate(
+            {"events": [{**data["events"][1], "status": "confirmed"}]}
+        )
+    assert ClosureEventsQuery().bbox is None
+    assert ClosureEventsQuery.model_validate({"bbox": "126.965,37.555,126.990,37.580"}).bbox

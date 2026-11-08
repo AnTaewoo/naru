@@ -21,6 +21,8 @@ from naru_contracts import (
     CandidateBatch,
     CandidateBatchResponse,
     ClosureCandidate,
+    ClosureEventsQuery,
+    ClosureEventsResponse,
     ClosuresQuery,
     ClosureState,
     ErrorBody,
@@ -38,6 +40,8 @@ MODELS = (
     RouteResponse,
     ClosuresQuery,
     FeatureCollection,
+    ClosureEventsQuery,
+    ClosureEventsResponse,
     ErrorBody,
 )
 OUT_DIR = Path("packages/fe/src/types")
