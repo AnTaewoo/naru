@@ -1,5 +1,6 @@
 // `make dev` 뒤 `pnpm e2e`. 실제 Flask(:5000, 개발 DB) + Next(:3000) 끝에서 끝으로 (CONVENTIONS §5.7-3)
 import { expect, test } from "@playwright/test";
+import { expectAttributionUncovered } from "./helpers";
 
 test("홈이 열린다", async ({ page }) => {
   await page.goto("/");
@@ -38,8 +39,8 @@ test("통제 중 시각(?t=…+09:00) — 지도 캔버스·워커·통제 시�
   await expect(page.getByText(/횡단보도 \d+곳 통제 중/)).toBeVisible();
   await expect(page.getByText("마라톤 1구간 세종대로 사거리~숭례문 오거리")).toBeVisible();
   await expect(page.getByText("23분 뒤 해제")).toBeVisible(); // 1구간 08:08 해제 — 배지가 잘리지 않는다
-  // 타일 출처 — VWorld 키 전까진 OSM, 하단 시트에 가리지 않게 위쪽에 펼쳐 둔다
-  await expect(page.getByRole("link", { name: "© OpenStreetMap contributors" })).toBeVisible();
+  // 타일 출처 — VWorld 키 전까진 OSM. 길찾기 바·칩·하단 시트에 가리지 않는다
+  await expectAttributionUncovered(page);
   await page.waitForTimeout(2500); // 타일·심볼이 그려질 시간 (스크린샷용)
   await page.screenshot({ path: "test-results/home-0745.png" });
   // 콘솔 오류 없음 — 워커·WebGL·하이드레이션 불일치 포함. 배경 타일 서버 오류(외부)만 뺀다
