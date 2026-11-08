@@ -15,6 +15,7 @@ import { countByStatus } from "../map/layers/closureLayer";
 import { useClosures } from "../state/ClosureProvider";
 import { useTime } from "../state/TimeProvider";
 import type { EvidenceKind, FeatureCollection, Status } from "../types/contracts";
+import { BottomSheet, type SheetStage } from "./BottomSheet";
 import { ClosureEvents } from "./ClosureEvents";
 import styles from "./ClosureSheet.module.css";
 import { ClosureTimeline } from "./ClosureTimeline";
@@ -85,8 +86,18 @@ export function ClosureSheet() {
   const { t, ready } = useTime();
   const rows = useMemo(() => closureRows(closures), [closures]);
   const counts = useMemo(() => countByStatus(closures), [closures]);
-  // 통제 불러오기 목록을 펼쳤나 (T5.4)
+  // 통제 불러오기 목록을 펼쳤나 (T5.4). 시트는 절반에서 시작 (T5.6)
   const [picking, setPicking] = useState(false);
+  const [stage, setStage] = useState<SheetStage>("half");
+  const openList = () => {
+    setPicking(true);
+    setStage("full"); // 목록은 길다
+  };
+  // 고르면 시트를 접고 지도가 그 통제 범위로 맞춘다 (ClosureEvents 가 focus 를 보낸다)
+  const picked = () => {
+    setPicking(false);
+    setStage("collapsed");
+  };
   // 서버 렌더·하이드레이션 중엔 "오늘" — 시각이 정해진 뒤에야 지금과 비교한다
   const title = ready ? sheetTitleKo(t, Date.now()) : "오늘 통제";
   const subtitle = !ready
@@ -95,8 +106,7 @@ export function ClosureSheet() {
       ? `${hhmm(t)} 기준 통제 없음`
       : `${hhmm(t)} 기준 · 횡단보도 ${counts.confirmed}곳 통제 중, ${counts.scheduled}곳 예정`;
   return (
-    <section className={styles.sheet} aria-label={title}>
-      <div className={styles.handle} />
+    <BottomSheet label={title} stage={stage} onStage={setStage}>
       <div className={styles.pad}>
         <div className={styles.head}>
           <div className={styles.title}>{title}</div>
@@ -104,7 +114,7 @@ export function ClosureSheet() {
             type="button"
             className={styles.load}
             aria-pressed={picking}
-            onClick={() => setPicking((v) => !v)}
+            onClick={() => (picking ? setPicking(false) : openList())}
           >
             통제 불러오기
           </button>
@@ -119,7 +129,7 @@ export function ClosureSheet() {
         </div>
       </div>
       {picking ? (
-        <ClosureEvents focusMap onDone={() => setPicking(false)} />
+        <ClosureEvents focusMap onDone={picked} />
       ) : (
         <>
           <ClosureTimeline />
@@ -147,7 +157,7 @@ export function ClosureSheet() {
             {rows.length === 0 && (
               <p className={styles.empty}>
                 이 시각에 걸린 통제가 없어요.{" "}
-                <button type="button" className={styles.inline} onClick={() => setPicking(true)}>
+                <button type="button" className={styles.inline} onClick={openList}>
                   통제 불러오기
                 </button>
               </p>
@@ -155,6 +165,6 @@ export function ClosureSheet() {
           </div>
         </>
       )}
-    </section>
+    </BottomSheet>
   );
 }

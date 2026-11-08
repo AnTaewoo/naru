@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LEG_KO, distanceKo, hhmm, routeErrorKo, routeNoteKo } from "../i18n/ko";
-import { CROSSING_KINDS } from "../map/layers/routeLayer";
+import { CROSSING_KINDS, routeOdKey } from "../map/layers/routeLayer";
 import { useRoute } from "../state/RouteProvider";
 import { useTime } from "../state/TimeProvider";
 import type { LegKind, RouteResponse } from "../types/contracts";
+import { BottomSheet, type SheetStage } from "./BottomSheet";
 import { ClosureEvents } from "./ClosureEvents";
 import { EvidencePopover } from "./EvidencePopover";
 import { LegList } from "./LegList";
@@ -94,13 +95,21 @@ export function RouteCard() {
   const { status, route, errorCode, at } = useRoute();
   const { t } = useTime();
   const [panel, setPanel] = useState<Panel>(null);
-  const toggle = (p: Exclude<Panel, null>) => setPanel((v) => (v === p ? null : p));
+  const [stage, setStage] = useState<SheetStage>("half");
+  // 새 출발·도착의 첫 경로가 오면 시트를 접는다 — 지도가 경로 전체를 보여 준다 (T5.6, MapView 와 같은 키)
+  const odKey = routeOdKey(route);
+  useEffect(() => {
+    if (odKey) setStage("collapsed");
+  }, [odKey]);
+  const toggle = (p: Exclude<Panel, null>) => {
+    if (panel !== p) setStage("full"); // 경로 상세·통제 근거·통제 목록은 길다
+    setPanel(panel === p ? null : p);
+  };
   const fast = route ? fastestCard(route, at ?? t) : null;
   const orig = route ? originalCard(route) : null;
   const hasAvoided = (route?.avoided.length ?? 0) > 0;
   return (
-    <section className={styles.sheet} aria-label="길찾기 결과">
-      <div className={styles.handle} />
+    <BottomSheet label="길찾기 결과" stage={stage} onStage={setStage}>
       {route && fast ? (
         <>
           <div className={styles.cards}>
@@ -187,6 +196,6 @@ export function RouteCard() {
       {route && panel === "legs" && <LegList route={route} />}
       {route && hasAvoided && panel === "evidence" && <EvidencePopover route={route} />}
       {panel === "events" && <ClosureEvents focusMap={false} onDone={() => setPanel(null)} />}
-    </section>
+    </BottomSheet>
   );
 }

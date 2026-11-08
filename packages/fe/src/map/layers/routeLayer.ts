@@ -103,6 +103,15 @@ export function baselineLine(route: RouteResponse | null): Collection<LineFeatur
   };
 }
 
+/**
+ * 경로의 첫·끝 좌표 = 출발·도착 (ADR-009 접근 구간 포함). 새 출발·도착의 첫 경로를 알아본다 —
+ * 지도 맞춤(MapView)·시트 접기(RouteCard)가 같은 키를 쓴다 (T5.6)
+ */
+export function routeOdKey(route: RouteResponse | null): string | null {
+  const coords = route ? lineCoordinates(route.route) : [];
+  return coords.length ? JSON.stringify([coords[0], coords[coords.length - 1]]) : null;
+}
+
 /** 경로와 원래 길을 모두 담는 [[서, 남], [동, 북]] — 지도를 맞출 때 */
 export function routeBounds(route: RouteResponse | null): [LngLat, LngLat] | null {
   if (!route) return null;
