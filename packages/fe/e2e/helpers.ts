@@ -10,9 +10,15 @@ export function consoleErrors(page: Page): string[] {
   return errors;
 }
 
-/** 배경 타일 서버 오류(외부)만 뺀다 */
+/**
+ * 배경 타일 서버 오류(외부)와 지오코딩 503 을 뺀다. e2e 의 BE 는 카카오 기록 재생이라 기록에 없는 점
+ * (지도를 누른 곳)의 주소는 503 이고 화면은 "선택한 위치"로 넘어간다 — INTERFACE §6 에서 503 은
+ * geocode_unavailable 뿐이다 (T5.8)
+ */
 export function ownErrors(errors: string[]): string[] {
-  return errors.filter((e) => !/tile\.openstreetmap|api\.vworld/i.test(e));
+  return errors.filter(
+    (e) => !/tile\.openstreetmap|api\.vworld/i.test(e) && !/status of 503/.test(e),
+  );
 }
 
 /** 보이기만 하는 게 아니라 가리지 않았나 — 링크 왼쪽·가운데·오른쪽 점의 맨 위 요소가 그 링크인지 */
