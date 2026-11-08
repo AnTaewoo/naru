@@ -1,20 +1,30 @@
 "use client";
 
-import { useNaruApi } from "../state/ApiProvider";
+import dynamic from "next/dynamic";
+import { useCallback, useState } from "react";
+import type { Status } from "../types/contracts";
+import { ClosureSheet } from "./ClosureSheet";
+import { CHIP_STATUSES, LayerChips } from "./LayerChips";
 import styles from "./NaruApp.module.css";
 
-// 'use client' 경계 2/2 — 화면 루트. MapView 는 T5.1 에서 next/dynamic(ssr: false) 로 여기서 부른다.
+// 'use client' 경계 2/2 — 화면 루트. maplibre 는 window 가 필요해 ssr: false 로 여기서만 부른다 (§5.3)
+const MapView = dynamic(() => import("../map/MapView"), {
+  ssr: false,
+  loading: () => <div className={styles.mapLoading}>지도 불러오는 중…</div>,
+});
+
 export function NaruApp() {
-  const api = useNaruApi();
+  const [visible, setVisible] = useState<readonly Status[]>(CHIP_STATUSES);
+  const toggle = useCallback(
+    (s: Status) => setVisible((v) => (v.includes(s) ? v.filter((x) => x !== s) : [...v, s])),
+    [],
+  );
   return (
     <main className={styles.app}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>나루</h1>
-        <p className={styles.subtitle}>마라톤·집회로 막힌 횡단보도, 지하도·육교로 건너는 길</p>
-      </header>
-      <section className={styles.panel} aria-label="상태">
-        <p className={styles.meta}>BE 연결: 같은 오리진 {api.baseUrl} (Next.js rewrites → Flask)</p>
-      </section>
+      <h1 className={styles.srOnly}>나루</h1>
+      <MapView visible={visible} />
+      <LayerChips visible={visible} onToggle={toggle} />
+      <ClosureSheet />
     </main>
   );
 }
