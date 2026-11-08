@@ -189,3 +189,9 @@
 - 정한 것: 전체를 88% 로 두면 손잡이가 출발·도착 패널 밑에 깔려 못 접음 → 위 UI 아래까지. 시각만 바뀌면 안 접음. 목록·경로 상세·근거는 전체로. 맞춤 아래 여백 = 접힌 시트 + 24px. 모바일 기준 640px, 푸터 e2e 는 데스크톱 폭
 - 막힌 것 / 태우 대기: 공개 반영은 `sudo systemctl restart naru`
 - 커밋: 18b8658 b9b3b5c 075a0f5 134a09a 89aa35a / 이 항목의 커밋
+
+## 2026-11-08 · T5.7 DONE
+- 한 것: 내 위치 — 길찾기를 켜면 출발 기본값 "내 위치"(권한 대답 없음·거부·실패·보행망 밖이면 칸은 비우고 시트 안내, 지도 누르기는 언제나 먹음), 출발·도착 칸 옆 내 위치 버튼, 지도 오른쪽 위 GeolocateControl(파란 점, 밖이면 6초 안내), maplibre 컨트롤 한국어. 범위는 `/closures/events` 의 `coverage`(INTERFACE v0.10, ADR-011 C 의 앞부분 — 보행망 노드 bbox). e2e 23(내 위치 6 포함)
+- 정한 것: 범위 밖 위치는 칸에 안 넣음, 범위를 아직 모르면 넣고 BE 판정. 자동 찾기는 길찾기를 켤 때만(주소창에 출발이 있으면 안 함). 받으면 지도를 그 점으로. 위치 옵션 정확도 우선·15초·1분 재사용. e2e 의 권한 거부는 DevTools Protocol `Browser.setPermission`(세션을 닫으면 풀려서 테스트 끝까지 연다)
+- 막힌 것 / 태우 대기: 공개 반영은 `sudo systemctl restart naru`. 작업 중 `git pull --rebase --autostash origin main` 으로 develop 커밋 해시가 전부 바뀜(내용 같음) — 앞 항목들의 커밋 해시는 rebase 전 값. e2e 라이선스 테스트 1회 실패(링크를 지도 래퍼가 가림, 재실행 5회 통과, trace 는 지워짐)
+- 커밋: c7e7b74 e2fdac2 29541d9 0615a70 54177a2 d1e715f cb85ffd 4fca075 832eeff / 이 항목의 커밋

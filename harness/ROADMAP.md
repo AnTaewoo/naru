@@ -261,12 +261,12 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 산출: 손잡이를 pointer 이벤트로 드래그(touch-action: none, user-select: none — 지금은 끌면 글자만 선택된다). 단계 3개: 접힘(약 96px) / 절반 / 전체, 놓으면 가까운 단계로. 손잡이 탭은 접힘↔절반. 경로를 찾으면 시트를 접힘으로 내리고 경로 전체에 fitBounds(padding 위 = 검색창, 아래 = 시트 높이 — 지금은 지도가 140px 띠로 줄고 경로가 화면 밖). 이벤트를 누르면 그 이벤트 횡단보도 전체에 fitBounds(지금은 서울 전체로 줌아웃되고 지점이 시트 뒤에 가려짐). 모바일에서 하단 푸터 숨김(지도 attribution 에 고지 링크가 이미 있음), 지도 로딩 중 회색 대신 로딩 표시
 
 ### T5.7 내 위치 ★
-- status: DOING
+- status: DONE
 - depends: T5.6
 - 산출: maplibre GeolocateControl + 출발 기본값 "내 위치"(거부·실패 시 지도 탭). 출발·도착 칸 옆 "내 위치" 버튼. 커버리지 밖이면 안내
 
 ### T5.8 주소·검색 ★ (결정 B)
-- status: TODO
+- status: DOING
 - depends: T5.7
 - 산출: 지도 탭으로 고른 점은 `/geocode/reverse` 로 도로명 주소 표시, 좌표는 화면에 안 보이게, 실패 시 "선택한 위치". 출발·도착 칸을 진짜 입력칸으로 — 2글자 이상, 300ms 디바운스로 `/geocode/search`, 결과에서 고르면 칸에 들어감. 맨 위 검색창 결과마다 "출발" "도착" 버튼
 - 테스트: `data/recorded/kakao/` 재생
