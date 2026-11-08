@@ -1,7 +1,8 @@
 # ADR-011 실서버 운영 결정 묶음 — 라우터 비용·그래프 밖·지오코딩·데이터 신선도·운영 워커 live·외부 수집
 - 상태: **승인** (2026-11-08, 태우) — naru.antaewoo.com 을 실제로 눌러 보고 실서버 API 를 직접 불러 본 뒤 "승인한 결정 — ADR 하나에 묶어서 초안". A 의 창 밖 처리는 같은 날 질문으로 확정("창 안에서만 +300초")
 - 개정 대상: INTERFACE §2(avoided 표기)·§3.1(coverage·data_as_of)·§5(라우터 반응)·§6(`out_of_coverage`)·§7(지오코딩, 새로), ARCHITECTURE 상태기계 표의 Router 칸, `.claude/CLAUDE.md` §2(운영 워커 상한)
-- 구현 Task: A·A′ → T5.5, B → T5.8, C → T5.9, D·E → T6.1·T6.2·T6.4
+- 구현 Task: A·A′ → T5.5, B → T5.8, C → T5.9, D·E → T6.1·T6.4·T6.6 (ADR-013 으로 P6 번호가 두 칸 밀림)
+- 보충: E 의 "robots.txt·같은 곳 최소 10분"은 웹 페이지 수집에만 — 키로 쓰는 공개 API 는 그 한도와 우리 일 상한 (ADR-013 H, 태우 2026-11-08)
 
 ## 맥락 (실서버에서 본 것, 2026-11-08)
 - 잠실 3/15 10:00 요청(37.5133,127.0980 → 37.5145,127.1035)이 그래프 밖인데 먼 노드에 붙어 16.9 km·14,118초 경로가 나왔다
@@ -34,4 +35,4 @@ E. **외부 수집** — robots.txt 를 지킨다. 같은 곳 요청 간격은 �
 - T5.5: 라우터 비용·`out_of_coverage`, INTERFACE §5·§6, ARCHITECTURE 표, 회귀 테스트 3개, recorded 재기록(3/15 04:30 경로는 원래 길로 바뀐다)
 - T5.8: INTERFACE §7, contracts, BE Geocoder, recorded kakao
 - T5.9: INTERFACE §3.1 coverage·data_as_of
-- T6.1·T6.2·T6.4: 워커 live·수집 규칙, CLAUDE.md §2 한 줄
+- T6.1·T6.4·T6.6: 워커 live·수집 규칙, CLAUDE.md §2 한 줄
