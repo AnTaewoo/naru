@@ -1,13 +1,26 @@
 // reducer 단독 (순수 함수) — Time·Closure·Route, 라벨
 import { describe, expect, it } from "vitest";
-import { LEG_KO, distanceKo, hhmm, josaRo, reasonKo, untilKo, whenKo, windowKo } from "../i18n/ko";
+import {
+  LEG_KO,
+  dateKo,
+  dayKo,
+  distanceKo,
+  hhmm,
+  josaRo,
+  reasonKo,
+  sheetTitleKo,
+  untilKo,
+  whenKo,
+  windowKo,
+} from "../i18n/ko";
 import type { LngLat } from "../map/layers/routeLayer";
 import type { ErrorBody } from "../types/contracts";
-import { recorded, recordedClosures, recordedRoute } from "../test/recorded";
+import { recorded, recordedClosures, recordedEvents, recordedRoute } from "../test/recorded";
 import {
   DEFAULT_BBOX,
   EMPTY_CLOSURES,
   closureReducer,
+  eventBbox,
   initialClosureState,
 } from "./ClosureProvider";
 import {
@@ -226,5 +239,43 @@ describe("길찾기 라벨", () => {
     expect(whenKo(ev[0]?.at, T745)).toBe("3/12 16:07");
     expect(whenKo(ev[1]?.at, T745)).toBe("08:08");
     expect(whenKo(null, T745)).toBe("—");
+  });
+});
+
+// recorded naru_api/closure_events.json — 11/7 집회 2(15:00·12:00 시작) + 3/15 마라톤 5, 시작 늦은 순
+const events = recordedEvents().events;
+
+describe("closureReducer — 통제 사건·지도 맞춤 (T5.4)", () => {
+  it("receiveEvents 로 목록, focus 는 누를 때마다 순번이 올라 같은 사건도 다시 맞춘다", () => {
+    const s0 = initialClosureState();
+    expect(s0.events).toBeNull();
+    expect(s0.focus).toBeNull();
+    const s1 = closureReducer(s0, { type: "receiveEvents", events });
+    expect(s1.events).toBe(events);
+    const bbox = events[0] ? eventBbox(events[0]) : null;
+    if (!bbox) throw new Error("기록 사건에 bbox 가 없다");
+    const f1 = closureReducer(s1, { type: "focus", bbox });
+    expect(f1.focus).toEqual({ bbox, seq: 1 });
+    expect(closureReducer(f1, { type: "focus", bbox }).focus?.seq).toBe(2);
+    // 실제 Flask 오류 문구 (recorded naru_api/error_not_found.json)
+    const err = recorded("error_not_found").body as ErrorBody;
+    const failed = closureReducer(s1, { type: "failEvents", error: err.error.message });
+    expect(failed.events).toBe(events); // 실패해도 받아 둔 목록은 그대로
+    expect(failed.eventsError).toBe(err.error.message);
+  });
+});
+
+describe("날짜 라벨 (T5.4)", () => {
+  it("dateKo·dayKo — KST 날짜와 요일", () => {
+    expect(dayKo(events[0]?.window.start)).toBe("11월 7일 (토)"); // 2026-11-07 15:00 집회
+    expect(dateKo(T745)).toBe("3월 15일");
+    expect(dayKo(T745)).toBe("3월 15일 (일)"); // 서울마라톤 일요일 (MANIFEST course)
+    expect(dayKo(null)).toBe("시간 미정");
+  });
+
+  it("sheetTitleKo — 기준 시각이 지금과 같은 날(KST)이면 '오늘 통제', 아니면 그 날짜", () => {
+    const rallyMs = Date.parse(events[0]?.window.start ?? "");
+    expect(sheetTitleKo(T745, Date.parse(T1330))).toBe("오늘 통제"); // 같은 3/15
+    expect(sheetTitleKo(T745, rallyMs)).toBe("3월 15일 통제"); // 지금이 11/7 이면
   });
 });

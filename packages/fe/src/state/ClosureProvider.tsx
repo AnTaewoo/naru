@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { NaruApiError } from "../api/naruApiClient";
-import type { FeatureCollection } from "../types/contracts";
+import type { ClosureEvent, FeatureCollection } from "../types/contracts";
 import { useNaruApi } from "./ApiProvider";
 import { useTime } from "./TimeProvider";
 
@@ -25,13 +25,30 @@ export interface ClosureState {
   at: string | null;
   bbox: string;
   error: string | null;
+  /** 통제 불러오기 목록 (GET /closures/events, T5.4). null = 아직 못 받음 */
+  events: ClosureEvent[] | null;
+  eventsError: string | null;
+  /** 지도 맞춤 요청 — 같은 범위를 다시 눌러도 맞추도록 순번을 올린다 (MapView 가 본다) */
+  focus: { bbox: Bbox4; seq: number } | null;
+}
+
+/** [minLng, minLat, maxLng, maxLat] */
+export type Bbox4 = [number, number, number, number];
+
+/** 사건의 bbox (생성 타입이 unknown 튜플이라 숫자를 확인한다) */
+export function eventBbox(e: ClosureEvent): Bbox4 | null {
+  const [w, s, n1, n2] = e.bbox;
+  return [w, s, n1, n2].every((x) => typeof x === "number") ? ([w, s, n1, n2] as Bbox4) : null;
 }
 
 export type ClosureAction =
   | { type: "request"; at: string; bbox: string }
   | { type: "receive"; at: string; bbox: string; closures: FeatureCollection }
   | { type: "fail"; error: string }
-  | { type: "setBbox"; bbox: string };
+  | { type: "setBbox"; bbox: string }
+  | { type: "receiveEvents"; events: ClosureEvent[] }
+  | { type: "failEvents"; error: string }
+  | { type: "focus"; bbox: Bbox4 };
 
 export const EMPTY_CLOSURES: FeatureCollection = { type: "FeatureCollection", features: [] };
 /** 광화문 일대 — 데모 범위(BE Settings.districts 종로·중구) 안의 기본 bbox. 지도가 움직이면 setBbox */
@@ -44,6 +61,9 @@ export function initialClosureState(partial: Partial<ClosureState> = {}): Closur
     at: null,
     bbox: DEFAULT_BBOX,
     error: null,
+    events: null,
+    eventsError: null,
+    focus: null,
     ...partial,
   };
 }
@@ -65,6 +85,12 @@ export function closureReducer(state: ClosureState, action: ClosureAction): Clos
       return { ...state, status: "error", error: action.error };
     case "setBbox":
       return state.bbox === action.bbox ? state : { ...state, bbox: action.bbox };
+    case "receiveEvents":
+      return { ...state, events: action.events, eventsError: null };
+    case "failEvents":
+      return { ...state, eventsError: action.error };
+    case "focus":
+      return { ...state, focus: { bbox: action.bbox, seq: (state.focus?.seq ?? 0) + 1 } };
   }
 }
 
@@ -107,6 +133,21 @@ export function ClosureProvider({
       controller.abort();
     };
   }, [api, t, ready, bbox, fetchEnabled, debounceMs]);
+
+  // 통제 불러오기 목록 — 시각·범위와 상관없어 마운트 때 한 번 (ADR-010)
+  useEffect(() => {
+    if (!fetchEnabled) return;
+    const controller = new AbortController();
+    api
+      .events({}, controller.signal)
+      .then((r) => dispatch({ type: "receiveEvents", events: r.events }))
+      .catch((e: unknown) => {
+        if (controller.signal.aborted) return;
+        const msg = e instanceof NaruApiError ? e.message : "통제 목록을 받지 못했다";
+        dispatch({ type: "failEvents", error: msg });
+      });
+    return () => controller.abort();
+  }, [api, fetchEnabled]);
 
   const value = useMemo(() => state, [state]);
   return (
