@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from flask import current_app
 
 from naru_be.config import Settings
+from naru_be.models.domain.bus_intake import BusIntake
 from naru_be.models.domain.candidate_intake import CandidateIntake
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
@@ -28,6 +29,7 @@ class NaruModels:
     route_planner: RoutePlanner
     intake: CandidateIntake
     geocoder: Geocoder
+    bus_intake: BusIntake
 
 
 def naru_models() -> NaruModels:
