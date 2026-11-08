@@ -153,3 +153,9 @@
 - 정한 것: Node 18.20 → Next 16 불가, 15.5 고정(nvm 22 올리면 교체). BE 오리진 기본 127.0.0.1(Node 18 localhost=::1). maplibre 6.16(pnpm 공급망 정책). `@` 별칭 없음. output standalone
 - 막힌 것 / 태우 대기: 없음 — 게이트 .next 제외는 태우가 a61c1d4 로 반영, 확인 완료
 - 커밋: fcb9ec4, f480003, 9549bfc, a86bd36 / 이 항목의 커밋
+
+## 2026-11-08 · T5.1 DONE
+- 한 것: FE 홈 — TimeProvider(t·하루 범위·?t=·하이드레이션 ready)·ClosureProvider(t·bbox → /api/closures, 디바운스·Abort), closureLayer·zoneLayer(상태색 점 + ×/! 아이콘, 예정 구역 빗금), MapView(maplibre useRef, 워커 setWorkerUrl, OSM 타일·출처), ClosureTimeline·TimeSlider·LayerChips·ClosureSheet, ko 라벨. 고쳐(태우): ADR-009 `legs[].coord_range`(INTERFACE v0.7, contracts 검증기, BE `_build`, recorded 재기록) + routeLayer 남색 터널·입구 마커, 겹친 횡단보도 합침(07:45 79건 = 64곳, 확인 45·예정 19). vitest 29 · e2e 4(실제 Flask + next start + Chrome)
+- 정한 것: 터널 남색(시안 02), 접근 구간은 sidewalk 레그, 육교 포함, 입구는 들어가는 쪽만, 출처는 오른쪽 위에 펼침, 겹친 횡단보도는 무거운 상태·늦은 해제. VWorld 키 전까지 OSM, 고지 페이지는 T5.3(태우)
+- 막힌 것 / 태우 대기: VWorld 키(.env.local, 태우) — 레이어 이름·축 순서는 키 받은 뒤 확인. ARCHITECTURE 4·38행이 "INTERFACE v0.5"(지금 v0.7)
+- 커밋: 4902574 … 2e2f7d1 (20개), 1616eac / 이 항목의 커밋

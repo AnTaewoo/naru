@@ -223,13 +223,13 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 테스트: `pnpm check` 초록, `contracts.d.ts`에 `ClosureCandidate`·`RouteResponse`, `make dev`로 rewrites 확인
 
 ### T5.1 MapView + 통제 레이어 + 시간 슬라이더 ★
-- status: DOING
+- status: DONE
 - depends: T5.0
 - 산출: `components/NaruApp.tsx`, `map/MapView.tsx`(maplibre `useRef`, VWorld 타일), `state/{Time,Closure}Provider.tsx`, `map/layers/closureLayer.ts`(confirmed 빨강 ×, scheduled 노랑, zone 보라 빗금, 지하보도 입구 파랑), `components/TimeSlider.tsx`, `i18n/ko.ts` — 화면 구성은 `docs/mockups/01_home.html`(CONVENTIONS §5.9)
 - 테스트: recorded `/closures` → closureLayer feature 수·색 일치. reducer 단독. TimeSlider는 closures state 변경에 재렌더 안 됨
 
 ### T5.2 길찾기 — RouteProvider + 경로 레이어 + 카드 ★
-- status: TODO
+- status: DOING
 - depends: T5.1
 - 산출: `state/RouteProvider.tsx`, `map/layers/routeLayer.ts`(route 파란 실선, underpass 구간 남색, baseline 회색 점선), `components/{RouteCard,LegList,EvidencePopover}.tsx` — `docs/mockups/02_route.html`·`03_closure.html`의 카드·탭·바텀시트 구조 그대로(CONVENTIONS §5.9): 가장 빠른 길 / 원래 길(막힘·해제 시각) / 근거·확신도
 - 테스트: recorded 통제 중 `/route` → 카드 숫자·LegList 라벨이 응답과 일치
