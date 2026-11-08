@@ -230,6 +230,44 @@ def test_bus_round_saves_positions_for_notice_windows(app: Flask, worker: Ingest
     assert w.bus.watched(datetime(2026, 11, 7, 17, 0, tzinfo=KST)) == []
 
 
+def test_bus_second_priority_follows_rally_incidents(app: Flask, worker: IngestWorker) -> None:
+    """2순위(태우 2026-11-08) — TOPIS 집회·행사 돌발마다 노선 1개, 공지 노선과 겹치지 않게."""
+    worker.run_once()
+    w, _ = _worker(app, NARU_INCIDENT_RECORD=ACCINFO_1107)
+    w.incident_batch()  # 돌발 원문 → 2순위 대상
+    targets = {t.key: t.rally for t in w.incident_targets()}
+    # 기록 AccInfo 11/7 15:40 의 집회·행사(A10) 15건을 같은 링크·시각으로 묶은 13개
+    # (1108990~2 하나로) — 행사 3: 차 없는 거리 둘·축제
+    assert len(targets) == 13
+    assert [k for k, rally in sorted(targets.items()) if not rally] == [
+        "1107882",
+        "1107886",
+        "1108981",
+    ]
+    at = datetime(2026, 11, 7, 15, 30, tzinfo=KST)
+    notice = w.bus.watched(at)
+    picks = {key: route for route, key in w.bus.incident_routes(at, notice)}
+    # 링크 선 100 m 안 정류소가 많은 순(OA-1095), 집회·최근 시작 먼저 고른다. 1109106 은 172 를
+    # 먼저 시작한 1108990(15:00)이 가져가 402. 1108989(여의대로, 링크 기록 없음 → 점)는 노선 없음
+    assert picks == {
+        "1108990": "100100037",
+        "1108999": "100100036",
+        "1109106": "100100063",
+        "1109001": "100100029",
+        "1109079": "100100032",
+        "1109004": "100100537",
+        "1109026": "100100048",
+        "1108984": "100100075",
+        "1108983": "121900008",
+        "1107886": "100100416",
+        "1107882": "100100567",
+        "1108981": "100000026",
+    }
+    assert not set(picks.values()) & set(notice)
+    # 2순위 노선은 아직 실제 기록이 없다(T6.2 live 상한) — 지어내지 않고 건너뛰어 공지 6개만
+    assert [b.route_id for b in w.bus.batches(at)] == notice
+
+
 def test_bus_positions_need_token(app: Flask) -> None:
     resp = app.test_client().post("/internal/bus-positions", json={})
     assert resp.status_code == 401
