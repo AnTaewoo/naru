@@ -1,7 +1,7 @@
 "use client";
 
 import { hhmm } from "../i18n/ko";
-import { minutesFromDayStart, useTime, useTimeDispatch } from "../state/TimeProvider";
+import { kstIso, minutesFromDayStart, useTime, useTimeDispatch } from "../state/TimeProvider";
 import styles from "./TimeSlider.module.css";
 
 // 기준 시각 슬라이더 — Time state 만 읽는다 (closures 가 바뀌어도 재렌더되지 않는다, CONVENTIONS §5.5)
@@ -21,9 +21,21 @@ export function TimeSlider() {
       >
         −
       </button>
-      <label className={styles.track}>
+      <div className={styles.track}>
         <span className={styles.label}>
-          <span className={styles.day}>{day}</span>
+          <span className={styles.day}>
+            {day}
+            {/* 다른 날·시각을 보다가 지금으로 (T5.4 통제 불러오기의 짝) */}
+            <button
+              type="button"
+              className={styles.now}
+              aria-label="지금 시각으로"
+              disabled={!time.ready}
+              onClick={() => dispatch({ type: "set", t: kstIso(Date.now()) })}
+            >
+              지금
+            </button>
+          </span>
           <strong className={styles.time}>{time.ready ? hhmm(time.t) : "—"}</strong>
         </span>
         <input
@@ -38,7 +50,7 @@ export function TimeSlider() {
             dispatch({ type: "setMinutes", minutesFromDayStart: Number(e.currentTarget.value) })
           }
         />
-      </label>
+      </div>
       <button
         type="button"
         className={styles.step}

@@ -43,3 +43,20 @@
 .day {
   font-variant-numeric: tabular-nums;
 }
+
+.now {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border: 1px solid #d6d6d6;
+  border-radius: 9px;
+  background: #fff;
+  font: inherit;
+  font-size: 11px;
+  color: #444;
+  cursor: pointer;
+}
+
+.now:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
