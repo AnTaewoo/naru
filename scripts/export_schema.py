@@ -27,6 +27,10 @@ from naru_contracts import (
     ClosureState,
     ErrorBody,
     FeatureCollection,
+    GeocodeReverseQuery,
+    GeocodeReverseResponse,
+    GeocodeSearchQuery,
+    GeocodeSearchResponse,
     RouteQuery,
     RouteResponse,
 )
@@ -42,6 +46,10 @@ MODELS = (
     FeatureCollection,
     ClosureEventsQuery,
     ClosureEventsResponse,
+    GeocodeSearchQuery,
+    GeocodeSearchResponse,
+    GeocodeReverseQuery,
+    GeocodeReverseResponse,
     ErrorBody,
 )
 OUT_DIR = Path("packages/fe/src/types")

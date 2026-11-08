@@ -144,7 +144,38 @@ export type Events = ClosureEvent[];
  * @maxItems 4
  */
 export type Coverage = [unknown, unknown, unknown, unknown];
-export type Code = "invalid_query" | "unauthorized" | "not_found" | "no_route" | "out_of_coverage" | "internal";
+export type Q = string;
+export type Near = string | null;
+export type Id = string;
+export type Name1 = string;
+export type Address = string;
+/**
+ * @minItems 2
+ * @maxItems 2
+ */
+export type Coord = [unknown, unknown];
+/**
+ * @maxItems 10
+ */
+export type Places =
+  | []
+  | [Place]
+  | [Place, Place]
+  | [Place, Place, Place]
+  | [Place, Place, Place, Place]
+  | [Place, Place, Place, Place, Place]
+  | [Place, Place, Place, Place, Place, Place]
+  | [Place, Place, Place, Place, Place, Place, Place]
+  | [Place, Place, Place, Place, Place, Place, Place, Place]
+  | [Place, Place, Place, Place, Place, Place, Place, Place, Place]
+  | [Place, Place, Place, Place, Place, Place, Place, Place, Place, Place];
+export type Lat2 = number;
+export type Lng2 = number;
+export type Label = string | null;
+export type RoadAddress = string | null;
+export type Address1 = string | null;
+export type Code =
+  "invalid_query" | "unauthorized" | "not_found" | "no_route" | "out_of_coverage" | "geocode_unavailable" | "internal";
 export type Message = string;
 export type Field = string | null;
 
@@ -186,6 +217,11 @@ export interface NaruContracts {
   ClosureEventsQuery?: ClosureEventsQuery;
   ClosureEvent?: ClosureEvent;
   ClosureEventsResponse?: ClosureEventsResponse;
+  GeocodeSearchQuery?: GeocodeSearchQuery;
+  Place?: Place;
+  GeocodeSearchResponse?: GeocodeSearchResponse;
+  GeocodeReverseQuery?: GeocodeReverseQuery;
+  GeocodeReverseResponse?: GeocodeReverseResponse;
   ErrorDetail?: ErrorDetail;
   ErrorBody?: ErrorBody;
   [k: string]: unknown;
@@ -372,6 +408,28 @@ export interface ClosureEvent {
 export interface ClosureEventsResponse {
   events: Events;
   coverage: Coverage;
+}
+export interface GeocodeSearchQuery {
+  q: Q;
+  near?: Near;
+}
+export interface Place {
+  id: Id;
+  name: Name1;
+  address: Address;
+  coord: Coord;
+}
+export interface GeocodeSearchResponse {
+  places: Places;
+}
+export interface GeocodeReverseQuery {
+  lat: Lat2;
+  lng: Lng2;
+}
+export interface GeocodeReverseResponse {
+  label: Label;
+  road_address: RoadAddress;
+  address: Address1;
 }
 export interface ErrorDetail {
   code: Code;
