@@ -43,6 +43,12 @@ def result(course_world: CourseWorld) -> RouteResult:
     return RouteResult(path, baseline, depart, datetime(2026, 3, 15, 7, 44, 30, tzinfo=UTC))
 
 
+def raw_leg_keys(body: dict[str, object]) -> set[str]:
+    legs = body["legs"]
+    assert isinstance(legs, list) and legs
+    return {key for leg in legs for key in leg}
+
+
 def test_route_view_renders_interface_section_2(result: RouteResult) -> None:
     resp = route_view.render(result)
     assert resp.status_code == 200 and resp.mimetype == "application/json"
@@ -52,6 +58,11 @@ def test_route_view_renders_interface_section_2(result: RouteResult) -> None:
     assert [leg.kind.value for leg in body.legs] == [leg.kind.value for leg in result.path.legs]
     underpass = next(leg for leg in body.legs if leg.kind.value == "underpass")
     assert underpass.name is not None and underpass.name.endswith("지하보도")
+    # ADR-009: coord_range 가 그대로 실리고, 그 범위의 좌표가 도메인 경로의 같은 구간이다
+    assert [leg.coord_range for leg in body.legs] == [leg.coord_range for leg in result.path.legs]
+    i, j = underpass.coord_range
+    assert body.route.coordinates[i : j + 1] == list(result.path.coords[i : j + 1])
+    assert raw_leg_keys(resp.get_json()) == {"kind", "name", "distance_m", "coord_range"}
     assert body.baseline.route.coordinates == list(result.baseline.coords)
     assert body.baseline.distance_m == result.baseline.distance_m < body.distance_m
     # 시각은 전부 +09:00 (CONVENTIONS §4.5). computed_at 은 UTC 로 줬어도 KST 로 나간다

@@ -21,7 +21,12 @@ def to_response(result: RouteResult) -> RouteResponse:
         duration_s=path.duration_s,
         distance_m=path.distance_m,
         legs=[
-            Leg(kind=LegKind(leg.kind.value), name=leg.name, distance_m=leg.distance_m)
+            Leg(
+                kind=LegKind(leg.kind.value),
+                name=leg.name,
+                distance_m=round(leg.distance_m, 1),
+                coord_range=leg.coord_range,
+            )
             for leg in path.legs
         ],
         avoided=[

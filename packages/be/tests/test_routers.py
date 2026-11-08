@@ -3,6 +3,8 @@
 기대값은 2026-11-07 에 그래프를 돌려 확인한 값 (기준 755 m, 우회 777 m + 접근 구간).
 """
 
+import itertools
+import math
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -10,6 +12,7 @@ from conftest import CourseWorld
 
 from naru_be.models.domain.ped_graph import EdgeKind
 from naru_be.models.domain.routers import BaselineRouter, TimeDependentRouter
+from naru_be.models.domain.types import Path, RouteLeg
 from naru_contracts import ClosureState, Status
 
 KST = timezone(timedelta(hours=9))
@@ -97,3 +100,42 @@ def test_scheduled_is_penalized_not_excluded(
     low = [s.model_copy(update={"confidence": 0.5}) for s in states]
     free = router.route(KYOBO, DAEHANMUN, at, low)
     assert free.avoided == () and 800 < free.distance_m < 830
+
+
+def leg_length_m(path: Path, leg: RouteLeg) -> float:
+    """coords[i..j] 의 측지 길이 (구면 근사)."""
+    i, j = leg.coord_range
+    total = 0.0
+    for (lng1, lat1), (lng2, lat2) in itertools.pairwise(path.coords[i : j + 1]):
+        p1, p2 = math.radians(lat1), math.radians(lat2)
+        h = (
+            math.sin((p2 - p1) / 2) ** 2
+            + math.cos(p1) * math.cos(p2) * math.sin(math.radians(lng2 - lng1) / 2) ** 2
+        )
+        total += 2 * 6_371_008.8 * math.asin(math.sqrt(h))
+    return total
+
+
+def test_legs_partition_route_with_coord_range(
+    world: tuple[TimeDependentRouter, list[ClosureState]],
+) -> None:
+    """ADR-009: 레그가 coords 를 빈틈없이 나누고, 레그 선 길이 = 레그 거리, 합 = 총거리."""
+    router, states = world
+    for hh, mm in ((7, 45), (13, 30)):
+        path = router.route(KYOBO, DAEHANMUN, datetime(2026, 3, 15, hh, mm, tzinfo=KST), states)
+        assert path.legs[0].coord_range[0] == 0
+        assert path.legs[-1].coord_range[1] == len(path.coords) - 1
+        for a, b in itertools.pairwise(path.legs):
+            assert a.coord_range[1] == b.coord_range[0] and a.kind is not b.kind
+        assert abs(sum(leg.distance_m for leg in path.legs) - path.distance_m) < 0.1
+        for leg in path.legs:  # 2026-11-08 확인: 레그마다 차이 최대 0.7 m
+            assert abs(leg_length_m(path, leg) - leg.distance_m) <= 1.0, leg
+    # 07:45 지하보도 레그 — 광화문(세종문화회관) 지하보도, coords[3..8] (2026-11-08 그래프로 확인)
+    path = router.route(KYOBO, DAEHANMUN, datetime(2026, 3, 15, 7, 45, tzinfo=KST), states)
+    k = next(n for n, leg in enumerate(path.legs) if leg.kind is EdgeKind.underpass)
+    underpass, before = path.legs[k], path.legs[k - 1]
+    assert underpass.name == "광화문(세종문화회관) 지하보도" and underpass.coord_range == (3, 8)
+    # 입구 = 지하보도 레그 시작점 = 앞 계단 레그의 끝 (경계 공유)
+    assert before.kind is EdgeKind.stairs and before.coord_range[1] == underpass.coord_range[0]
+    # 첫 레그는 교보빌딩 → 첫 노드 접근 구간(약 45 m)을 포함한 sidewalk
+    assert path.legs[0].kind is EdgeKind.sidewalk and path.legs[0].distance_m > 44

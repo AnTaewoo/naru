@@ -17,6 +17,7 @@ class RouteLeg:
     kind: EdgeKind
     name: str | None
     distance_m: float
+    coord_range: tuple[int, int]  # ADR-009: Path.coords 인덱스 [i, j], 양끝 포함
 
 
 @dataclass(frozen=True)

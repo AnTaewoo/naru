@@ -108,27 +108,37 @@ class _AStarRouter:
         coords: list[LngLat] = [src]
         legs: list[RouteLeg] = []
         distance = snap_in + snap_out
-        for u, v in itertools.pairwise(path):
-            edge: PedEdge = g[u][v]["edge"]
-            pts = list(edge.coords)
-            if pts[0] != (g.nodes[u]["lng"], g.nodes[u]["lat"]) and pts[-1] == (
-                g.nodes[u]["lng"],
-                g.nodes[u]["lat"],
-            ):
-                pts.reverse()
+
+        def add(kind: EdgeKind, name: str | None, length_m: float, pts: list[LngLat]) -> None:
+            """선을 이어 붙이고 레그 범위를 늘린다 (ADR-009: 이웃 레그는 경계 점 공유)."""
             for p in pts:
                 if coords[-1] != p:
                     coords.append(p)
-            distance += edge.length_m
-            if legs and legs[-1].kind is edge.kind:
+            end = len(coords) - 1
+            if legs and legs[-1].kind is kind:
                 last = legs[-1]
                 legs[-1] = RouteLeg(
-                    last.kind, last.name or edge.name, last.distance_m + edge.length_m
+                    kind, last.name or name, last.distance_m + length_m, (last.coord_range[0], end)
                 )
             else:
-                legs.append(RouteLeg(edge.kind, edge.name, edge.length_m))
-        if coords[-1] != dst:
-            coords.append(dst)
+                start = legs[-1].coord_range[1] if legs else 0
+                legs.append(RouteLeg(kind, name, length_m, (start, end)))
+
+        def node_xy(n: str) -> LngLat:
+            return (g.nodes[n]["lng"], g.nodes[n]["lat"])
+
+        # 접근 구간(출발점 → 첫 노드)은 sidewalk 레그로 — 레그 합 = 총거리 (ADR-009)
+        if src != node_xy(path[0]):
+            add(EdgeKind.sidewalk, None, snap_in, [node_xy(path[0])])
+        for u, v in itertools.pairwise(path):
+            edge: PedEdge = g[u][v]["edge"]
+            pts = list(edge.coords)
+            if pts[0] != node_xy(u) and pts[-1] == node_xy(u):
+                pts.reverse()
+            distance += edge.length_m
+            add(edge.kind, edge.name, edge.length_m, pts)
+        if coords[-1] != dst:  # 마지막 노드 → 도착점
+            add(EdgeKind.sidewalk, None, snap_out, [dst])
         return Path(
             coords=tuple(coords),
             distance_m=round(distance, 1),
