@@ -8,6 +8,8 @@ export const RECORDED_DIR = path.resolve(__dirname, "../../../../data/recorded/n
 interface Recorded {
   method: string;
   path: string;
+  /** 기록할 때 보낸 질의 (예: route 의 from·to·depart_at) */
+  query?: Record<string, string>;
   status: number;
   body: unknown;
 }
