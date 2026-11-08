@@ -10,7 +10,7 @@ import { ClosureProvider, EMPTY_CLOSURES, useClosures } from "../state/ClosurePr
 import { RouteProvider, odFromLocation, type RouteState } from "../state/RouteProvider";
 import { TimeProvider, kstIso } from "../state/TimeProvider";
 import { recorded, recordedEvents, recordedRoute } from "../test/recorded";
-import { eventDays } from "./ClosureEvents";
+import { eventDays, eventGroups } from "./ClosureEvents";
 import { ClosureSheet } from "./ClosureSheet";
 import { RouteCard } from "./RouteCard";
 
@@ -61,6 +61,22 @@ describe("eventDays (순수)", () => {
   });
 });
 
+describe("eventGroups (순수, T5.9)", () => {
+  it("다가오는(진행 중 포함) 것 먼저 시작 순, 끝난 건 '지난 통제' — 기준은 실제 지금", () => {
+    // 11/7 13:00 이면 12:00~16:00 은 진행 중, 15:00~16:00 은 다가옴, 3/15 마라톤은 지남
+    const mid = eventGroups(events, Date.parse("2026-11-07T13:00:00+09:00"));
+    expect(mid.upcoming.flatMap((d) => d.events.map((e) => e.window.start))).toEqual([
+      "2026-11-07T12:00:00+09:00",
+      "2026-11-07T15:00:00+09:00",
+    ]);
+    expect(mid.past.map((d) => d.label)).toEqual(["3월 15일 (일)"]);
+    // 11/8 16:00(기록한 날) 이면 전부 지난 통제 — 최근 날짜 먼저
+    const later = eventGroups(events, Date.parse("2026-11-08T16:00:00+09:00"));
+    expect(later.upcoming).toEqual([]);
+    expect(later.past.map((d) => d.label)).toEqual(["11월 7일 (토)", "3월 15일 (일)"]);
+  });
+});
+
 describe("통제 불러오기 렌더", () => {
   it("지금(통제 없음) → 빈 칸 안내 버튼 → 목록 → 3/15 1구간 → 07:20·지도 맞춤·목록 닫힘·제목 날짜 → '지금'", () => {
     render(
@@ -70,11 +86,19 @@ describe("통제 불러오기 렌더", () => {
       </Providers>,
     );
     expect(screen.getByText("오늘 통제")).toBeDefined();
+    // 기준 시각이 실제 지금이면 '지금' 배지, 지금으로 돌아가는 버튼은 없다 (T5.9)
+    expect(screen.getByText("지금")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "지금 시각으로" })).toBeNull();
     const empty = screen.getByText("이 시각에 걸린 통제가 없어요.");
     fireEvent.click(within(empty).getByRole("button", { name: "통제 불러오기" }));
     const list = screen.getByRole("region", { name: "통제 불러오기" });
-    expect(within(list).getByText("11월 7일 (토)")).toBeDefined();
-    expect(within(list).getByText("3월 15일 (일)")).toBeDefined();
+    const past = within(list).getByRole("group", { name: "지난 통제" }); // 기록은 전부 지난 일
+    expect(within(past).getByText("11월 7일 (토)")).toBeDefined();
+    expect(within(past).getByText("3월 15일 (일)")).toBeDefined();
+    expect(
+      within(past).getByText("시의회~숭례문오거리 집회 → 광화문·고용노동청 행진"),
+    ).toBeDefined();
+    expect(within(past).getAllByText("5만 명 · 태평로").length).toBeGreaterThan(0);
     fireEvent.click(within(list).getByRole("button", { name: new RegExp(SEG1) }));
     expect(screen.getByText("07:20")).toBeDefined();
     expect(screen.getByText("2026-03-15")).toBeDefined();
@@ -127,7 +151,11 @@ describe("통제 불러오기 렌더", () => {
     const note = screen.getByText("이 시각엔 경로에 걸린 통제가 없어요.");
     fireEvent.click(within(note).getByRole("button", { name: "통제 불러오기" }));
     const list = screen.getByRole("region", { name: "통제 불러오기" });
-    fireEvent.click(within(list).getByRole("button", { name: /15:00~16:00 시의회~숭례문R/ }));
+    fireEvent.click(
+      within(list).getByRole("button", {
+        name: /시의회~숭례문오거리 집회 → 광화문·고용노동청 행진/,
+      }),
+    );
     expect(screen.getByText("15:00")).toBeDefined();
     expect(screen.getByText("2026-11-07")).toBeDefined();
     expect(screen.getByTestId("focus").textContent).toBe("none");

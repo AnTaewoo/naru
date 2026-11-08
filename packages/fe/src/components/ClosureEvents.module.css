@@ -60,3 +60,22 @@
   color: #666;
   font-variant-numeric: tabular-nums;
 }
+
+/* 둘째 줄 — 인원 · 도로 (T5.9) */
+.detail {
+  font-size: 13px;
+  color: #444;
+}
+
+/* 끝난 통제 묶음 (T5.9) — 다가오는 것 아래 */
+.past {
+  margin-top: 6px;
+  border-top: 1px solid #eee;
+}
+
+.pastHead {
+  padding: 10px 20px 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #999;
+}
