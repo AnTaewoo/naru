@@ -45,7 +45,8 @@ dev-be:
 	uv run flask --app naru_be.app run --port 5000
 
 # 시연 운영 (홈서버, T5.3). make dev(5000·3000)와 같은 체크아웃에서 함께 돈다 — 포트와 Next 빌드 폴더(dist)가 따로.
-# MySQL → 마이그레이션 → Next 빌드 → gunicorn(127.0.0.1) → 워커 1회(기록 재생, 외부 API 호출 없음) → Next standalone(127.0.0.1).
+# MySQL → 마이그레이션 → Next 빌드 → gunicorn(127.0.0.1) → Next standalone(127.0.0.1).
+# 워커는 따로 돈다(T6.1) — deploy/naru-worker.service: uv run python -m naru_ai.worker --loop
 # 공개는 nginx 가 SERVE_FE_PORT 하나만 프록시한다 — Flask·/internal 은 밖에 열지 않는다 (README "운영")
 SERVE_BE_PORT ?= 5050
 SERVE_FE_PORT ?= 3050
@@ -58,7 +59,6 @@ serve:
 	@trap 'kill 0' EXIT; \
 	uv run gunicorn --workers 2 --threads 4 --bind 127.0.0.1:$(SERVE_BE_PORT) 'naru_be.app:create_app()' & \
 	curl -sf --retry 90 --retry-connrefused --retry-delay 2 -o /dev/null '$(SERVE_CHECK)' && \
-	NARU_BE_URL=http://127.0.0.1:$(SERVE_BE_PORT) uv run python -m naru_ai.worker --once && \
 	PORT=$(SERVE_FE_PORT) HOSTNAME=127.0.0.1 node packages/fe/dist/standalone/server.js
 
 fetch:

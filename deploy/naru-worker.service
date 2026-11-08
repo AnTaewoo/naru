@@ -1,0 +1,25 @@
+# Naru AI 워커 (T6.1) — naru.service(make serve)와 따로 돈다. 설치:
+#   sudo cp deploy/naru-worker.service /etc/systemd/system/ && sudo systemctl daemon-reload
+#   sudo systemctl enable --now naru-worker && journalctl -u naru-worker -f
+# 키·토큰은 .env (SEOUL_OPENDATA_KEY, NARU_INTERNAL_TOKEN — BE 와 같은 값)
+[Unit]
+Description=Naru AI worker (--loop: course once, notices 5 min, TOPIS incidents 5 min)
+After=network-online.target naru.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=antaewoo
+Group=antaewoo
+WorkingDirectory=/home/antaewoo/workspace/naru
+Environment=HOME=/home/antaewoo
+Environment=PATH=/home/antaewoo/miniconda3/bin:/home/antaewoo/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=NARU_BE_URL=http://127.0.0.1:5050
+Environment=NARU_INCIDENT_SOURCE=live
+ExecStart=/home/antaewoo/miniconda3/bin/uv run python -m naru_ai.worker --loop
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
