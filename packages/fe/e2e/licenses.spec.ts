@@ -20,8 +20,12 @@ test("고지 — 지도 출처 칸의 '오픈소스 고지' → /licenses: 타�
   expect(ownErrors(errors)).toEqual([]);
 });
 
-test("고지 — 푸터 링크", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("contentinfo").getByRole("link", { name: "오픈소스·데이터 고지" }).click();
-  await expect(page).toHaveURL(/\/licenses$/);
+test.describe("데스크톱 폭", () => {
+  // 모바일(≤640px)은 푸터를 숨긴다(T5.6) — 푸터 링크는 넓은 화면에서 본다
+  test.use({ viewport: { width: 1024, height: 800 } });
+  test("고지 — 푸터 링크", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("contentinfo").getByRole("link", { name: "오픈소스·데이터 고지" }).click();
+    await expect(page).toHaveURL(/\/licenses$/);
+  });
 });

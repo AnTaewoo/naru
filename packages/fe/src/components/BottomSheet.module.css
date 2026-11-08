@@ -21,8 +21,9 @@
   height: 50%;
 }
 
+/* 위에 떠 있는 UI 아래까지 — 부모(.app)가 모드별로 --sheet-top 을 준다. 없으면 88% */
 .full {
-  height: 88%;
+  height: calc(100% - var(--sheet-top, 12%));
 }
 
 /* 끄는 동안은 손가락을 바로 따라간다 */

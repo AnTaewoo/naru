@@ -49,6 +49,10 @@ test("손잡이 — 탭은 접힘↔절반, 위로 끌면 전체, 아래로 끌�
   const grip = sheet.getByRole("button", { name: "시트 높이" });
   await grip.click();
   await expect(sheet).toHaveAttribute("data-stage", "half");
+  // 높이 전환(200ms)이 끝난 뒤 끈다 — 끌기는 지금 보이는 높이에서 시작한다
+  const settled = async (px: number) =>
+    expect.poll(async () => Math.round((await sheet.boundingBox())?.height ?? 0)).toBe(px);
+  await settled(332); // iPhone 13 보이는 높이 664 의 절반
   const drag = async (dy: number) => {
     const b = await grip.boundingBox();
     const x = (b?.x ?? 0) + (b?.width ?? 0) / 2;
@@ -58,10 +62,11 @@ test("손잡이 — 탭은 접힘↔절반, 위로 끌면 전체, 아래로 끌�
     await page.mouse.move(x, y + dy, { steps: 12 });
     await page.mouse.up();
   };
-  await drag(-250); // 절반(332) → 582 쯤 → 전체(584)
+  await drag(-250); // 절반(332) → 582 쯤 → 전체(664 − 출발·도착 패널 176 = 488)
   await expect(sheet).toHaveAttribute("data-stage", "full");
   expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
-  await drag(450); // 전체 → 134 쯤 → 접힘(96)
+  await settled(488); // 손잡이가 패널 아래에 있어 다시 잡을 수 있다
+  await drag(450); // 전체 → 38 → 접힘(96)
   await expect(sheet).toHaveAttribute("data-stage", "collapsed");
 });
 

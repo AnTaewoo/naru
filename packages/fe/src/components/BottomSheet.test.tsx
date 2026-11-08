@@ -21,6 +21,12 @@ describe("단계 높이·가까운 단계 (순수)", () => {
     expect(stageHeight("full", IPHONE13_H)).toBe(584);
   });
 
+  it("위에 떠 있는 UI 가 있으면 전체 = 화면 − 그 높이 (길찾기 패널 176px → 488)", () => {
+    expect(stageHeight("full", IPHONE13_H, 176)).toBe(488);
+    expect(nearestStage(582, IPHONE13_H, 176)).toBe("full");
+    expect(nearestStage(380, IPHONE13_H, 176)).toBe("half");
+  });
+
   it("놓은 높이에서 가장 가까운 단계로", () => {
     expect(nearestStage(150, IPHONE13_H)).toBe("collapsed");
     expect(nearestStage(300, IPHONE13_H)).toBe("half");
