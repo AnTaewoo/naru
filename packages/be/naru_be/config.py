@@ -72,3 +72,5 @@ class Settings(BaseSettings):
     crosswalk_attach_any_m: float = 8.0  # 없으면 아무 간선 (점은 간선 위, 중앙값 1.8 m)
     crosswalk_promote_max_m: float = 60.0  # 그 간선이 이보다 짧으면 kind를 crosswalk으로
     connector_max_m: float = 30.0
+    # 경로 상세(T5.10) — 관리번호 없는 횡단보도 간선은 이 안의 가장 가까운 도로명으로 이름을 단다
+    crosswalk_road_name_m: float = 20.0

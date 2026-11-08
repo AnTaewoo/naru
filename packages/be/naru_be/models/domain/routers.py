@@ -117,10 +117,20 @@ class _AStarRouter:
         g = self.ped.graph
         coords: list[LngLat] = [src]
         legs: list[RouteLeg] = []
+        fallbacks: list[str | None] = []  # 레그마다 대안 이름(횡단보도 도로명, T5.10)
         distance = snap_in + snap_out
 
-        def add(kind: EdgeKind, name: str | None, length_m: float, pts: list[LngLat]) -> None:
-            """선을 이어 붙이고 레그 범위를 늘린다 (ADR-009: 이웃 레그는 경계 점 공유)."""
+        def add(
+            kind: EdgeKind,
+            name: str | None,
+            length_m: float,
+            pts: list[LngLat],
+            fallback: str | None = None,
+        ) -> None:
+            """선을 이어 붙이고 레그 범위를 늘린다 (ADR-009: 이웃 레그는 경계 점 공유).
+
+            같은 종류가 이어지면 한 레그 — 이름은 처음 나온 것, 대안 이름은 이름이 하나도 없을 때만.
+            """
             for p in pts:
                 if coords[-1] != p:
                     coords.append(p)
@@ -130,9 +140,11 @@ class _AStarRouter:
                 legs[-1] = RouteLeg(
                     kind, last.name or name, last.distance_m + length_m, (last.coord_range[0], end)
                 )
+                fallbacks[-1] = fallbacks[-1] or fallback
             else:
                 start = legs[-1].coord_range[1] if legs else 0
                 legs.append(RouteLeg(kind, name, length_m, (start, end)))
+                fallbacks.append(fallback)
 
         def node_xy(n: str) -> LngLat:
             return (g.nodes[n]["lng"], g.nodes[n]["lat"])
@@ -146,14 +158,18 @@ class _AStarRouter:
             if pts[0] != node_xy(u) and pts[-1] == node_xy(u):
                 pts.reverse()
             distance += edge.length_m
-            add(edge.kind, edge.name, edge.length_m, pts)
+            add(edge.kind, edge.name, edge.length_m, pts, edge.road_name)
         if coords[-1] != dst:  # 마지막 노드 → 도착점
             add(EdgeKind.sidewalk, None, snap_out, [dst])
+        named = [
+            leg if leg.name or not fb else RouteLeg(leg.kind, fb, leg.distance_m, leg.coord_range)
+            for leg, fb in zip(legs, fallbacks, strict=True)
+        ]
         return Path(
             coords=tuple(coords),
             distance_m=round(distance, 1),
             duration_s=round(distance / self.settings.walk_speed_mps),
-            legs=tuple(legs),
+            legs=tuple(named),
             avoided=avoided,
             node_ids=tuple(path),
         )

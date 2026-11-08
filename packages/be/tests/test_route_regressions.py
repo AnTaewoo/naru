@@ -81,6 +81,9 @@ def test_2_scheduled_rally_inside_window_detours(client: FlaskClient) -> None:
     assert {a.status for a in body.avoided} == {Status.scheduled}
     assert body.route.coordinates != body.baseline.route.coordinates
     assert body.duration_s > body.baseline.duration_s  # 페널티라 돌아가는 길이 더 길다
+    # T5.10 — 시청 지하보도를 나와 건너는 레그: 덕수궁앞 → (관리번호 없음) → 서울광장 간선을
+    # 합친 것, 이름은 경로에서 처음 만나는 교차로명
+    assert [g.name for g in body.legs if g.kind is LegKind.crosswalk] == ["덕수궁앞"]
     # 피한 횡단보도는 그 시각 /closures 의 11/7 집회 횡단보도다
     fc = FeatureCollection.model_validate(
         client.get(

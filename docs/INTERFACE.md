@@ -106,6 +106,7 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 ```
 - `baseline`은 같은 그래프에서 closures를 끈 경로. FE "통제 전후 비교"에 쓴다. 외부 API 아님.
 - `legs[].kind`로 FE가 아이콘·안내 문구를 고른다.
+- `legs[].name`: 지하보도·육교는 시설 이름, 횡단보도는 교차로명(OA-23081 `교차로명` — 위치명 열은 없다), 관리번호가 없는 횡단보도는 20 m 안의 가까운 도로명(표준노드링크 `ROAD_NAME`), 그래도 없으면 null. 이어진 같은 종류 간선은 한 레그 — 이름은 처음 나온 교차로명이 도로명보다 먼저 (T5.10, 스키마는 그대로).
 - `legs[].coord_range: [i, j]` **필수** (v0.7, ADR-009) — `route.coordinates[i..j]`(양끝 포함)가 그 레그의 선. 레그는 경로를 빈틈없이 나눈다: 첫 레그 `i = 0`, 마지막 레그 `j = len(coordinates) − 1`, 이웃 레그는 경계 점을 공유(`legs[k].j == legs[k+1].i`), `i ≤ j`. 출발점·도착점 ↔ 그래프 노드 접근 구간은 `sidewalk` 레그에 들어가서 `Σ legs[].distance_m = distance_m`(1 m 안). FE는 `underpass`·`overpass` 레그 범위를 남색 터널로, 그 `coordinates[i]`에 입구 마커를 그린다.
 - `avoided[].evidence`는 §1의 evidence를 그대로 전달. `avoided[].approx`는 후보의 `approx` 그대로 (FE "약" 표시).
 
@@ -230,3 +231,4 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 | 2026-11-08 | v0.10 | §3.1 응답에 `coverage`(보행망 bbox) 필수 (ADR-011 C 의 앞부분, data_as_of 는 뒤에) | 태우 승인 |
 | 2026-11-08 | v0.11 | §7 지오코딩 `GET /geocode/search`·`GET /geocode/reverse` 추가, §6 `geocode_unavailable`(503) (ADR-011 B) | 태우 승인 |
 | 2026-11-08 | v0.12 | §1 `summary`(구조화 칸: 구간·지점 이름·reported_people·roads), §3.1 사건 `type`·`source`·`summary`·`notice`, 응답 `data_as_of` 필수 (ADR-012, ADR-011 C) | 태우 승인 |
+| 2026-11-08 | v0.12 (보충) | §2 `legs[].name` 뜻 — 횡단보도는 교차로명, 없으면 가까운 도로명. 스키마 그대로 (ROADMAP T5.10) | 태우 (T5.10) |

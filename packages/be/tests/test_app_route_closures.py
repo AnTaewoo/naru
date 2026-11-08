@@ -77,6 +77,8 @@ def test_route_during_closure(client: FlaskClient) -> None:
     assert avoided["06-0000023206"].status is Status.confirmed
     assert avoided["06-0000023206"].until == datetime(2026, 3, 15, 8, 8, tzinfo=KST)
     assert "지하보도" in resp.get_data(as_text=True)  # 한글 이스케이프 안 함 (ensure_ascii=False)
+    # T5.10 — 횡단보도 레그 이름 = OA-23081 교차로명 (06-0000002137 청계광장)
+    assert [g.name for g in body.legs if g.kind.value == "crosswalk"] == ["청계광장"]
     # 통제 끝난 뒤: path == baseline
     resp = client.get("/route", query_string=route_q("2026-03-15T13:30:00+09:00"))
     body = RouteResponse.model_validate(resp.get_json())

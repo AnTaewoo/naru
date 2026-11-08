@@ -59,7 +59,9 @@ class PedEdge:
     length_m: float
     crosswalk_ids: tuple[str, ...]  # 횡단보도 관리번호 (OA-23081). crosswalk 간선에만, 없을 수 있다
     coords: tuple[LngLat, ...]  # WGS84, u → v 순서
-    name: str | None = None  # 지하도는 '<역명> 지하보도', 육교는 '육교'. 나머지 None (legs 이름)
+    name: str | None = None  # 지하도는 '<역명> 지하보도', 육교는 '육교', 횡단보도는 교차로명(T5.10)
+    # 횡단보도인데 관리번호(교차로명)가 없으면 가까운 도로의 도로명 — 레그 이름 대안 (T5.10)
+    road_name: str | None = None
 
 
 @dataclass(frozen=True)

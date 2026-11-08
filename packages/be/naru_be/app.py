@@ -29,6 +29,7 @@ from naru_be.log import configure_logging
 from naru_be.models.domain.candidate_intake import CandidateIntake
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
+from naru_be.models.domain.crosswalk_names import name_crosswalks
 from naru_be.models.domain.geocoder import Geocoder
 from naru_be.models.domain.ped_graph import PedGraph
 from naru_be.models.domain.road_graph import RoadGraph
@@ -54,6 +55,7 @@ def build_models(settings: Settings) -> NaruModels:
     road_graph = RoadGraph.from_gpkg(latest_dir(raw, "nodelink_seoul_*") / "link.gpkg")
     ped = PedGraph.from_seoul_spatial(spatial, settings)
     index = CrosswalkIndex.from_xlsx(spatial / "OA-23081.xlsx", settings, road_graph)
+    by_intersection, by_road = name_crosswalks(ped, index, road_graph, settings)  # T5.10
     engine = ClosureEngine(index, settings)
     repo = ClosureRepository(make_sessions(make_engine(settings.database_url)), settings)
     planner = RoutePlanner(
@@ -65,6 +67,7 @@ def build_models(settings: Settings) -> NaruModels:
             "spatial": str(spatial),
             "ped_nodes": ped.graph.number_of_nodes(),
             "crosswalks": len(index),
+            "crosswalk_edges_named": {"intersection": by_intersection, "road": by_road},
         },
     )
     intake = CandidateIntake(index, engine, repo, road_graph, settings)

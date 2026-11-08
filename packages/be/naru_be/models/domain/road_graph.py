@@ -55,6 +55,7 @@ class RoadGraph:
         self._node_ids = list(node_xy)
         self._tree = STRtree([shapely.Point(xy) for xy in node_xy.values()])
         self._links = [shapely.LineString(d["coords"]) for _, _, d in graph.edges(data=True)]
+        self._link_roads = [str(d["road"]) for _, _, d in graph.edges(data=True)]
         self._link_tree = STRtree(self._links)
 
     @classmethod
@@ -100,6 +101,17 @@ class RoadGraph:
                     key=lambda n: (self.node_xy[n][0] - x) ** 2 + (self.node_xy[n][1] - y) ** 2,
                 )
         return self._node_ids[int(self._tree.nearest(shapely.Point(x, y)))]
+
+    def nearest_road_name(self, lng: float, lat: float, max_m: float) -> str | None:
+        """max_m 안에서 가장 가까운, 이름 있는 도로 링크의 도로명 (T5.10 레그 이름 대안)."""
+        pt = shapely.Point(_4326_TO_5179.transform(lng, lat))
+        best: tuple[float, str] | None = None
+        for k in self._link_tree.query(pt.buffer(max_m)):
+            name = self._link_roads[int(k)]
+            dist = float(self._links[int(k)].distance(pt))
+            if name and dist <= max_m and (best is None or dist < best[0]):
+                best = (dist, name)
+        return best[1] if best else None
 
     def nearest_link_distance_m(self, lng: float, lat: float) -> float:
         """가장 가까운 도로 링크까지 거리 (ADR-008: impact unknown 지점의 30 m 승격 규칙)."""
