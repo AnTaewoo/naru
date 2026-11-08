@@ -1,5 +1,5 @@
 # Naru — 명령 설명은 .claude/CLAUDE.md §4
-.PHONY: setup check layers check-no-fakes lint type test fe-check schema dev dev-be fetch record record-llm record-candidates record-naru-api
+.PHONY: setup check layers check-no-fakes lint type test fe-check schema dev dev-be serve fetch record record-llm record-candidates record-naru-api
 
 setup:
 	uv sync --all-groups
@@ -43,6 +43,23 @@ dev:
 
 dev-be:
 	uv run flask --app naru_be.app run --port 5000
+
+# 시연 운영 (홈서버, T5.3). make dev(5000·3000)와 같은 체크아웃에서 함께 돈다 — 포트와 Next 빌드 폴더(dist)가 따로.
+# MySQL → 마이그레이션 → Next 빌드 → gunicorn(127.0.0.1) → 워커 1회(기록 재생, 외부 API 호출 없음) → Next standalone(127.0.0.1).
+# 공개는 nginx 가 SERVE_FE_PORT 하나만 프록시한다 — Flask·/internal 은 밖에 열지 않는다 (README "운영")
+SERVE_BE_PORT ?= 5050
+SERVE_FE_PORT ?= 3050
+SERVE_CHECK = http://127.0.0.1:$(SERVE_BE_PORT)/closures?bbox=126.965,37.555,126.990,37.580&at=2026-03-15T07:45:00%2B09:00
+serve:
+	docker compose up -d mysql
+	uv run alembic -c packages/be/alembic.ini upgrade head
+	cd packages/fe && NARU_NEXT_DIST_DIR=dist NARU_API_ORIGIN=http://127.0.0.1:$(SERVE_BE_PORT) pnpm build
+	rm -rf packages/fe/dist/standalone/dist/static && cp -r packages/fe/dist/static packages/fe/dist/standalone/dist/static
+	@trap 'kill 0' EXIT; \
+	uv run gunicorn --workers 2 --threads 4 --bind 127.0.0.1:$(SERVE_BE_PORT) 'naru_be.app:create_app()' & \
+	curl -sf --retry 90 --retry-connrefused --retry-delay 2 -o /dev/null '$(SERVE_CHECK)' && \
+	NARU_BE_URL=http://127.0.0.1:$(SERVE_BE_PORT) uv run python -m naru_ai.worker --once && \
+	PORT=$(SERVE_FE_PORT) HOSTNAME=127.0.0.1 node packages/fe/dist/standalone/server.js
 
 fetch:
 	@test -n "$(SRC)" || { echo "SRC=seoul_spatial|nodelink|course|station"; exit 1; }

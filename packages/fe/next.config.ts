@@ -22,6 +22,8 @@ export function apiRewrites(origin: string = API_ORIGIN) {
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone", // 홈서버 배포용 (static export 는 rewrites 가 안 된다)
+  // make serve 는 dist 에 빌드한다 — 같은 체크아웃의 make dev(.next)와 서로 덮어쓰지 않게 (T5.3)
+  distDir: process.env.NARU_NEXT_DIST_DIR || ".next",
   rewrites: async () => apiRewrites(),
 };
 
