@@ -129,6 +129,16 @@ export type Impact2 = "blocks" | "unknown";
 export type Approx3 = boolean;
 export type Type4 = "FeatureCollection";
 export type Features = Feature[];
+export type Bbox1 = string | null;
+export type Reason3 = string;
+export type Crosswalks = number;
+/**
+ * @minItems 4
+ * @maxItems 4
+ */
+export type Bbox2 = [unknown, unknown, unknown, unknown];
+export type Approx4 = boolean;
+export type Events = ClosureEvent[];
 export type Code = "invalid_query" | "unauthorized" | "not_found" | "no_route" | "internal";
 export type Message = string;
 export type Field = string | null;
@@ -168,6 +178,9 @@ export interface NaruContracts {
   PointGeometry?: PointGeometry;
   PolygonGeometry?: PolygonGeometry;
   FeatureCollection?: FeatureCollection;
+  ClosureEventsQuery?: ClosureEventsQuery;
+  ClosureEvent?: ClosureEvent;
+  ClosureEventsResponse?: ClosureEventsResponse;
   ErrorDetail?: ErrorDetail;
   ErrorBody?: ErrorBody;
   [k: string]: unknown;
@@ -337,6 +350,22 @@ export interface Window1 {
 export interface FeatureCollection {
   type?: Type4;
   features: Features;
+}
+export interface ClosureEventsQuery {
+  bbox?: Bbox1;
+}
+/**
+ * 같은 (reason, window) 의 횡단보도 상태 묶음 (§3.1). 상태는 시각마다 달라서 없다.
+ */
+export interface ClosureEvent {
+  reason: Reason3;
+  window: Window;
+  crosswalks: Crosswalks;
+  bbox: Bbox2;
+  approx?: Approx4;
+}
+export interface ClosureEventsResponse {
+  events: Events;
 }
 export interface ErrorDetail {
   code: Code;

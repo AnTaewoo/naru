@@ -98,6 +98,15 @@
     "FeatureCollection": {
       "$ref": "#/$defs/FeatureCollection"
     },
+    "ClosureEventsQuery": {
+      "$ref": "#/$defs/ClosureEventsQuery"
+    },
+    "ClosureEvent": {
+      "$ref": "#/$defs/ClosureEvent"
+    },
+    "ClosureEventsResponse": {
+      "$ref": "#/$defs/ClosureEventsResponse"
+    },
     "ErrorDetail": {
       "$ref": "#/$defs/ErrorDetail"
     },
@@ -1184,6 +1193,93 @@
         "features"
       ],
       "title": "FeatureCollection",
+      "type": "object"
+    },
+    "ClosureEventsQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        }
+      },
+      "title": "ClosureEventsQuery",
+      "type": "object"
+    },
+    "ClosureEvent": {
+      "additionalProperties": false,
+      "description": "같은 (reason, window) 의 횡단보도 상태 묶음 (§3.1). 상태는 시각마다 달라서 없다.",
+      "properties": {
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "window": {
+          "$ref": "#/$defs/Window"
+        },
+        "crosswalks": {
+          "minimum": 1,
+          "title": "Crosswalks",
+          "type": "integer"
+        },
+        "bbox": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Bbox",
+          "type": "array"
+        },
+        "approx": {
+          "default": false,
+          "title": "Approx",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "reason",
+        "window",
+        "crosswalks",
+        "bbox"
+      ],
+      "title": "ClosureEvent",
+      "type": "object"
+    },
+    "ClosureEventsResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "events": {
+          "items": {
+            "$ref": "#/$defs/ClosureEvent"
+          },
+          "title": "Events",
+          "type": "array"
+        }
+      },
+      "required": [
+        "events"
+      ],
+      "title": "ClosureEventsResponse",
       "type": "object"
     },
     "ErrorDetail": {
