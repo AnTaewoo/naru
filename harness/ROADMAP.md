@@ -235,11 +235,17 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - 테스트: recorded 통제 중 `/route` → 카드 숫자·LegList 라벨이 응답과 일치
 
 ### T5.3 배포 · e2e · 시연 영상 ★
-- status: DOING
+- status: DONE
 - depends: T5.2, T4.4
 - 산출: Flask + AI 워커 `--once`(홈서버, 기록 재생) + Next.js 배포(Vercel 또는 홈서버) → **배포 링크**. Playwright e2e: 교보빌딩 앞 → 대한문, 통제 중 시각 선택 → 우회 경로·지하보도 레그. 시연 영상 스크립트 `harness/plans/active/demo_script.md`
 - 산출(고지, 태우 2026-11-08): 지도 attribution(VWorld 키 전까지 OSM "© OpenStreetMap contributors") + `/licenses` 페이지 — maplibre-gl(BSD-3-Clause, LICENSE.txt 의 MapLibre·Mapbox 저작권 고지 전문) 등 오픈소스 고지
 - 🧑 태우: 영상 촬영, 포스터 A0, 보고서 결과 칸 채우기(T4.3 표, 사용성 테스트)
+
+### T5.4 통제 불러오기 ★ (태우 2026-11-08)
+- status: DOING
+- depends: T5.3
+- 산출: BE `GET /closures/events`(ADR-010, INTERFACE v0.8 §3.1 — DB 통제를 (사유, 창) 사건으로 묶어 창·횡단보도 수·범위), FE 하단 시트 "통제 불러오기"(날짜별 목록 → 누르면 그 시작 시각·그 범위로, 지금 통제가 없으면 빈 칸에 안내 버튼), 슬라이더 "지금", 시트 제목 날짜("3월 15일 통제"). 공개 반영은 태우(tmux `make serve` 재시작)
+- 테스트: naru_test 코스 상태로 사건 API, recorded `closure_events.json` → 날짜 묶음·렌더, e2e 홈(지금, 통제 0) → 불러오기 → 3/15 → 길찾기 지하보도 우회 → 지금
 
 ### PC-5 (태우) — 11/16 제출
 - [ ] 배포 링크에서 라이브로 경로가 나온다 (외부 API 호출 없이)
