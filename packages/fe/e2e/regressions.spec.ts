@@ -3,7 +3,7 @@
 //    (recorded naru_api/route_1107_1500.json — 935 s·1,122.5 m, 예정 1곳 16:00까지, 원래 길 871 s)
 // ① 잠실: 그래프 밖 → 범위 밖 안내 (recorded naru_api/error_out_of_coverage.json)
 import { devices, expect, test } from "@playwright/test";
-import { consoleErrors, ownErrors } from "./helpers";
+import { consoleErrors, expandSheet, ownErrors } from "./helpers";
 
 // Playwright 의 iPhone 13 (보이는 영역 390×664, 3배율, 터치) — 브라우저는 설정의 Chrome 그대로
 const iphone = devices["iPhone 13"];
@@ -29,6 +29,14 @@ test("② 11/7 15:00 세종대로 건너기 — 예정 집회를 시청 지하�
   ).toBeVisible();
   await page.waitForTimeout(2500); // 화면 맞춤·타일 (스크린샷용)
   await page.screenshot({ path: "test-results/iphone13-t55-sejong-1500.png" });
+  // 통제 근거: 공지 줄 뒤에 [공지] 칸이 또 붙지 않는다 (태우 2026-11-08)
+  await expandSheet(page, "길찾기 결과");
+  await page.getByRole("button", { name: "통제 근거" }).click();
+  const ev = page.getByRole("region", { name: "통제 근거" });
+  await expect(ev).toContainText("서울경찰청 집회 공지");
+  await expect(ev).not.toContainText("공지공지");
+  await ev.getByText("해제 예정").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "test-results/iphone13-t58-evidence.png" });
   expect(ownErrors(errors)).toEqual([]);
 });
 
