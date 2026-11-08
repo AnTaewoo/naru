@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { LEG_KO, distanceKo, hhmm, locateNoteKo, routeErrorKo, routeNoteKo } from "../i18n/ko";
 import { CROSSING_KINDS, routeOdKey } from "../map/layers/routeLayer";
-import { useRoute } from "../state/RouteProvider";
+import { useRoute, useRouteDispatch, type RouteView } from "../state/RouteProvider";
 import { useTime } from "../state/TimeProvider";
 import type { LegKind, RouteResponse } from "../types/contracts";
 import { BottomSheet, type SheetStage } from "./BottomSheet";
@@ -91,8 +91,37 @@ export function routeCrossing(route: RouteResponse): string | null {
 
 type Panel = "legs" | "evidence" | "events" | null;
 
+function cardClass(
+  base: string | undefined,
+  pressable: boolean,
+  selected: string | false | undefined,
+): string {
+  return [base, pressable ? styles.pressable : "", selected || ""].filter(Boolean).join(" ");
+}
+
+/** 카드 전체가 버튼 (T5.11) — 원래 길 카드가 있을 때만. 버튼 안이라 내용은 span 만 쓴다 */
+function CardPress({
+  on,
+  pressed,
+  onPress,
+  children,
+}: {
+  on: boolean;
+  pressed: boolean;
+  onPress: () => void;
+  children: ReactNode;
+}) {
+  if (!on) return <>{children}</>;
+  return (
+    <button type="button" className={styles.press} aria-pressed={pressed} onClick={onPress}>
+      {children}
+    </button>
+  );
+}
+
 export function RouteCard() {
-  const { status, route, errorCode, at, locate } = useRoute();
+  const { status, route, errorCode, at, locate, view } = useRoute();
+  const dispatch = useRouteDispatch();
   const { t } = useTime();
   const [panel, setPanel] = useState<Panel>(null);
   const [stage, setStage] = useState<SheetStage>("half");
@@ -108,6 +137,12 @@ export function RouteCard() {
   const fast = route ? fastestCard(route, at ?? t) : null;
   const orig = route ? originalCard(route) : null;
   const hasAvoided = (route?.avoided.length ?? 0) > 0;
+  const original = view === "original" && orig !== null;
+  // 카드를 누르면 그 길을 지도에서 본다 — 시트를 접고 MapView 가 그 길에 맞춘다 (T5.11)
+  const choose = (v: RouteView) => {
+    dispatch({ type: "view", view: v });
+    setStage("collapsed");
+  };
   // 내 위치를 칸에 못 넣었거나 찾는 중 (T5.7) — 경로가 있어도 맨 위에
   const locateNote = locate ? locateNoteKo(locate.which, locate.status) : null;
   return (
@@ -116,40 +151,51 @@ export function RouteCard() {
         <>
           {locateNote && <p className={styles.msg}>{locateNote}</p>}
           <div className={styles.cards}>
-            <article className={`${styles.card} ${styles.sel}`} aria-label="가장 빠른 길">
-              <span className={`${styles.badge} ${styles.blue}`}>가장 빠름</span>
-              <div className={styles.t}>
-                {fast.minutes}
-                <small>분</small>
-                <span>
-                  {fast.distance} · {fast.arrive} 도착
-                </span>
-              </div>
-              <div className={styles.facts}>
-                {fast.facts.map((f) => (
-                  <span key={f.kind}>
-                    {LEG_KO[f.kind]} <b>{f.count}</b>
+            <article
+              className={cardClass(styles.card, orig !== null, !original && styles.sel)}
+              aria-label="가장 빠른 길"
+            >
+              <CardPress on={orig !== null} pressed={!original} onPress={() => choose("fastest")}>
+                <span className={`${styles.badge} ${styles.blue}`}>가장 빠름</span>
+                <span className={styles.t}>
+                  {fast.minutes}
+                  <small>분</small>
+                  <span>
+                    {fast.distance} · {fast.arrive} 도착
                   </span>
-                ))}
-                {fast.facts.length === 0 && <span>보도만 걸어요</span>}
-              </div>
+                </span>
+                <span className={styles.facts}>
+                  {fast.facts.map((f) => (
+                    <span key={f.kind}>
+                      {LEG_KO[f.kind]} <b>{f.count}</b>
+                    </span>
+                  ))}
+                  {fast.facts.length === 0 && <span>보도만 걸어요</span>}
+                </span>
+              </CardPress>
             </article>
             {orig && (
               <article
-                className={`${styles.card} ${orig.blocked ? styles.blocked : ""}`}
+                className={cardClass(
+                  `${styles.card} ${orig.blocked ? styles.blocked : ""}`,
+                  true,
+                  original && (orig.blocked ? styles.selStop : styles.selSlow),
+                )}
                 aria-label="원래 길"
               >
-                <span className={`${styles.badge} ${orig.blocked ? styles.stop : styles.slow}`}>
-                  {orig.blocked ? "지금 못 감" : "공지상 통제 시간"}
-                </span>
-                <div className={styles.t}>
-                  {orig.minutes}
-                  <small>분</small>
-                  <span>{orig.distance}</span>
-                </div>
-                <div className={styles.facts}>
-                  <span>{originalFactsKo(orig)}</span>
-                </div>
+                <CardPress on pressed={original} onPress={() => choose("original")}>
+                  <span className={`${styles.badge} ${orig.blocked ? styles.stop : styles.slow}`}>
+                    {orig.blocked ? "지금 못 감" : "공지상 통제 시간"}
+                  </span>
+                  <span className={styles.t}>
+                    {orig.minutes}
+                    <small>분</small>
+                    <span>{orig.distance}</span>
+                  </span>
+                  <span className={styles.facts}>
+                    <span>{originalFactsKo(orig)}</span>
+                  </span>
+                </CardPress>
               </article>
             )}
           </div>

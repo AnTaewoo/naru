@@ -328,6 +328,45 @@ describe("RoutePanel", () => {
   });
 });
 
+describe("원래 길 보기 (T5.11)", () => {
+  it("07:45 — 원래 길 카드를 누르면 원래 길을 고르고 시트가 접힌다, 가장 빠른 길 카드로 돌아온다", () => {
+    render(
+      <Providers at={T745} route={ready(r0745, T745)}>
+        <RouteCard />
+      </Providers>,
+    );
+    const fast = within(screen.getByRole("article", { name: "가장 빠른 길" })).getByRole("button");
+    const orig = within(screen.getByRole("article", { name: "원래 길" })).getByRole("button");
+    expect([fast.getAttribute("aria-pressed"), orig.getAttribute("aria-pressed")]).toEqual([
+      "true",
+      "false",
+    ]);
+    fireEvent.click(orig);
+    expect([fast.getAttribute("aria-pressed"), orig.getAttribute("aria-pressed")]).toEqual([
+      "false",
+      "true",
+    ]);
+    // 지도에서 원래 길을 보도록 시트를 접는다 (T5.6 과 같은 규칙)
+    expect(screen.getByRole("region", { name: "길찾기 결과" }).getAttribute("data-stage")).toBe(
+      "collapsed",
+    );
+    expect(orig.textContent).toContain("지금 못 감"); // 카드 내용은 그대로
+    fireEvent.click(fast);
+    expect(fast.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("13:30 — 피한 통제가 없으면 원래 길 카드가 없고 가장 빠른 길 카드도 누를 게 없다", () => {
+    render(
+      <Providers at={T1330} route={ready(r1330, T1330)}>
+        <RouteCard />
+      </Providers>,
+    );
+    const fast = screen.getByRole("article", { name: "가장 빠른 길" });
+    expect(within(fast).queryByRole("button")).toBeNull();
+    expect(screen.queryByRole("article", { name: "원래 길" })).toBeNull();
+  });
+});
+
 describe("칸 입력 (T5.8)", () => {
   it("칸을 누르면 그 칸이 검색 입력칸 — 두 글자 전엔 안내, 닫기·Esc 로 돌아간다", () => {
     render(
