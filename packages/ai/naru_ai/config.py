@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     seoul_api_url: str = Field(
         default="http://openapi.seoul.go.kr:8088", validation_alias="NARU_SEOUL_API_URL"
     )
+    # T6.2 버스 위치 (ADR-013 D·G). recorded = 노선별 가장 최근 기록 재생, live = 호출 + 기록
+    bus_source: Literal["live", "recorded"] = Field(
+        default="recorded", validation_alias="NARU_BUS_SOURCE"
+    )
+    bus_interval_s: int = Field(default=60, validation_alias="NARU_BUS_INTERVAL_S")
+    bus_daily_cap: int = Field(default=900, validation_alias="NARU_BUS_DAILY_CAP")  # 개발계정 1,000
+    bus_routes_per_event: int = Field(default=3, validation_alias="NARU_BUS_ROUTES_PER_EVENT")
+    data_go_kr_key: SecretStr = Field(default=SecretStr(""), validation_alias="DATA_GO_KR_KEY")
 
     @property
     def recorded_llm_dir(self) -> Path:
