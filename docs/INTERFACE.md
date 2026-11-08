@@ -1,4 +1,4 @@
-# INTERFACE.md — 파트 간 계약 v0.7
+# INTERFACE.md — 파트 간 계약 v0.8
 
 파트 경계의 단일 기준. 스키마를 바꾸면 **이 파일 먼저** 고치고, 하위호환이 깨지면 버전을 올린다. 변경은 ADR + 태우 승인.
 코드 구현은 `packages/contracts`(`naru_contracts`, pydantic v2) 하나뿐이다. 테스트가 이 문서의 예시 JSON 블록을 그대로 파싱하므로, 예시를 고치면 코드도 고쳐야 한다. FE 타입은 `make schema`로 생성한다.
@@ -127,6 +127,28 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 }
 ```
 
+### §3.1 BE → FE: `GET /closures/events` (v0.8, ADR-010)
+
+**요청** `bbox=minLng,minLat,maxLng,maxLat` (선택 — 없으면 전체)
+
+**응답** DB 에 있는 통제를 사건으로 묶은 목록. 사건 = 같은 `(reason, window.start, window.end)` 의 횡단보도 상태들
+```json
+{
+  "events": [
+    {"reason": "15:00~16:00 시의회~숭례문R → 광화문·고용노동청 <태평로 등> 50,000명 중부, 종로, 남대문",
+     "window": {"start": "2026-11-07T15:00:00+09:00", "end": "2026-11-07T16:00:00+09:00"},
+     "crosswalks": 31, "bbox": [126.9757, 37.5605, 126.9877, 37.5759], "approx": false},
+    {"reason": "marathon 1구간 세종대로 사거리~숭례문 오거리",
+     "window": {"start": "2026-03-15T07:20:00+09:00", "end": "2026-03-15T08:08:00+09:00"},
+     "crosswalks": 6, "bbox": [126.9757, 37.5608, 126.9772, 37.5701], "approx": false}
+  ]
+}
+```
+- 순서: `window.start` 가 늦은 것 먼저, start 가 없으면 끝.
+- `crosswalks` = 서로 다른 횡단보도 수(1 이상). 같은 공지 문장이 구간 여러 개로 나뉘어도 한 사건이다. `bbox` = 그 횡단보도들의 [minLng, minLat, maxLng, maxLat]. `approx` = 하나라도 근사면 true.
+- 상태(status)는 없다 — 시각마다 다르다. 그 시각의 상태는 §3 `/closures?at=`.
+- FE "통제 불러오기": 누르면 t = `window.start`, 지도 = `bbox`. start 가 없는 사건은 누를 수 없다.
+
 ## §4 enum
 | 필드 | 코드값 | FE 라벨 |
 |---|---|---|
@@ -159,3 +181,4 @@ ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, �
 | 2026-11-07 | v0.6 | §1 `impact`(필수, blocks/unknown)·`toward`·`approx` 추가, unknown이면 confidence ≤ 0.65, §2 `avoided[].approx`, §3 properties `impact`·`approx`, §4 `impact` 행 (ADR-008) | 태우 승인 |
 | 2026-11-07 | v0.6 | §3 `at` 의미 보강: 진행 중 + 60분 안 시작 예정, status는 `at` 기준 재판정 (스키마 변경 없음) | 태우 결정 |
 | 2026-11-08 | v0.7 | §2 `legs[].coord_range` [i, j] 필수(route.coordinates 인덱스, 양끝 포함, 레그가 경로를 빈틈없이 나눔), 접근 구간을 sidewalk 레그로 셈해 Σ legs.distance_m = distance_m (ADR-009) | 태우 승인 |
+| 2026-11-08 | v0.8 | §3.1 `GET /closures/events` 추가 — DB 통제를 (reason, window) 사건으로 묶은 목록, 상태 없음, 시작 늦은 순 (ADR-010) | 태우 승인 |
