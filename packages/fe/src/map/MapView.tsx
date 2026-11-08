@@ -171,7 +171,7 @@ export function MapView({ visible }: MapViewProps) {
   const loaded = useRef(false);
   const { closures, bbox, focus, coverage } = useClosures();
   const dispatch = useClosureDispatch();
-  const { route, from, to, active, mine } = useRoute();
+  const { route, from, to, active } = useRoute();
   const routeDispatch = useRouteDispatch();
   const fromPin = useRef<Marker | null>(null);
   const toPin = useRef<Marker | null>(null);
@@ -274,18 +274,34 @@ export function MapView({ visible }: MapViewProps) {
     return () => clearTimeout(timer);
   }, [notice]);
 
-  // 출발·도착을 내 위치로 받으면(T5.7) 그 점을 떠 있는 UI 와 접힌 시트 사이 가운데로
+  // 새로 정해진 출발·도착이 화면 밖이면 그 점으로 — 내 위치(T5.7)·검색으로 고른 곳(T5.8).
+  // 둘이 함께 바뀌면(바꾸기·주소창) 경로 맞춤이 한다
+  const lastOd = useRef<{ from: LngLat | null; to: LngLat | null }>({ from: null, to: null });
   useEffect(() => {
+    const prev = lastOd.current;
+    lastOd.current = { from, to };
     const map = mapRef.current;
-    if (!map || !mine) return;
+    const moved = [from !== prev.from ? from : null, to !== prev.to ? to : null].filter(
+      (p): p is LngLat => p !== null,
+    );
+    const [p] = moved;
+    if (!map || moved.length !== 1 || !p) return;
     const run = () => {
-      const p = fitPadding(map);
+      const pad = fitPadding(map);
+      const { x, y } = map.project(p);
+      const box = map.getContainer();
+      const inView =
+        x >= pad.left &&
+        x <= box.clientWidth - pad.right &&
+        y >= pad.top &&
+        y <= box.clientHeight - pad.bottom;
+      if (inView) return;
       const zoom = Math.max(map.getZoom(), 15);
-      map.easeTo({ center: mine, zoom, offset: [0, (p.top - p.bottom) / 2] });
+      map.easeTo({ center: p, zoom, offset: [0, (pad.top - pad.bottom) / 2] });
     };
     if (loaded.current) run();
     else map.once("load", run);
-  }, [mine]);
+  }, [from, to]);
 
   // closures 가 바뀌면 소스 데이터만 갱신
   useEffect(() => {
