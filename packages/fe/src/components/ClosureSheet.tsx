@@ -1,0 +1,124 @@
+"use client";
+
+import { useMemo } from "react";
+import { EVIDENCE_KO, STATUS_BADGE_KO, hhmm, reasonKo, untilKo, windowKo } from "../i18n/ko";
+import { STATUS_BG, STATUS_COLOR } from "../map/colors";
+import { countByStatus } from "../map/layers/closureLayer";
+import { useClosures } from "../state/ClosureProvider";
+import { useTime } from "../state/TimeProvider";
+import type { EvidenceKind, FeatureCollection, Status } from "../types/contracts";
+import styles from "./ClosureSheet.module.css";
+import { ClosureTimeline } from "./ClosureTimeline";
+import { TimeSlider } from "./TimeSlider";
+
+// 목업 01_home 하단 시트: 제목/부제 → 타임라인+슬라이더 → 통제 행(후보 한 건 = 한 행)
+export interface ClosureRow {
+  key: string;
+  status: Status;
+  reason: string;
+  crosswalks: number;
+  start: string | null;
+  end: string | null;
+  evidence: EvidenceKind[];
+  confidence: number;
+  approx: boolean;
+}
+
+const ORDER: Record<Status, number> = {
+  confirmed: 0,
+  scheduled: 1,
+  zone_scheduled: 2,
+  released: 3,
+};
+
+/** 횡단보도 feature 들을 후보(reason + 창) 단위 행으로 묶는다. 순수 함수 */
+export function closureRows(fc: FeatureCollection): ClosureRow[] {
+  const rows = new Map<string, ClosureRow>();
+  for (const f of fc.features) {
+    const p = f.properties;
+    const start = (p.window["start"] as string | null | undefined) ?? null;
+    const end = (p.window["end"] as string | null | undefined) ?? null;
+    const key = `${p.reason}|${start ?? ""}|${end ?? ""}`;
+    const row = rows.get(key);
+    if (row) {
+      row.crosswalks += 1;
+      continue;
+    }
+    const kinds = new Set<EvidenceKind>();
+    for (const e of p.evidence ?? []) {
+      const k = e["kind"];
+      if (typeof k === "string") kinds.add(k as EvidenceKind);
+    }
+    rows.set(key, {
+      key,
+      status: p.status,
+      reason: p.reason,
+      crosswalks: 1,
+      start,
+      end,
+      evidence: [...kinds],
+      confidence: p.confidence,
+      approx: p.approx ?? false,
+    });
+  }
+  return [...rows.values()].sort(
+    (a, b) => ORDER[a.status] - ORDER[b.status] || (a.start ?? "").localeCompare(b.start ?? ""),
+  );
+}
+
+function badge(row: ClosureRow, t: string): string {
+  if (row.status === "confirmed") return untilKo(row.end, t);
+  return STATUS_BADGE_KO[row.status];
+}
+
+export function ClosureSheet() {
+  const { closures, status, error, at } = useClosures();
+  const { t, ready } = useTime();
+  const rows = useMemo(() => closureRows(closures), [closures]);
+  const counts = useMemo(() => countByStatus(closures), [closures]);
+  const subtitle = !ready
+    ? "시각 확인 중…"
+    : counts.confirmed + counts.scheduled === 0
+      ? `${hhmm(t)} 기준 통제 없음`
+      : `${hhmm(t)} 기준 · 횡단보도 ${counts.confirmed}곳 통제 중, ${counts.scheduled}곳 예정`;
+  return (
+    <section className={styles.sheet} aria-label="오늘 통제">
+      <div className={styles.handle} />
+      <div className={styles.pad}>
+        <div className={styles.title}>오늘 통제</div>
+        <div className={styles.sub}>
+          {subtitle}
+          {status === "loading" && <span className={styles.loading}> · 불러오는 중</span>}
+          {status === "error" && <span className={styles.error}> · {error}</span>}
+          {at && at !== t && status !== "loading" && (
+            <span className={styles.loading}> · {hhmm(at)} 결과</span>
+          )}
+        </div>
+      </div>
+      <ClosureTimeline />
+      <TimeSlider />
+      <div className={styles.rows}>
+        {rows.map((row) => (
+          <div key={row.key} className={styles.row}>
+            <span className={styles.ico} style={{ background: STATUS_BG[row.status] }}>
+              <span className={styles.dot} style={{ background: STATUS_COLOR[row.status] }} />
+            </span>
+            <div className={styles.rowText}>
+              <b className={styles.rowTitle}>{reasonKo(row.reason)}</b>
+              <span className={styles.rowSub}>
+                {row.approx ? "약 " : ""}
+                {windowKo(row.start, row.end)} · 횡단보도 {row.crosswalks}곳 ·{" "}
+                {row.evidence.map((k) => EVIDENCE_KO[k]).join("·") || "근거 없음"} · 확신{" "}
+                {Math.round(row.confidence * 100)}%
+              </span>
+            </div>
+            <em className={styles.badge} style={{ color: STATUS_COLOR[row.status] }}>
+              {badge(row, t)}
+            </em>
+          </div>
+        ))}
+        {rows.length === 0 && <p className={styles.empty}>이 시각에 걸린 통제가 없어요.</p>}
+      </div>
+    </section>
+  );
+}
