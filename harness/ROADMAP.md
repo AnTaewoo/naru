@@ -326,12 +326,13 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - 결과(2026-11-08): 원문은 게시판과 최신 글이 같은 열린데이터광장 NoticeList(OA-22861, 키) — 웹은 안 긁는다. 글 하나 = 문장 하나(`topis-<번호>-u<고친 시각>`), 한 번 10·하루 200 live. N045·N046 은 게시판이 아니라 돌발(AccInfo) 형식이었다
 
 ### T6.6 경찰청 PDF inbox
-- status: DOING
+- status: DONE
 - depends: T6.4 (태우 2026-11-08 — 11/13(금) 18:00 전 운영)
 - 산출: smpa 는 robots.txt 가 막혀 있어 자동 수집 안 한다. `data/raw/notices/smpa/inbox/` 에 태우가 PDF 를 넣으면 워커가 새 파일을 감지 → 표 추출 → notice_v2 live 파싱 → 후보 발행 → 처리한 파일은 `data/raw/notices/smpa/<날짜>.pdf` 로 옮기고 MANIFEST 갱신
+- 결과(2026-11-09): inbox → 행마다 notice_v2(TOPIS 와 같은 상한) → 후보 → `smpa/<집회 날짜>.pdf` 로 옮기고 `smpa/inbox_manifest.jsonl`(git 밖) 한 줄. 행 ID 에 기준 작성 버전, 후보 ID 는 버전 없이. 같은 파일은 `inbox/duplicate/`, 표가 아니면 `inbox/failed/` — 지우지 않는다
 
 ### T6.3 버스 확신도 보정 (ADR-013)
-- status: TODO
+- status: DOING
 - depends: T6.6 (태우 2026-11-08 순서: T6.4 → T6.6 → T6.3)
 - 산출: BE `bus_correction.py` — 통제 구간(같은 후보의 횡단보도 묶음)마다 최근 20분 관측으로 항목(서로 다른 2대 이상이 15분 안에 피해 감 +0.20·구간 정류소를 2대 이상 건너뜀 +0.10·통과 시간이 평소 2배 초과 2대 이상 +0.10·1대만 피해 감 +0.05·2대 이상 정상 통과 −0.30) → 합 [−0.30, +0.25] → 최종 clamp(공지 + 보정, 0, 0.95). 보정은 시각의 함수(at 기준, 저장값 = base_confidence), bus_skip 은 20분 안에서만 확인 근거, 정상 통과 −0.30 이 20분 간격으로 2번이면 끝 시각 전 해제(bus_return), impact unknown 승격 후보는 지점 30 m 안 노선에서 2대 이탈일 때만 0.65 위로. /closures `confidence` 는 보정 후, `base_confidence` 추가, EvidenceKind `bus`, INTERFACE v0.14. `/route` 는 depart_at 보정으로(0.7 이상·창 안이면 +300초, 0.8 이상 + bus_skip·시작 뒤면 제외, 0.7 아래·해제면 보통). FE 통제 근거 "버스 2대가 16:02·16:06에 세종대로 구간을 피해 감 +0.20 → 확신도 0.95". README 확신도 절. 규칙서(파서 확신도)는 그대로(태우 결정). 이탈 60 m·보정값은 2순위 돌발 기록(`bus/incident/`, 실제로 막힌 구간의 버스 움직임 = 정답)으로 실측 맞춤. 노선 경로는 getRoutePath(도로 그래프 잇기 금지). `bus_corrections` 표(Alembic)
 - 테스트: 순수 함수(합·clamp·20분 창·상한·해제 순서)는 실데이터 상수로, 감지 부품은 평일 기록으로, 통제일 통합은 그날 기록으로 — 없으면 "실측 대기"로 보고하고 멈춘다

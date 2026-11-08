@@ -243,3 +243,9 @@
 - 정한 것: 원문은 API(웹 안 긁음), 글 단위(규칙서 §1.3), 볼 글 기준 `topis_feed.RECENT`, 하루 수는 기록 파일 시각(KST). 버그 고침 — 빌더 로그 extra `name`(LogRecord 예약어라 INFO 에서 KeyError, 운영 워커는 INFO). C① 은 지금 기록 33건에서 바뀌는 후보 0: AREA 끝점은 6262 광화문광장뿐인데 OA-23081 에 없고, 6288 서울광장은 구간 끝점이 아니라 지점이다 — 보고의 "범위 안 놓침을 다 잡는다"는 틀렸다
 - 막힌 것 / 태우 대기: 🧑 `sudo cp deploy/naru-worker.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart naru-worker`(지금 워커는 18:56 T6.1 유닛 — 버스 live·TOPIS 안 돈다). 범위 안 놓침(서울광장 지점·광화문광장)을 잡을 방법은 태우 결정 대기. ADR-011 E 위반 1회(게시판 GET 2.7분 뒤 POST). 버스 e2e 2건이 운영 기록 폴더의 '가장 최근'을 재생. 펼친 원문이 길면 행의 점·배지가 가운데로 내려감. 기록 live: API 29(NoticeList 1·Claude 28, ≈ $0.017 / $50) + 웹 3
 - 커밋: 7feec75 cdedc37 0bc2627 bf5fffc 39a8b3c ff4e7bb 6d5e7f8 1ec8a59 / 이 항목의 커밋
+
+## 2026-11-09 · T6.6 DONE
+- 한 것: 경찰청 '오늘의 주요집회' PDF inbox — 태우가 `smpa/inbox/` 에 넣으면 워커 smpa 소스(1분)가 표(SmpaPdfSource) → 행마다 notice_v2(기록 재생, 없으면 `--live`, TOPIS 와 같은 상한) → 후보 → BE, 남은 행 없이 보낸 뒤 `smpa/<집회 날짜>.pdf` 로 옮기고 `inbox_manifest.jsonl` 한 줄. 행 ID 에 기준 작성 버전(`-u<기준 작성>`), 후보 ID 는 버전 없이. 같은 파일은 `inbox/duplicate/`, 표가 아니면 `inbox/failed/`(지우지 않음). 실데이터: 실제 PDF 3개를 임시 inbox 로 복사 → 후보 10·11/7 횡단보도 38(r01 13·r04 24·r05 1), 옮긴 뒤 다시 돌려도 같은 배치
+- 정한 것: PDF 별 처리 기록은 git 밖 jsonl(MANIFEST.md 엔 방식만), 옮긴 PDF 는 그날까지 다시 보냄, T0.5 테스트는 세 파일로 고정, 파싱은 TOPIS 와 한 코드(`_parse_notices`·`parse_failed`), 루프 테스트는 빈 임시 inbox
+- 막힌 것 / 태우 대기: 🧑 새 유닛 설치·재시작(11/8 20:10 재시작은 옛 유닛 — TOPIS·PDF·버스 live 가 안 돈다). failed 경로는 그런 실제 PDF 가 없어 테스트 못 함. `build_notices.py` 를 다시 돌리면 옮긴 PDF 도 문장이 되고 같은 날짜가 둘이면 멈춘다. 기록 live: Claude 13(≈ $0.006, 누적 ≈ $0.023 / $50)
+- 커밋: 1b0e96d a79f2fb f64351e d3ba13e 6d8bb36 / 이 항목의 커밋
