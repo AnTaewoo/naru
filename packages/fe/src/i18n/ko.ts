@@ -224,6 +224,32 @@ export function locateNoteKo(
   }
 }
 
+// 주소·검색 (T5.8) — 좌표는 화면에 쓰지 않는다
+export const SELECTED_PLACE_KO = "선택한 위치";
+export const SEARCH_PLACEHOLDER_KO = "장소·주소 검색";
+
+/** 칸 입력칸 안내 — "출발 검색 또는 지도 누르기" */
+export function fieldSearchPlaceholderKo(which: "from" | "to"): string {
+  return `${OD_KO[which]} 검색 또는 지도 누르기`;
+}
+
+/** 검색 결과 칸의 한 줄 — 칸 입력(inField)이면 지도로 골라도 된다고 덧붙인다 */
+export function searchStatusKo(
+  status: "short" | "loading" | "empty" | "error",
+  inField: boolean,
+): string {
+  switch (status) {
+    case "short":
+      return inField ? "두 글자 이상 입력하거나 지도를 누르세요" : "두 글자 이상 입력하세요";
+    case "loading":
+      return "찾는 중…";
+    case "empty":
+      return inField ? "찾는 곳이 없어요. 지도를 눌러 고르세요" : "찾는 곳이 없어요";
+    case "error":
+      return inField ? "검색을 못 했어요. 지도를 눌러 고르세요" : "검색을 못 했어요";
+  }
+}
+
 /** 지도 오른쪽 위 '내 위치 찾기'(GeolocateControl) 결과가 보행망 밖일 때 */
 export const MAP_OUTSIDE_KO = "내 위치는 아직 길찾기 범위(종로·중구) 밖이에요";
 

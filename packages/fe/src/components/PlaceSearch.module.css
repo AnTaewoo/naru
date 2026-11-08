@@ -1,0 +1,101 @@
+/* 검색 결과 칸 (T5.8) — 홈 검색창·출발·도착 패널 바로 아래에 떠 있다 */
+.results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  z-index: 6;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f1f3;
+}
+
+.text,
+.pick {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pick {
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.text b,
+.pick b {
+  font-size: 15px;
+  font-weight: 600;
+  color: #222;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text small,
+.pick small {
+  font-size: 12.5px;
+  color: #888;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.act {
+  flex: none;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  border: 1px solid #d0d7e2;
+  background: #fff;
+  color: #2d6bff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.status {
+  margin: 0;
+  padding: 12px 14px 4px;
+  color: #666;
+  font-size: 13.5px;
+}
+
+.foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 2px 6px 6px;
+}
+
+.close {
+  border: 0;
+  background: none;
+  color: #555;
+  font: inherit;
+  font-size: 13.5px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
