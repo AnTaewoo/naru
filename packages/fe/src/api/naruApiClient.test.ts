@@ -1,8 +1,8 @@
 // recorded 응답(data/recorded/naru_api, scripts/record_naru_api.py 가 실제 Flask 에서 받은 것)으로
 // 클라이언트의 URL·파싱을 검사한다. fetch 는 가로채지 않는다 (CONVENTIONS §5.7).
-import { readFileSync, readdirSync } from "node:fs";
-import path from "node:path";
+import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { RECORDED_DIR, recorded } from "../test/recorded";
 import type { FeatureCollection, RouteResponse } from "../types/contracts";
 import {
   closuresUrl,
@@ -12,23 +12,9 @@ import {
   routeUrl,
 } from "./naruApiClient";
 
-const RECORDED = path.resolve(__dirname, "../../../../data/recorded/naru_api");
-
-interface Recorded {
-  method: string;
-  path: string;
-  status: number;
-  body: unknown;
-}
-
-function recorded(name: string): Recorded {
-  const file = path.join(RECORDED, `${name}.json`);
-  return JSON.parse(readFileSync(file, "utf-8")) as Recorded;
-}
-
 describe("naruApiClient", () => {
   it("기록 폴더가 있다 (없으면 make record-naru-api 먼저)", () => {
-    const names = readdirSync(RECORDED);
+    const names = readdirSync(RECORDED_DIR);
     expect(names).toContain("route_0745.json");
     expect(names).toContain("closures_0745.json");
   });
