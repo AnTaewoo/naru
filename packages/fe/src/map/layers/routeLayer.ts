@@ -1,7 +1,14 @@
 // 순수 함수: /route 응답(RouteResponse) → 경로 파란 실선 · 원래 길(baseline) 회색 점선 · 지하보도·육교 구간
 // (남색 터널)과 그 입구 마커. 시안 02 범례. 터널은 레그의 coord_range [i, j] 로 route.coordinates 를 자른다 (ADR-009)
-import type { LayerSpecification } from "maplibre-gl";
-import type { Leg, LegKind, LineString, RouteResponse } from "../../types/contracts";
+import type { ExpressionSpecification, LayerSpecification } from "maplibre-gl";
+import type {
+  FeatureCollection,
+  Leg,
+  LegKind,
+  LineString,
+  RouteResponse,
+  Status,
+} from "../../types/contracts";
 import { COLORS } from "../colors";
 import { ICON_IDS } from "../icons";
 
@@ -9,7 +16,9 @@ export const ROUTE_LINE_SOURCE_ID = "naru-route-line";
 export const ROUTE_BASELINE_SOURCE_ID = "naru-route-baseline";
 export const ROUTE_CROSSING_SOURCE_ID = "naru-route-crossings";
 export const ROUTE_ENTRANCE_SOURCE_ID = "naru-route-entrances";
+export const ROUTE_AVOIDED_SOURCE_ID = "naru-route-avoided";
 export const ROUTE_LAYER_IDS = {
+  avoided: "naru-route-avoided",
   baseline: "naru-route-baseline",
   casing: "naru-route-casing",
   line: "naru-route-line",
@@ -39,6 +48,13 @@ export interface EntranceFeature {
   type: "Feature";
   geometry: { type: "Point"; coordinates: LngLat };
   properties: { kind: LegKind; name: string; leg_index: number };
+}
+
+/** 원래 길이 지나는 통제 횡단보도 (T5.11) */
+export interface AvoidedFeature {
+  type: "Feature";
+  geometry: { type: "Point"; coordinates: LngLat };
+  properties: { crosswalk_id: string; status: Status };
 }
 
 export interface Collection<F> {
@@ -115,14 +131,49 @@ export function routeOdKey(route: RouteResponse | null): string | null {
 /** 경로와 원래 길을 모두 담는 [[서, 남], [동, 북]] — 지도를 맞출 때 */
 export function routeBounds(route: RouteResponse | null): [LngLat, LngLat] | null {
   if (!route) return null;
-  const all = [...lineCoordinates(route.route), ...lineCoordinates(route.baseline.route)];
-  if (all.length === 0) return null;
-  const lngs = all.map((p) => p[0]);
-  const lats = all.map((p) => p[1]);
+  return boundsOf([...lineCoordinates(route.route), ...lineCoordinates(route.baseline.route)]);
+}
+
+function boundsOf(coords: LngLat[]): [LngLat, LngLat] | null {
+  if (coords.length === 0) return null;
+  const lngs = coords.map((p) => p[0]);
+  const lats = coords.map((p) => p[1]);
   return [
     [Math.min(...lngs), Math.min(...lats)],
     [Math.max(...lngs), Math.max(...lats)],
   ];
+}
+
+/** 원래 길만 담는 범위 — 원래 길 카드를 누르면 지도를 여기에 맞춘다 (T5.11) */
+export function baselineBounds(route: RouteResponse | null): [LngLat, LngLat] | null {
+  return route ? boundsOf(lineCoordinates(route.baseline.route)) : null;
+}
+
+/**
+ * 원래 길이 지나는 통제 횡단보도 (T5.11) — avoided 의 crosswalk_id 를 같은 시각 /closures 점에서 찾는다.
+ * 계약에 위치가 없어서다(태우 결정 "계약 그대로, FE만"). 못 찾은 곳은 그리지 않는다
+ */
+export function avoidedPoints(
+  route: RouteResponse | null,
+  closures: FeatureCollection,
+): Collection<AvoidedFeature> {
+  const at = new Map<string, LngLat>();
+  for (const f of closures.features) {
+    const id = f.properties.crosswalk_id;
+    const p = f.geometry.type === "Point" ? toLngLat(f.geometry.coordinates) : null;
+    if (id && p) at.set(id, p);
+  }
+  const features: AvoidedFeature[] = [];
+  for (const a of route?.avoided ?? []) {
+    const p = at.get(a.crosswalk_id);
+    if (!p || features.some((f) => f.properties.crosswalk_id === a.crosswalk_id)) continue;
+    features.push({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: p },
+      properties: { crosswalk_id: a.crosswalk_id, status: a.status },
+    });
+  }
+  return { type: "FeatureCollection", features };
 }
 
 /** 레그의 [i, j] (ADR-009). 생성 타입이 unknown 이라 여기서 숫자를 확인한다 */
@@ -267,5 +318,49 @@ export function baselineLayers(sourceId: string = ROUTE_BASELINE_SOURCE_ID): Lay
         "line-dasharray": [0, 2],
       },
     },
+  ];
+}
+
+/** 원래 길 보기에서 막힌 횡단보도를 둘러싸는 원 (T5.11) — 통제 중 빨강, 공지상 통제 시간 주황 */
+export function avoidedLayers(sourceId: string = ROUTE_AVOIDED_SOURCE_ID): LayerSpecification[] {
+  const color: ExpressionSpecification = [
+    "match",
+    ["get", "status"],
+    "confirmed",
+    COLORS.stop,
+    COLORS.slow,
+  ];
+  return [
+    {
+      id: ROUTE_LAYER_IDS.avoided,
+      type: "circle",
+      source: sourceId,
+      paint: {
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 10, 17, 24],
+        "circle-color": color,
+        "circle-opacity": 0.2,
+        "circle-stroke-width": 3,
+        "circle-stroke-color": color,
+      },
+    },
+  ];
+}
+
+const DIM = 0.35;
+
+/** 고른 길에 따른 선 모양 (T5.11) — 원래 길이면 원래 길 실선(대시 없음)·굵게, 가장 빠른 길은 흐리게 */
+export function viewPaint(original: boolean): [string, string, unknown][] {
+  const opacity = original ? DIM : 1;
+  return [
+    [ROUTE_LAYER_IDS.casing, "line-opacity", opacity],
+    [ROUTE_LAYER_IDS.line, "line-opacity", opacity],
+    [ROUTE_LAYER_IDS.tunnel, "line-opacity", opacity],
+    [ROUTE_LAYER_IDS.tunnelDash, "line-opacity", opacity],
+    [ROUTE_LAYER_IDS.baseline, "line-dasharray", original ? undefined : [0, 2]],
+    [
+      ROUTE_LAYER_IDS.baseline,
+      "line-width",
+      ["interpolate", ["linear"], ["zoom"], 13, original ? 4 : 3, 17, original ? 8 : 5],
+    ],
   ];
 }

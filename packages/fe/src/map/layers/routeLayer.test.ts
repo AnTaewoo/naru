@@ -1,11 +1,14 @@
 // recorded /route (2026-03-15 교보빌딩 → 대한문, INTERFACE v0.7): 07:45 는 광화문(세종문화회관) 지하보도
 // 레그 coord_range [3, 8] (BE test_routers 와 같은 값), 04:30·13:30 은 지하보도 없음
 import { describe, expect, it } from "vitest";
-import { recordedRoute } from "../../test/recorded";
+import { recordedClosures, recordedRoute } from "../../test/recorded";
 import { COLORS } from "../colors";
 import { ICON_IDS } from "../icons";
 import {
   ROUTE_LAYER_IDS,
+  avoidedLayers,
+  avoidedPoints,
+  baselineBounds,
   baselineLayers,
   baselineLine,
   crossingLayers,
@@ -17,6 +20,7 @@ import {
   routeBounds,
   routeLayers,
   routeLine,
+  viewPaint,
   type LngLat,
 } from "./routeLayer";
 
@@ -157,5 +161,50 @@ describe("routeLayer — 경로 실선·원래 길 점선", () => {
     expect(dots.paint?.["line-color"]).toBe(COLORS.baseline);
     expect(dots.layout?.["line-cap"]).toBe("round");
     expect(dots.paint?.["line-dasharray"]).toBeDefined();
+  });
+});
+
+describe("원래 길 보기 (T5.11)", () => {
+  // recorded route_0745 avoided 2곳(confirmed) ↔ 같은 시각 closures_0745 의 점 (파일을 열어 확인)
+  const r0745 = recordedRoute("route_0745");
+  const fc0745 = recordedClosures("closures_0745");
+
+  it("피한 횡단보도는 같은 시각 /closures 점에서 찾는다 — 못 찾으면 그리지 않는다", () => {
+    const pts = avoidedPoints(r0745, fc0745);
+    expect(pts.features.map((f) => [f.properties.crosswalk_id, f.properties.status])).toEqual([
+      ["06-0000023206", "confirmed"],
+      ["06-0000036391", "confirmed"],
+    ]);
+    expect(pts.features.map((f) => f.geometry.coordinates)).toEqual([
+      [126.9771308, 37.5700504],
+      [126.9769067, 37.5701284],
+    ]);
+    expect(avoidedPoints(recordedRoute("route_1330"), fc0745).features).toEqual([]);
+    expect(avoidedPoints(r0745, { type: "FeatureCollection", features: [] }).features).toEqual([]);
+    expect(avoidedPoints(null, fc0745).features).toEqual([]);
+  });
+
+  it("원래 길 범위는 원래 길 좌표만 — 경로와 원래 길을 다 담는 범위 안", () => {
+    const b = baselineBounds(r0745);
+    const all = routeBounds(r0745);
+    if (!b || !all) throw new Error("범위 없음");
+    expect(b[0][0]).toBeGreaterThanOrEqual(all[0][0]);
+    expect(b[0][1]).toBeGreaterThanOrEqual(all[0][1]);
+    expect(b[1][0]).toBeLessThanOrEqual(all[1][0]);
+    expect(b[1][1]).toBeLessThanOrEqual(all[1][1]);
+    expect(baselineBounds(null)).toBeNull();
+  });
+
+  it("원래 길을 고르면 원래 길 실선·굵게, 가장 빠른 길은 흐리게 — 둘러싼 원은 통제 중 빨강·공지상 주황", () => {
+    const on = new Map(viewPaint(true).map(([id, prop, v]) => [`${id}|${prop}`, v]));
+    const off = new Map(viewPaint(false).map(([id, prop, v]) => [`${id}|${prop}`, v]));
+    expect(on.get(`${ROUTE_LAYER_IDS.line}|line-opacity`)).toBeLessThan(1);
+    expect(off.get(`${ROUTE_LAYER_IDS.line}|line-opacity`)).toBe(1);
+    expect(on.get(`${ROUTE_LAYER_IDS.baseline}|line-dasharray`)).toBeUndefined(); // 실선
+    expect(off.get(`${ROUTE_LAYER_IDS.baseline}|line-dasharray`)).toEqual([0, 2]); // 점선
+    const [halo] = avoidedLayers();
+    expect(halo?.type).toBe("circle");
+    expect(JSON.stringify(halo)).toContain(COLORS.stop);
+    expect(JSON.stringify(halo)).toContain(COLORS.slow);
   });
 });
