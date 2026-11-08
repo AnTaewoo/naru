@@ -1,6 +1,7 @@
 """BE 도메인 예외 — INTERFACE §6 오류 코드와 1:1. Model 이 던지고 error_view 가 응답으로 만든다.
 
-code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, internal}.
+code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, geocode_unavailable,
+internal}.
 Flask 를 모른다.
 """
 
@@ -25,6 +26,13 @@ class InvalidQueryError(NaruError):
 class NoRouteError(NaruError):
     code = "no_route"
     http_status = 422
+
+
+class GeocodeUnavailableError(NaruError):
+    """카카오 로컬을 못 불렀다 — 키 없음·오류·시간 초과·기록 없음 (INTERFACE §6·§7, ADR-011 B)."""
+
+    code = "geocode_unavailable"
+    http_status = 503
 
 
 class OutOfCoverageError(NaruError):
