@@ -27,6 +27,9 @@ KYOBO = "37.5709686446227,126.9779039768265"  # 카카오 24020019 (lat,lng)
 DAEHANMUN = "37.5650416322942,126.976542945622"  # 카카오 17582477
 GWANGHWAMUN = "126.965,37.555,126.990,37.580"
 TIMES = {"0430": "04:30", "0745": "07:45", "1330": "13:30"}  # 통제 전 / 중 / 후 (2026-03-15 KST)
+# T5.5 회귀 — 태우가 2026-11-08 실서버에 보낸 요청 그대로 (lat,lng)
+SEJONG = ("37.56368,126.97230", "37.56368,126.98193")  # 11/7 15:00 세종대로 건너기 (예정 집회 안)
+JAMSIL = ("37.5133,127.0980", "37.5145,127.1035")  # 그래프 밖 → out_of_coverage
 
 
 def record(out: Path, name: str, method: str, path: str, resp: TestResponse, **req: object) -> None:
@@ -62,6 +65,13 @@ def main(argv: list[str] | None = None) -> int:
     record(out, "candidates_course", "POST", "/internal/candidates", resp, json=str(batches[-1]))
     resp = client.post("/internal/candidates", json=batch)
     record(out, "error_unauthorized", "POST", "/internal/candidates", resp)
+    # 공지 후보(T5.5) — 11/7 서울경찰청 집회. 예정 통제 우회 기록용
+    notices = sorted((args.recorded / "candidates" / "notice").glob("*.json"))
+    if not notices:
+        raise SystemExit("기록 없음: make record-candidates SOURCE=notice 먼저")
+    notice = json.loads(notices[-1].read_text("utf-8"))
+    resp = client.post("/internal/candidates", json=notice, headers=headers)
+    record(out, "candidates_notice", "POST", "/internal/candidates", resp, json=str(notices[-1]))
 
     for key, hhmm in TIMES.items():
         at = f"2026-03-15T{hhmm}:00+09:00"
@@ -70,6 +80,13 @@ def main(argv: list[str] | None = None) -> int:
         q2 = {"bbox": GWANGHWAMUN, "at": at}
         resp = client.get("/closures", query_string=q2)
         record(out, f"closures_{key}", "GET", "/closures", resp, query=q2)
+
+    # 예정 집회 창 안 우회 (ADR-011 A) · 그래프 밖 (ADR-011, INTERFACE §6)
+    q = {"from": SEJONG[0], "to": SEJONG[1], "depart_at": "2026-11-07T15:00:00+09:00"}
+    record(out, "route_1107_1500", "GET", "/route", client.get("/route", query_string=q), query=q)
+    q = {"from": JAMSIL[0], "to": JAMSIL[1], "depart_at": "2026-03-15T10:00:00+09:00"}
+    resp = client.get("/route", query_string=q)
+    record(out, "error_out_of_coverage", "GET", "/route", resp, query=q)
 
     # 통제 사건 목록 (INTERFACE §3.1) — 개발 DB 에 들어 있는 배치(코스·공지) 전부가 실린다
     record(out, "closure_events", "GET", "/closures/events", client.get("/closures/events"))
@@ -86,6 +103,7 @@ def main(argv: list[str] | None = None) -> int:
         "recorded_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "commit": commit,
         "batch_file": str(batches[-1]),
+        "notice_batch_file": str(notices[-1]),
         "database": settings.database_url.rsplit("@", 1)[-1],  # 호스트/DB 만
         "files": sorted(p.name for p in out.glob("*.json") if p.name != "_meta.json"),
     }
