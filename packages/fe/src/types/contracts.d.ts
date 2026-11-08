@@ -139,7 +139,7 @@ export type Crosswalks = number;
 export type Bbox2 = [unknown, unknown, unknown, unknown];
 export type Approx4 = boolean;
 export type Events = ClosureEvent[];
-export type Code = "invalid_query" | "unauthorized" | "not_found" | "no_route" | "internal";
+export type Code = "invalid_query" | "unauthorized" | "not_found" | "no_route" | "out_of_coverage" | "internal";
 export type Message = string;
 export type Field = string | null;
 

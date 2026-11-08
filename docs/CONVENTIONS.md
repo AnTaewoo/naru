@@ -30,7 +30,7 @@ Claude는 코드를 쓰기 전에 해당 레인 섹션을 읽는다. 여기 없�
 - **docstring**: Google 스타일. 공개 함수·클래스만. "무엇을"보다 "왜"를.
 - **예외**: 패키지별 `errors.py`에 도메인 예외. `except Exception:` 금지. 잡으면 로그 남기고 다시 던지거나 명시적으로 변환.
 - **로깅**: 표준 `logging` + JSON 한 줄 포맷 (`naru_*/log.py` 하나). `print` 금지. 외부 호출은 `api`, `params`(키 제거), `status`, `elapsed_ms`를 남긴다.
-- **설정**: `pydantic-settings`의 `Settings` 하나(`naru_*/config.py`). 코드에서 `os.environ` 직접 읽지 않는다. 임계값(0.7, 0.8, ×3, 30분, 점 반경 30m, 선 버퍼 15m, 도로 등급별 버퍼 대로 25m/로 15m/길 8m)은 전부 여기.
+- **설정**: `pydantic-settings`의 `Settings` 하나(`naru_*/config.py`). 코드에서 `os.environ` 직접 읽지 않는다. 임계값(0.7, 0.8, 예정 +300초, 붙임 150m, 30분, 점 반경 30m, 선 버퍼 15m, 도로 등급별 버퍼 대로 25m/로 15m/길 8m)은 전부 여기.
 - **의존 방향** (`.importlinter`가 `make check`에서 강제):
   - `ai → contracts`, `be → contracts`. **ai ↔ be 직접 import 금지.** AI→BE는 HTTP(`POST /internal/candidates`)로만 넘긴다.
   - `naru_contracts`는 우리 패키지를 import하지 않는다.

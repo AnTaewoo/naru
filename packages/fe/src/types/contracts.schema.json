@@ -1291,6 +1291,7 @@
             "unauthorized",
             "not_found",
             "no_route",
+            "out_of_coverage",
             "internal"
           ],
           "title": "Code",

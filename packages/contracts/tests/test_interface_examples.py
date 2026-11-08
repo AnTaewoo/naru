@@ -129,6 +129,7 @@ def test_error_body_example() -> None:  # §6
         "unauthorized",
         "not_found",
         "no_route",
+        "out_of_coverage",  # v0.9, ADR-011 그래프 밖 — 그래프에 붙일 거리 150 m 초과
         "internal",
     }
 

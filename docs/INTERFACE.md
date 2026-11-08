@@ -1,4 +1,4 @@
-# INTERFACE.md — 파트 간 계약 v0.8
+# INTERFACE.md — 파트 간 계약 v0.9
 
 파트 경계의 단일 기준. 스키마를 바꾸면 **이 파일 먼저** 고치고, 하위호환이 깨지면 버전을 올린다. 변경은 ADR + 태우 승인.
 코드 구현은 `packages/contracts`(`naru_contracts`, pydantic v2) 하나뿐이다. 테스트가 이 문서의 예시 JSON 블록을 그대로 파싱하므로, 예시를 고치면 코드도 고쳐야 한다. FE 타입은 `make schema`로 생성한다.
@@ -162,13 +162,15 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 | `legs[].kind` | `sidewalk` · `crosswalk` · `underpass` · `overpass` · `stairs` · `elevator` · `station` | 보도 · 횡단보도 · 지하보도 · 육교 · 계단 · 엘리베이터 · 역 통과 |
 
 ## §5 상태별 라우팅 반응 (엔진·라우터·FE 공통 규칙)
-ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, ×3, 30분)은 `naru_be/config.py` 상수. 바꾸면 이 문서와 ARCHITECTURE 표도 같이.
+ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, 예정 +300초, 30분, 붙임 150 m)은 `naru_be/config.py` 상수. 바꾸면 이 문서와 ARCHITECTURE 표도 같이.
+- (v0.9, ADR-011 A) `scheduled`(확신도 ≥ 0.7)는 횡단보도에 닿는 시각이 공지 창 안일 때만 그 횡단보도마다 +300초(`scheduled_penalty_s`) — 하드 차단이 아니라 페널티. 창 밖(시작 전·끝난 뒤)은 보통. `confirmed`는 차단. FE 는 `avoided[].status` 로 confirmed "통제 중" / scheduled "공지상 통제 시간 · 현장 확인 전"을 나눈다.
 
 ## §6 오류 응답 (Flask)
 ```json
 {"error": {"code": "invalid_query", "message": "depart_at: 오프셋 없는 시각", "field": "depart_at"}}
 ```
-- `code ∈ {invalid_query, unauthorized, not_found, no_route, internal}`. HTTP 400 / 401 / 404 / 422(`no_route`) / 500. Flask `error_view`(View 계층)가 만든다.
+- `code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, internal}`. HTTP 400 / 401 / 404 / 422(`no_route`·`out_of_coverage`) / 500. Flask `error_view`(View 계층)가 만든다.
+- `out_of_coverage` (v0.9, ADR-011): 출발·도착을 보행망 노드에 붙일 거리가 150 m(`max_snap_m`)를 넘는다. `field` = `from` 또는 `to`.
 
 ## 변경 이력
 | 날짜 | 버전 | 변경 | 누가 |
@@ -182,3 +184,4 @@ ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, �
 | 2026-11-07 | v0.6 | §3 `at` 의미 보강: 진행 중 + 60분 안 시작 예정, status는 `at` 기준 재판정 (스키마 변경 없음) | 태우 결정 |
 | 2026-11-08 | v0.7 | §2 `legs[].coord_range` [i, j] 필수(route.coordinates 인덱스, 양끝 포함, 레그가 경로를 빈틈없이 나눔), 접근 구간을 sidewalk 레그로 셈해 Σ legs.distance_m = distance_m (ADR-009) | 태우 승인 |
 | 2026-11-08 | v0.8 | §3.1 `GET /closures/events` 추가 — DB 통제를 (reason, window) 사건으로 묶은 목록, 상태 없음, 시작 늦은 순 (ADR-010) | 태우 승인 |
+| 2026-11-08 | v0.9 | §5 예정은 공지 창 안에서만 횡단보도당 +300초(×3 폐지), §6 `out_of_coverage`(422, 붙임 150 m 초과) (ADR-011 A) | 태우 승인 |

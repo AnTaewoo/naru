@@ -4,7 +4,9 @@ from typing import Literal
 
 from naru_contracts._base import Contract
 
-ErrorCode = Literal["invalid_query", "unauthorized", "not_found", "no_route", "internal"]
+ErrorCode = Literal[
+    "invalid_query", "unauthorized", "not_found", "no_route", "out_of_coverage", "internal"
+]
 
 
 class ErrorDetail(Contract):
