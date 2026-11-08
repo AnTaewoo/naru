@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import {
-  EVIDENCE_KO,
   STATUS_BADGE_KO,
+  dataAsOfKo,
+  eventDetailKo,
+  eventTitleKo,
   hhmm,
-  reasonKo,
   sheetTitleKo,
   untilKo,
   windowKo,
@@ -14,14 +15,16 @@ import { STATUS_BG, STATUS_COLOR } from "../map/colors";
 import { countByStatus } from "../map/layers/closureLayer";
 import { useClosures } from "../state/ClosureProvider";
 import { useTime } from "../state/TimeProvider";
-import type { EvidenceKind, FeatureCollection, Status } from "../types/contracts";
+import type { ClosureEvent, FeatureCollection, Status } from "../types/contracts";
 import { BottomSheet, type SheetStage } from "./BottomSheet";
 import { ClosureEvents } from "./ClosureEvents";
 import styles from "./ClosureSheet.module.css";
 import { ClosureTimeline } from "./ClosureTimeline";
 import { TimeSlider } from "./TimeSlider";
 
-// 목업 01_home 하단 시트: 제목/부제 → 타임라인+슬라이더 → 통제 행(후보 한 건 = 한 행)
+// 목업 01_home 하단 시트: 제목/부제 → 기준 시각 → 타임라인+슬라이더 → 통제 행(사건 한 건 = 한 행).
+// T5.9: 행 제목·둘째 줄은 파서 요약(사건 칸), 횡단보도 수는 사건 전체, 출처 줄(시각표·확신)은 쓰지 않고
+// 원문은 "공지 원문 보기"에서만
 export interface ClosureRow {
   key: string;
   status: Status;
@@ -29,9 +32,9 @@ export interface ClosureRow {
   crosswalks: number;
   start: string | null;
   end: string | null;
-  evidence: EvidenceKind[];
-  confidence: number;
   approx: boolean;
+  /** 같은 (reason, window) 의 사건 (/closures/events) — 제목·전체 수·공지 원문 */
+  event?: ClosureEvent;
 }
 
 const ORDER: Record<Status, number> = {
@@ -54,11 +57,6 @@ export function closureRows(fc: FeatureCollection): ClosureRow[] {
       row.crosswalks += 1;
       continue;
     }
-    const kinds = new Set<EvidenceKind>();
-    for (const e of p.evidence ?? []) {
-      const k = e["kind"];
-      if (typeof k === "string") kinds.add(k as EvidenceKind);
-    }
     rows.set(key, {
       key,
       status: p.status,
@@ -66,8 +64,6 @@ export function closureRows(fc: FeatureCollection): ClosureRow[] {
       crosswalks: 1,
       start,
       end,
-      evidence: [...kinds],
-      confidence: p.confidence,
       approx: p.approx ?? false,
     });
   }
@@ -76,15 +72,33 @@ export function closureRows(fc: FeatureCollection): ClosureRow[] {
   );
 }
 
+const sameTime = (a: string | null | undefined, b: string | null | undefined) =>
+  (a ?? null) === (b ?? null) || (!!a && !!b && Date.parse(a) === Date.parse(b));
+
+/** 행마다 같은 (reason, window) 사건을 붙인다 — 횡단보도 수는 화면 영역이 아니라 사건 전체 (T5.9) */
+export function withEvents(rows: ClosureRow[], events: readonly ClosureEvent[]): ClosureRow[] {
+  return rows.map((row) => {
+    const event = events.find(
+      (e) =>
+        e.reason === row.reason &&
+        sameTime(e.window.start, row.start) &&
+        sameTime(e.window.end, row.end),
+    );
+    return event ? { ...row, crosswalks: event.crosswalks, event } : row;
+  });
+}
+
 function badge(row: ClosureRow, t: string): string {
   if (row.status === "confirmed") return untilKo(row.end, t);
   return STATUS_BADGE_KO[row.status];
 }
 
 export function ClosureSheet() {
-  const { closures, status, error, at } = useClosures();
+  const { closures, status, error, at, events, dataAsOf } = useClosures();
   const { t, ready } = useTime();
-  const rows = useMemo(() => closureRows(closures), [closures]);
+  const rows = useMemo(() => withEvents(closureRows(closures), events ?? []), [closures, events]);
+  // "공지 원문 보기"로 펼친 행 (T5.9) — 원문은 여기서만
+  const [opened, setOpened] = useState<string | null>(null);
   const counts = useMemo(() => countByStatus(closures), [closures]);
   // 통제 불러오기 목록을 펼쳤나 (T5.4). 시트는 절반에서 시작 (T5.6)
   const [picking, setPicking] = useState(false);
@@ -105,6 +119,8 @@ export function ClosureSheet() {
     : counts.confirmed + counts.scheduled === 0
       ? `${hhmm(t)} 기준 통제 없음`
       : `${hhmm(t)} 기준 · 횡단보도 ${counts.confirmed}곳 통제 중, ${counts.scheduled}곳 예정`;
+  // 목록 위 데이터 기준 시각 (결정 C) — 실시간 돌발이 없거나 30분 넘게 오래면 회색 경고
+  const asof = ready && dataAsOf ? dataAsOfKo(dataAsOf, Date.now()) : null;
   return (
     <BottomSheet label={title} stage={stage} onStage={setStage}>
       <div className={styles.pad}>
@@ -127,6 +143,12 @@ export function ClosureSheet() {
             <span className={styles.loading}> · {hhmm(at)} 결과</span>
           )}
         </div>
+        {asof && (
+          <div className={styles.asof}>
+            <span>{asof.text}</span>
+            {asof.warning && <span className={styles.asofWarn}>{asof.warning}</span>}
+          </div>
+        )}
       </div>
       {picking ? (
         <ClosureEvents focusMap onDone={picked} />
@@ -135,25 +157,45 @@ export function ClosureSheet() {
           <ClosureTimeline />
           <TimeSlider />
           <div className={styles.rows}>
-            {rows.map((row) => (
-              <div key={row.key} className={styles.row}>
-                <span className={styles.ico} style={{ background: STATUS_BG[row.status] }}>
-                  <span className={styles.dot} style={{ background: STATUS_COLOR[row.status] }} />
-                </span>
-                <div className={styles.rowText}>
-                  <b className={styles.rowTitle}>{reasonKo(row.reason)}</b>
-                  <span className={styles.rowSub}>
-                    {row.approx ? "약 " : ""}
-                    {windowKo(row.start, row.end)} · 횡단보도 {row.crosswalks}곳 ·{" "}
-                    {row.evidence.map((k) => EVIDENCE_KO[k]).join("·") || "근거 없음"} · 확신{" "}
-                    {Math.round(row.confidence * 100)}%
+            {rows.map((row) => {
+              const ev: Pick<ClosureEvent, "reason" | "type" | "summary"> = row.event ?? {
+                reason: row.reason,
+                summary: null,
+              };
+              const detail = eventDetailKo(ev);
+              const notice = row.event?.notice;
+              return (
+                <div key={row.key} className={styles.row}>
+                  <span className={styles.ico} style={{ background: STATUS_BG[row.status] }}>
+                    <span className={styles.dot} style={{ background: STATUS_COLOR[row.status] }} />
                   </span>
+                  <div className={styles.rowText}>
+                    <b className={styles.rowTitle}>{eventTitleKo(ev)}</b>
+                    {detail && <span className={styles.rowDetail}>{detail}</span>}
+                    <span className={styles.rowSub}>
+                      {row.approx ? "약 " : ""}
+                      {windowKo(row.start, row.end)} · 횡단보도 {row.crosswalks}곳
+                    </span>
+                    {notice && (
+                      <button
+                        type="button"
+                        className={styles.raw}
+                        aria-expanded={opened === row.key}
+                        onClick={() => setOpened(opened === row.key ? null : row.key)}
+                      >
+                        공지 원문 보기
+                      </button>
+                    )}
+                    {notice && opened === row.key && (
+                      <p className={styles.excerpt}>{notice.excerpt}</p>
+                    )}
+                  </div>
+                  <em className={styles.badge} style={{ color: STATUS_COLOR[row.status] }}>
+                    {badge(row, t)}
+                  </em>
                 </div>
-                <em className={styles.badge} style={{ color: STATUS_COLOR[row.status] }}>
-                  {badge(row, t)}
-                </em>
-              </div>
-            ))}
+              );
+            })}
             {rows.length === 0 && (
               <p className={styles.empty}>
                 이 시각에 걸린 통제가 없어요.{" "}

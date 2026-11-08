@@ -1,27 +1,38 @@
 // 렌더 테스트 — Provider 초기 state 에 recorded 응답을 넣고 그린다. 네트워크 없음 (CONVENTIONS §5.7-2)
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { createNaruApiClient } from "../api/naruApiClient";
 import { ApiProvider } from "../state/ApiProvider";
 import { ClosureProvider, useClosureDispatch, useClosures } from "../state/ClosureProvider";
 import { TimeProvider } from "../state/TimeProvider";
-import { recordedClosures } from "../test/recorded";
-import { ClosureSheet, closureRows } from "./ClosureSheet";
+import { recordedClosures, recordedEvents } from "../test/recorded";
+import { ClosureSheet, closureRows, withEvents } from "./ClosureSheet";
 import { timelineBars } from "./ClosureTimeline";
 import { TimeSlider } from "./TimeSlider";
 
 const T = "2026-03-15T07:45:00+09:00";
 const fc0745 = recordedClosures("closures_0745");
 const fc0430 = recordedClosures("closures_0430");
+const fc1107 = recordedClosures("closures_1107_1500"); // 11/7 15:00 광화문 — 공지 집회 두 건
+const T1107 = "2026-11-07T15:00:00+09:00";
+const { events, data_as_of: dataAsOf } = recordedEvents(); // v0.12 — 사건 칸·기준 시각
 
-function Providers({ children, at = T }: { children: ReactNode; at?: string }) {
+function Providers({
+  children,
+  at = T,
+  closures = fc0745,
+}: {
+  children: ReactNode;
+  at?: string;
+  closures?: typeof fc0745;
+}) {
   return (
     <ApiProvider client={createNaruApiClient("/api")}>
       <TimeProvider initialT={at}>
         <ClosureProvider
           fetchEnabled={false}
-          initialState={{ status: "ready", closures: fc0745, at }}
+          initialState={{ status: "ready", closures, at, events, dataAsOf }}
         >
           {children}
         </ClosureProvider>
@@ -40,12 +51,24 @@ describe("closureRows / timelineBars (순수)", () => {
     expect(seg1?.status).toBe("confirmed");
     expect(seg1?.start).toBe("2026-03-15T07:20:00+09:00");
     expect(seg1?.end).toBe("2026-03-15T08:08:00+09:00");
-    expect(seg1?.evidence).toEqual(["timetable"]);
+    expect(seg1 && "evidence" in seg1).toBe(false); // 출처 줄(시각표·확신)은 쓰지 않는다 (T5.9)
     const bars = timelineBars(fc0745, "2026-03-15T00:00:00+09:00");
     expect(bars).toHaveLength(rows.length);
     const seg1bar = bars.find((b) => b.reason.includes("1구간"));
     expect(seg1bar?.leftPct).toBeCloseTo(((7 * 60 + 20) / (24 * 60)) * 100, 3);
     expect(seg1bar?.widthPct).toBeCloseTo((48 / (24 * 60)) * 100, 3);
+  });
+  it("횡단보도 수는 화면 영역 말고 사건 전체 — 07:45 2구간 화면 안 23곳 → 58곳 (T5.9)", () => {
+    const rows = withEvents(closureRows(fc0745), events);
+    const count = (part: string) => rows.find((r) => r.reason.includes(part))?.crosswalks;
+    // recorded closures_0745 의 화면 안 개수 23·21·24 → closure_events 의 사건 전체 58·54·60
+    expect([count("2구간"), count("3구간"), count("4구간"), count("1구간")]).toEqual([
+      58, 54, 60, 6,
+    ]);
+    // 11/7 r04: 구간 후보가 겹쳐 피처 38개지만 서로 다른 횡단보도 31곳
+    const rally = withEvents(closureRows(fc1107), events).find((r) => r.reason.startsWith("15:00"));
+    expect(rally?.crosswalks).toBe(31);
+    expect(rally?.event?.summary?.reported_people).toBe(50000);
   });
   it("04:30 — 예정 1행(출발지 구간), 횡단보도 5곳", () => {
     const rows = closureRows(fc0430);
@@ -70,6 +93,35 @@ describe("ClosureSheet", () => {
     expect(screen.getAllByText("제한").length).toBeGreaterThan(0); // scheduled 행 배지
     expect(screen.getByLabelText("기준 시각")).toBeDefined();
     expect(screen.getByText("07:45")).toBeDefined();
+    // T5.9 — 사건 전체 수, 출처 줄 없음, 목록 위 기준 시각(실시간 돌발 없으면 회색 경고)
+    expect(screen.getByText("07:23–08:57 · 횡단보도 58곳")).toBeDefined(); // 2구간, 기록 창 그대로
+    expect(screen.queryByText(/확신/)).toBeNull();
+    expect(screen.queryByText(/시각표·|시각표 ·/)).toBeNull();
+    expect(screen.getByText("경찰청 11/6 공지 · 마라톤 3/12 시각표 기준")).toBeDefined();
+    expect(screen.getByText("실시간 돌발(TOPIS)은 아직 받지 않아요")).toBeDefined();
+  });
+
+  it("11/7 15:00 — 공지 행은 파서 제목·둘째 줄, 원문은 '공지 원문 보기'에서만 (T5.9)", () => {
+    render(
+      <Providers at={T1107} closures={fc1107}>
+        <ClosureSheet />
+      </Providers>,
+    );
+    expect(screen.getByText("시의회~숭례문오거리 집회 → 광화문·고용노동청 행진")).toBeDefined();
+    expect(screen.getByText("5만 명 · 태평로")).toBeDefined();
+    expect(screen.getByText("15:00–16:00 · 횡단보도 31곳")).toBeDefined();
+    const excerpt =
+      "15:00~16:00 시의회~숭례문R → 광화문·고용노동청 <태평로 등> 50,000명 중부, 종로, 남대문";
+    expect(screen.queryByText(excerpt)).toBeNull(); // 목록엔 원문이 없다
+    expect(document.querySelector(`[title="${excerpt}"]`)).toBeNull(); // 타임라인 툴팁에도
+    const row = screen
+      .getByText("시의회~숭례문오거리 집회 → 광화문·고용노동청 행진")
+      .closest("div");
+    if (!row) throw new Error("집회 행");
+    const open = within(row).getByRole("button", { name: "공지 원문 보기" });
+    fireEvent.click(open);
+    expect(screen.getByText(excerpt)).toBeDefined();
+    expect(open.getAttribute("aria-expanded")).toBe("true");
   });
 });
 

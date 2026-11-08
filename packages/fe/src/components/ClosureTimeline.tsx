@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { reasonKo } from "../i18n/ko";
+import { eventTitleKo } from "../i18n/ko";
 import { STATUS_COLOR } from "../map/colors";
 import { useClosures } from "../state/ClosureProvider";
 import { useTime } from "../state/TimeProvider";
@@ -51,7 +51,10 @@ export function nowPct(t: string, dayStart: string): number {
 }
 
 export function ClosureTimeline() {
-  const { closures } = useClosures();
+  const { closures, events } = useClosures();
+  // 막대 툴팁은 사건 제목 — 원문은 "공지 원문 보기"에서만 (T5.9)
+  const titleOf = (reason: string) =>
+    eventTitleKo(events?.find((e) => e.reason === reason) ?? { reason, summary: null });
   const { t, dayStart, ready } = useTime();
   const bars = useMemo(() => timelineBars(closures, dayStart), [closures, dayStart]);
   return (
@@ -61,7 +64,7 @@ export function ClosureTimeline() {
         <span
           key={b.key}
           className={styles.bar}
-          title={reasonKo(b.reason)}
+          title={titleOf(b.reason)}
           style={{
             left: `${b.leftPct}%`,
             width: `${b.widthPct}%`,
