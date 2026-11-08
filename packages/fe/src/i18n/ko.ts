@@ -144,25 +144,34 @@ export function routeNoteKo(p: {
   return `횡단보도 ${p.crosswalks}곳이 ${until}막혀 있어 ${via ?? "돌아가는"} 길을 골랐어요.`;
 }
 
+/** 공지 근거의 출처 — 근거 ref 의 문장 id 앞머리(`…#smpa-20261107-r01`). 모르면 "통제 공지" */
+const NOTICE_SOURCE_KO: Record<string, string> = {
+  smpa: "서울경찰청 집회 공지",
+  topis: "TOPIS 통제 공지",
+};
+
 /**
- * 근거 한 줄 (시안 03 "이렇게 판단했어요"): detail 의 상태 전이 → 구간 label·section → 공지 excerpt 순.
- * 없으면 근거 종류 라벨. 기준 시각보다 뒤의 전이(해제 등)는 "예정"
+ * 근거 한 줄 (통제 근거, 시간순): 상태 전이는 "해제 예정"·"해제"·"통제 시작", 시각표는 구간 label·section,
+ * 공지는 출처("서울경찰청 집회 공지"). 오른쪽 배지가 근거 종류라 같은 말을 두 번 쓰지 않는다
  */
 export function evidenceTextKo(e: Evidence, t: string): string {
   const d = e.detail ?? {};
+  const future = new Date(e.at).getTime() > new Date(t).getTime();
   const transition = d["transition"];
   if (typeof transition === "string") {
-    const [a, b] = transition.split("→");
-    if (a && b && a in STATUS_KO && b in STATUS_KO) {
-      const future = new Date(e.at).getTime() > new Date(t).getTime();
-      return `${STATUS_KO[a as Status]} → ${STATUS_KO[b as Status]}${future ? " 예정" : ""}`;
-    }
+    const to = transition.split("→")[1];
+    if (to === "released") return future ? "해제 예정" : "해제";
+    if (to === "confirmed") return future ? "통제 시작 예정" : "통제 시작";
   }
   const parts = [d["label"], d["section"]].filter(
     (x): x is string => typeof x === "string" && x !== "",
   );
   if (parts.length > 0) return parts.join(" ");
   if (typeof d["excerpt"] === "string") return d["excerpt"];
+  if (e.kind === "notice") {
+    const head = e.ref.split("#")[1]?.split("-")[0] ?? "";
+    return NOTICE_SOURCE_KO[head] ?? "통제 공지";
+  }
   return EVIDENCE_KO[e.kind];
 }
 

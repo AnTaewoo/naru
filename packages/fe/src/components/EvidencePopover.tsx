@@ -27,7 +27,7 @@ import type {
 } from "../types/contracts";
 import styles from "./EvidencePopover.module.css";
 
-// 통제 근거 (시안 03 구조) — 이 경로가 피한 통제를 사유별로: 해제 시각, "이렇게 판단했어요", 확신도.
+// 통제 근거 (시안 03 구조) — 이 경로가 피한 통제를 사유별로: 해제 시각, 근거 줄(시간순), 확신도.
 // 확신도는 /route 의 avoided 에 없어서 같은 시각 /closures 의 같은 횡단보도 값을 쓴다 (없으면 숨김)
 export interface EvidenceRow {
   key: string;
@@ -122,10 +122,9 @@ export function EvidencePopover({ route }: { route: RouteResponse }) {
           <strong className={styles.title}>{reasonKo(g.reason)}</strong>
           <span className={styles.sub}>이 길이 피한 횡단보도 {g.crosswalks}곳</span>
           <div className={styles.big}>
-            {g.until ? `~${hhmm(g.until)}` : "종료 미정"}
+            {g.until ? `~${hhmm(g.until)}` : "종료 미정"}{" "}
             <small style={{ color: STATUS_COLOR[g.status] }}>{untilKo(g.until, t)}</small>
           </div>
-          <div className={styles.lbl}>이렇게 판단했어요</div>
           <div className={styles.ev}>
             {g.evidence.map((e) => (
               <Fragment key={e.key}>

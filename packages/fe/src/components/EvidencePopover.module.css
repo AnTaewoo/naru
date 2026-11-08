@@ -56,17 +56,10 @@
 .big small {
   font-size: 13.5px;
   font-weight: 600;
-  margin-left: 6px;
+  margin-left: 2px; /* 앞에 띄어쓰기가 있다 */
 }
-
-.lbl {
-  margin: 12px 0 6px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #444;
-}
-
 .ev {
+  margin-top: 12px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 6px 10px;

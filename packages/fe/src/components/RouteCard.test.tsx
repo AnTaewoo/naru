@@ -170,7 +170,7 @@ describe("카드·레그·근거 (순수)", () => {
     expect(g1?.until).toBe("2026-03-15T08:08:00+09:00");
     expect(g1?.evidence.map((e) => [e.when, e.text, e.kind])).toEqual([
       ["3/12 16:07", "1구간 세종대로 사거리~숭례문 오거리", "timetable"],
-      ["08:08", "확인 → 해제 예정", "timetable"],
+      ["08:08", "해제 예정", "timetable"],
     ]);
     expect(evidenceGroups(r1330.avoided, fc0745, T1330)).toEqual([]);
   });
@@ -208,11 +208,12 @@ describe("RouteCard 렌더", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "통제 근거" }));
     const ev = screen.getByRole("region", { name: "통제 근거" });
-    expect(ev.textContent).toContain("이렇게 판단했어요");
+    expect(ev.textContent).not.toContain("이렇게 판단했어요"); // 머리 없이 근거 줄만 (태우 2026-11-08)
     expect(ev.textContent).toContain("마라톤 1구간 세종대로 사거리~숭례문 오거리");
-    expect(ev.textContent).toContain("23분 뒤 해제");
+    expect(ev.textContent).toContain("~08:08 23분 뒤 해제"); // 해제 시각과 남은 시간 사이 띄어쓰기
     expect(ev.textContent).toContain("3/12 16:07");
-    expect(ev.textContent).toContain("확인 → 해제 예정");
+    expect(ev.textContent).toContain("해제 예정");
+    expect(ev.textContent).not.toContain("→");
     expect(ev.textContent).toContain("확신도");
     expect(ev.textContent).toContain("0.90");
     expect(screen.queryByRole("list", { name: "경로 상세" })).toBeNull(); // 한 번에 하나
@@ -239,9 +240,12 @@ describe("RouteCard 렌더", () => {
     expect(orig.textContent).toContain("공지상 통제 시간");
     expect(orig.textContent).toContain("횡단보도 공지상 통제 시간 1곳 · 현장 확인 전 · 16:00 해제");
     fireEvent.click(screen.getByRole("button", { name: "통제 근거" }));
-    expect(screen.getByRole("region", { name: "통제 근거" }).textContent).toContain(
-      "공지상 통제 시간 · 현장 확인 전",
-    );
+    const ev = screen.getByRole("region", { name: "통제 근거" }).textContent ?? "";
+    expect(ev).toContain("공지상 통제 시간 · 현장 확인 전");
+    // 근거 줄: 11/6 18:00 서울경찰청 집회 공지(공지 문장 id smpa-…), 16:00 해제 예정 — "공지 공지" 겹침 없음
+    expect(ev).toContain("11/6 18:00서울경찰청 집회 공지공지");
+    expect(ev).toContain("16:00해제 예정");
+    expect(ev).not.toContain("이렇게 판단했어요");
   });
 
   it("오류 — 그래프 밖(recorded error_out_of_coverage, 잠실)", () => {

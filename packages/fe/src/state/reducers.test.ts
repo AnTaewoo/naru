@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   LEG_KO,
+  evidenceTextKo,
   dateKo,
   dayKo,
   distanceKo,
@@ -276,5 +277,20 @@ describe("날짜 라벨 (T5.4)", () => {
     const rallyMs = Date.parse(events[0]?.window.start ?? "");
     expect(sheetTitleKo(T745, Date.parse(T1330))).toBe("오늘 통제"); // 같은 3/15
     expect(sheetTitleKo(T745, rallyMs)).toBe("3월 15일 통제"); // 지금이 11/7 이면
+  });
+});
+
+describe("근거 문장 (통제 근거 말투, 태우 2026-11-08)", () => {
+  it("상태 전이는 '해제 예정'·'해제'·'통제 시작', 공지는 출처, 구간은 그대로", () => {
+    // recorded route_0745 avoided[0]: 시각표 게시(1구간 label·section) + 08:08 confirmed→released
+    const [posted, release] = r0745.avoided[0]?.evidence ?? [];
+    if (!posted || !release) throw new Error("근거 둘");
+    expect(evidenceTextKo(posted, T745)).toBe("1구간 세종대로 사거리~숭례문 오거리");
+    expect(evidenceTextKo(release, T745)).toBe("해제 예정"); // 07:45 기준 08:08 은 뒤
+    expect(evidenceTextKo(release, T1330)).toBe("해제"); // 13:30 기준은 지난 일
+    // recorded route_1107_1500 avoided[0]: 서울경찰청 공지(문장 id smpa-20261107-r04) + 16:00 해제
+    const [notice] = recordedRoute("route_1107_1500").avoided[0]?.evidence ?? [];
+    if (!notice) throw new Error("공지 근거");
+    expect(evidenceTextKo(notice, "2026-11-07T15:00:00+09:00")).toBe("서울경찰청 집회 공지");
   });
 });
