@@ -139,7 +139,7 @@ def test_unresolved_names_make_no_candidates(
     # 글 순서 6289·6288·6275
     assert logged == ["용문동 107번지 앞", "서울광장 일대", "잠실수중보"]
     assert worker._live_budget(EVENING) == 0  # client 없음
-    assert worker.topis_batch(EVENING) is None and worker.topis_failed == set()
+    assert worker.topis_batch(EVENING) is None and worker.parse_failed == set()
 
 
 def test_topis_batch_on_nov7_morning(worker: IngestWorker, record: dict[str, str]) -> None:

@@ -23,7 +23,8 @@ def test_smpa_rows_become_sentences(smpa_dir: Path) -> None:
     source = SmpaPdfSource(smpa_dir)
     for name, rows in SMPA_ROWS.items():
         assert len(source.parse_file(smpa_dir / name)) == rows, name
-    sentences = source.sentences()
+    # 이 세 파일만 — 운영 워커가 inbox(T6.6)에서 읽은 PDF 를 같은 폴더로 옮겨 온다
+    sentences = [s for name in SMPA_ROWS for s in source.parse_file(smpa_dir / name)]
     assert len(sentences) == sum(SMPA_ROWS.values())
     assert len({s.sentence_id for s in sentences}) == len(sentences)
     for s in sentences:
