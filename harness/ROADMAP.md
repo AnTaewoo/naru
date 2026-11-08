@@ -217,13 +217,13 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 ## P5 — FE · 배포 ★ (CONVENTIONS §5)
 
 ### T5.0 Next.js 스캐폴드 ★
-- status: DOING
+- status: DONE
 - depends: T3.4
 - 산출: `packages/fe` (App Router, React 19, TS strict, pnpm, eslint+prettier, vitest, Playwright), `next.config.ts` rewrites(`/api/:path*` → `NARU_API_ORIGIN`, `/internal/*` 제외), `app/{layout,page,providers}.tsx`, `make schema` → `src/types/contracts.d.ts`, `make check`에 `pnpm check` 연결
 - 테스트: `pnpm check` 초록, `contracts.d.ts`에 `ClosureCandidate`·`RouteResponse`, `make dev`로 rewrites 확인
 
 ### T5.1 MapView + 통제 레이어 + 시간 슬라이더 ★
-- status: TODO
+- status: DOING
 - depends: T5.0
 - 산출: `components/NaruApp.tsx`, `map/MapView.tsx`(maplibre `useRef`, VWorld 타일), `state/{Time,Closure}Provider.tsx`, `map/layers/closureLayer.ts`(confirmed 빨강 ×, scheduled 노랑, zone 보라 빗금, 지하보도 입구 파랑), `components/TimeSlider.tsx`, `i18n/ko.ts` — 화면 구성은 `docs/mockups/01_home.html`(CONVENTIONS §5.9)
 - 테스트: recorded `/closures` → closureLayer feature 수·색 일치. reducer 단독. TimeSlider는 closures state 변경에 재렌더 안 됨

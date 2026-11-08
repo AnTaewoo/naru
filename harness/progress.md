@@ -147,3 +147,9 @@
 - 정한 것: e2e 테스트만 naru_ai·naru_be 를 함께 import(패키지는 여전히 독립). 광화문 시연용으로 few-shot 문장 r01·r04 기록. 돌발·버스 스케줄은 P6. few-shot news 2행 URL 은 태우 확인값으로 채움
 - 막힌 것 / 태우 대기: PC-4 — review 임계값·모델 결정(Sonnet 비교는 live 34회·≈$0.2 라 승인 필요), 지도 확인
 - 커밋: 97360ce, bd483bf, 25fdb7e, 0969ad4, 616c041 + URL 보강·규칙서 커밋 / 이 항목의 커밋
+
+## 2026-11-08 · T5.0 DONE
+- 한 것: `packages/fe` — Next 15.5.29·React 19.3.1·TS 5.9 strict, pnpm 12(corepack 심, allowBuilds), eslint 9 flat + typescript-eslint strict, prettier, vitest 3 + jsdom 26, Playwright 1.56, rewrites `/api/:path*` → NARU_API_ORIGIN(internal 제외, 순수 함수 테스트), app/{layout,page}(server)·providers·NaruApp('use client' 둘)·ApiProvider·naruApiClient(URL·파싱, recorded 응답 테스트 8개)·Footer·CSS Modules, `make dev` = Flask + next, ADR-006 버전 표. `make dev` 로 :3000 경유 /api/closures 200·/api/route 839.6 m·internal 404 확인
+- 정한 것: Node 18.20 → Next 16 불가, 15.5 고정(nvm 22 올리면 교체). BE 오리진 기본 127.0.0.1(Node 18 localhost=::1). maplibre 6.16(pnpm 공급망 정책). `@` 별칭 없음. output standalone
+- 막힌 것 / 태우 대기: 없음 — 게이트 .next 제외는 태우가 a61c1d4 로 반영, 확인 완료
+- 커밋: fcb9ec4, f480003, 9549bfc, a86bd36 / 이 항목의 커밋
