@@ -89,6 +89,12 @@
 - topis 2,797행(공지 258건): 제목(l000) + 본문 줄(l001~). 본문은 블록 태그(p/br/div/li/tr)에서만 줄을 나누고 인라인 태그(span/b)는 지움 — 글자는 손대지 않음. `fetched_at` = 기록 파일 `called_at`. 예 `topis-6301-l005` "- 의사당대로 국회앞교차로 → 글래드호텔 앞 3개차로 통제"
 - 안 한 것: 보도 문장(naru-reader 수집본 import) — 이 머신에 naru-reader 저장소가 없다
 
+### bus_routes_20261108 (서울시 버스노선별 정류소, T6.2)
+- 출처: 서울 열린데이터광장 OA-1095 "서울시 버스노선별 정류소 정보" https://data.seoul.go.kr/dataList/OA-1095/S/1/datasetView.do — 매월 XLSX(키 없음). `make fetch SRC=bus_routes` → `scripts/fetch_bus_routes.py` 가 페이지의 가장 최근 파일(seq)을 읽어 `nio_download.do` 로 한 번 받는다(frmFile infId OA-1095·seq 58·infSeq 2 — 페이지의 다른 폼 infSeq 4 는 HTML 이 온다). robots.txt: data.seoul.go.kr 전부 허용, datafile.seoul.go.kr 없음 (2026-11-08 확인). 공공누리 1유형
+- 파일: `data/raw/bus_routes_20261108/OA-1095.xlsx` (원래 이름 `서울시버스노선별정류소정보(20260902).xlsx`, 3,251,120 B, sha256 `b54816e9…b1df`) + `_meta.json`
+- 칸(실제): `ROUTE_ID, 노선명, 순번, NODE_ID, ARS_ID, 정류소명, X좌표, Y좌표` — **X·Y 는 WGS84 경위도**(126.43~127.19, 37.18~37.83). 41,688행, 노선 718개. 세종대로 일대(126.970~126.981, 37.558~37.575)에 정류소가 있는 노선 98개 — 심야(N)·새벽 노선이 섞여 있어 버스 폴러는 뺀다
+- 노선 경로(폴리라인)는 없다 — 정류소 순서만. T6.3 의 "노선에서 60 m 이탈"에는 경로가 필요하다(도로 그래프로 정류소를 잇거나 노선정보 API getRoutePath, 그때 정한다)
+
 ## recorded
 
 | api | 최초 기록 | 파일 수 | 비고 |
@@ -99,7 +105,7 @@
 | rtd | 2026-11-07 | 1 | 실시간 도시데이터 citydata 광화문·덕수궁 (json, 175 KB) |
 | kakao | 2026-11-07 | 3 | 로컬 키워드 검색 숭례문·덕수궁·교보빌딩 (`kakao/keyword/<sha1(검색어)>.json`, 리졸버 재생용). 아래 "recorded/kakao" |
 | kakao/local | 2026-11-08 | 10 | BE 지오코딩 재생용(T5.8, ADR-011 B) — 역지오코딩 4·키워드 6(쓰는 것 3) (`make record API=geocode`). 아래 "recorded/kakao/local" |
-| bus | 2026-11-07 | 1 | 버스위치 getBusPosByRtid 노선 100100118, 차량 12대 (json). 아래 "recorded/bus" |
+| bus | 2026-11-07 | 9 | 버스위치 getBusPosByRtid 노선 100100118, 차량 12대 (json) + 2026-11-08 광화문 노선 7개(`--routes`, T6.2) + 워커 live 경로 확인 1(100100118). 운영 워커(`NARU_BUS_SOURCE=live`)가 공지 통제 창에만 60초마다 더한다(하루 900). 아래 "recorded/bus" |
 | candidates/course | 2026-11-07 | 1 | `make record-candidates SOURCE=course` — CourseIngestor(T2.2) 출력 `CandidateBatch` 그대로: 후보 16개(시각표 16구간, geometry line, scheduled, confidence 0.9, evidence timetable, v0.6 `impact: blocks`·`toward: null`·`approx: false`). BE 테스트(T2.3)가 naru_ai 없이 최신 파일을 읽는다. 유효본은 `20261107T194153.json`(ADR-008 반영 재기록). 그 전 둘(185022 조각 겹침, 185247 impact 없음)은 삭제 대상. 2026-11-08 T5.9: 같은 입력으로 `20261108T162816.json`(sha256 54b369cb1c6a…, 후보 16 그대로, summary null) — 새 batch_id 라야 개발 DB 의 기존 행에 v0.12 메타(source·type)가 채워진다 |
 
 ### recorded/bus (서울 버스위치정보, data.go.kr)
@@ -107,6 +113,12 @@
 - 파일: `data/recorded/bus/20261107T155630_getBusPosByRtid.json` (6 KB)
 - 응답(실제): `comMsgHeader`, `msgHeader{headerCd("0"=정상), headerMsg, itemCount}` — **itemCount는 0으로 와도 itemList에 12대가 있다**, `msgBody.itemList[]{vehId, plainNo, busType, dataTm(YYYYMMDDHHmmss KST), gpsX, gpsY(WGS84 문자열), posX, posY, tmX, tmY, sectOrd, sectionId, sectDist, fullSectDist, rtDist, stopFlag, lastStnId, lastStTm, nextStId, nextStTm, isrunyn, islastyn, isFullFlag, congetion, trnstnid}`
 - 노선 100100118은 활용가이드 예시 노선. 기록 시각 15:54~15:56, 차량 위치 126.909~126.959 / 37.495~37.614 (서울 서부). P6 버스 우회 감지에서 광화문 경유 노선으로 바꿔 기록한다
+- 2026-11-08(일) 통제 없는 날 (live 7, T6.2 — `uv run python scripts/record_api.py --api bus --routes …`, 파일 `<ts>_getBusPosByRtid_<노선>.json`). 노선은 11/7 공지 통제 r04·r01 횡단보도 100 m 안 정류소가 많은 순(OA-1095):
+  - 18:38 — 종로11 100900007 4대 (`8c9d40c0aa4f…`) · 종로09 100900003 5대 (`2fa5f51ab643…`) · 01A 100100001 7대 (`70a43d637aa2…`, INTERFACE §1.2 예시)
+  - 18:44 — 1711 100100185 11대 (`df2f2ee5289d…`) · 160 100100033 20대 (`2fb4026fa17c…`) · 260 100100042 17대 (`43e15b789d34…`) · 270 100100046 18대 (`9d4b67f28224…`)
+  - 전부 headerCd 0. 마을버스(종로09·11)는 `nextStId` "0". `sectDist`·`fullSectDist` 는 km 로 보인다(0.327·0.214). `tmX/tmY` 는 null 일 때가 있다 — 좌표는 `gpsX/gpsY`(WGS84)만 쓴다
+  - 18:48 — 워커 `BusApi` live 경로 확인(키 가림·하루 호출 수 세기): 예시 노선 100100118 12대 `20261108T184839_getBusPosByRtid_100100118.json` (`ad792b80f08b…`) — 테스트가 쓰는 노선의 "가장 최근 기록"을 바꾸지 않으려고 예시 노선으로. 이날 호출 수 8 = 기록 파일 수
+  - 통제일 기록은 아직 없다 — T6.3 통합 시험은 그날 기록이 생겨야 한다(실측 대기)
 
 ### recorded/kakao (카카오 로컬 키워드 검색)
 - 출처: https://dapi.kakao.com/v2/local/search/keyword.json (`Authorization: KakaoAK <REST 키>`). 앱 `naru`에 카카오맵(로컬) API 사용 설정 필요(꺼져 있으면 403 "disabled OPEN_MAP_AND_LOCAL service"). 이용약관상 결과 저장은 서비스 내부 캐시 용도

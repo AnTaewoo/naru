@@ -151,7 +151,7 @@ git clone <repo-url> naru && cd naru
 make setup      # Python·Node 의존성 설치
 make check      # 린트·타입·테스트 (키 없이 기록으로 돔)
 make serve      # MySQL → 마이그레이션 → 빌드 → http://127.0.0.1:3050
-uv run python -m naru_ai.worker --loop   # 워커: 코스 · 공지 · TOPIS 돌발 5분 (운영은 deploy/naru-worker.service)
+uv run python -m naru_ai.worker --loop   # 워커: 코스 · 공지 · TOPIS 돌발 5분 · 공지 통제 중 버스 위치 60초 (운영은 deploy/naru-worker.service)
 ```
 
 새 공지를 실제로 읽거나 지도 타일을 바꾸려면 `.env`에 키를 넣습니다: `ANTHROPIC_API_KEY`, 카카오 로컬·서울 열린데이터광장 키, 그리고 `packages/fe/.env.local`의 `NEXT_PUBLIC_VWORLD_KEY`.
