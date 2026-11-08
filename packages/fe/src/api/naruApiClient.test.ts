@@ -103,6 +103,11 @@ describe("naruApiClient", () => {
     expect(body.coverage).toHaveLength(4);
     expect(() => parseClosureEvents(recorded("closures_0745").body)).toThrow(NaruApiError);
     expect(() => parseClosureEvents({ events: body.events })).toThrow(NaruApiError);
+    // v0.12 data_as_of 필수 — 기록: 경찰청 11/6 18:00 공지, 마라톤 3/12 16:07 시각표
+    expect(body.data_as_of.smpa).toBe("2026-11-06T18:00:00+09:00");
+    expect(() => parseClosureEvents({ events: body.events, coverage: body.coverage })).toThrow(
+      NaruApiError,
+    );
   });
 
   it("지오코딩 (INTERFACE §7, T5.8) — URL, recorded 검색·주소 응답 파싱, 오류 본문", () => {

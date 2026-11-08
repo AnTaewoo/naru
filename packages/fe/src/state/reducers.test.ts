@@ -35,6 +35,7 @@ import {
 import {
   dayBoundsKst,
   initialTimeState,
+  isNowAt,
   kstIso,
   minutesFromDayStart,
   pendingTimeState,
@@ -246,7 +247,9 @@ describe("closureReducer — 통제 사건·지도 맞춤 (T5.4)", () => {
     expect(s0.events).toBeNull();
     expect(s0.focus).toBeNull();
     expect(s0.coverage).toBeNull();
-    const s1 = closureReducer(s0, { type: "receiveEvents", events, coverage });
+    const dataAsOf = recordedEvents().data_as_of;
+    const s1 = closureReducer(s0, { type: "receiveEvents", events, coverage, dataAsOf });
+    expect(s1.dataAsOf).toBe(dataAsOf);
     expect(s1.events).toBe(events);
     expect(s1.coverage).toBe(coverage);
     const bbox = events[0] ? eventBbox(events[0]) : null;
@@ -467,5 +470,15 @@ describe("원래 길 보기 (T5.11)", () => {
     );
     expect(routeReducer(original, { type: "swap" }).view).toBe("fastest");
     expect(routeReducer(original, { type: "close" }).view).toBe("fastest");
+  });
+});
+
+describe("'지금' 배지 (T5.9)", () => {
+  it("기준 시각이 실제 지금(±5분)일 때만 — 5분 넘게 떨어지면 아니다", () => {
+    const t0 = Date.parse(T745); // recorded route_0745 출발 시각
+    expect(isNowAt(T745, t0 + 4 * 60_000)).toBe(true);
+    expect(isNowAt(T745, t0 - 4 * 60_000)).toBe(true);
+    expect(isNowAt(T745, t0 + 6 * 60_000)).toBe(false);
+    expect(isNowAt(T1330, t0)).toBe(false);
   });
 });

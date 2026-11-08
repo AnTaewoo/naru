@@ -36,6 +36,11 @@ const MS_MIN = 60_000;
 const KST_MS = 9 * 60 * MS_MIN;
 
 /** ms(UTC) → "YYYY-MM-DDTHH:MM:00+09:00" */
+/** 기준 시각이 실제 지금인가 — ±5분(슬라이더 한 칸의 절반) 안. '지금' 배지는 이때만 (T5.9) */
+export function isNowAt(t: string, nowMs: number): boolean {
+  return Math.abs(Date.parse(t) - nowMs) <= 5 * 60_000;
+}
+
 export function kstIso(ms: number): string {
   const d = new Date(ms + KST_MS);
   const y = d.getUTCFullYear();

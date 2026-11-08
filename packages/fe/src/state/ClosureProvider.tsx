@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { NaruApiError } from "../api/naruApiClient";
-import type { ClosureEvent, FeatureCollection } from "../types/contracts";
+import type { ClosureEvent, DataAsOf, FeatureCollection } from "../types/contracts";
 import { useNaruApi } from "./ApiProvider";
 import { useTime } from "./TimeProvider";
 
@@ -30,6 +30,8 @@ export interface ClosureState {
   eventsError: string | null;
   /** 보행망 범위 (같은 응답의 coverage, INTERFACE v0.10) — 내 위치가 밖이면 안내 (T5.7). null = 모름 */
   coverage: Bbox4 | null;
+  /** 출처별 기준 시각 (같은 응답의 data_as_of, v0.12) — 목록 위에 쓴다 (T5.9). null = 모름 */
+  dataAsOf: DataAsOf | null;
   /** 지도 맞춤 요청 — 같은 범위를 다시 눌러도 맞추도록 순번을 올린다 (MapView 가 본다) */
   focus: { bbox: Bbox4; seq: number } | null;
 }
@@ -61,7 +63,12 @@ export type ClosureAction =
   | { type: "receive"; at: string; bbox: string; closures: FeatureCollection }
   | { type: "fail"; error: string }
   | { type: "setBbox"; bbox: string }
-  | { type: "receiveEvents"; events: ClosureEvent[]; coverage: Bbox4 | null }
+  | {
+      type: "receiveEvents";
+      events: ClosureEvent[];
+      coverage: Bbox4 | null;
+      dataAsOf: DataAsOf | null;
+    }
   | { type: "failEvents"; error: string }
   | { type: "focus"; bbox: Bbox4 };
 
@@ -79,6 +86,7 @@ export function initialClosureState(partial: Partial<ClosureState> = {}): Closur
     events: null,
     eventsError: null,
     coverage: null,
+    dataAsOf: null,
     focus: null,
     ...partial,
   };
@@ -102,7 +110,13 @@ export function closureReducer(state: ClosureState, action: ClosureAction): Clos
     case "setBbox":
       return state.bbox === action.bbox ? state : { ...state, bbox: action.bbox };
     case "receiveEvents":
-      return { ...state, events: action.events, coverage: action.coverage, eventsError: null };
+      return {
+        ...state,
+        events: action.events,
+        coverage: action.coverage,
+        dataAsOf: action.dataAsOf,
+        eventsError: null,
+      };
     case "failEvents":
       return { ...state, eventsError: action.error };
     case "focus":
@@ -157,7 +171,12 @@ export function ClosureProvider({
     api
       .events({}, controller.signal)
       .then((r) =>
-        dispatch({ type: "receiveEvents", events: r.events, coverage: asBbox4(r.coverage) }),
+        dispatch({
+          type: "receiveEvents",
+          events: r.events,
+          coverage: asBbox4(r.coverage),
+          dataAsOf: r.data_as_of,
+        }),
       )
       .catch((e: unknown) => {
         if (controller.signal.aborted) return;

@@ -108,6 +108,7 @@ export function parseClosureEvents(json: unknown): ClosureEventsResponse {
   if (!isRecord(json) || !Array.isArray(json.events)) throw new NaruApiError(200, null);
   const coverage: unknown = json.coverage; // v0.10 부터 필수 — 보행망 bbox (T5.7)
   if (!Array.isArray(coverage) || coverage.length !== 4) throw new NaruApiError(200, null);
+  if (!isRecord(json.data_as_of)) throw new NaruApiError(200, null); // v0.12 필수 (T5.9)
   return json as unknown as ClosureEventsResponse;
 }
 

@@ -56,6 +56,17 @@
   cursor: pointer;
 }
 
+/* 기준 시각이 실제 지금일 때만 (T5.9) */
+.nowBadge {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: #eaf1ff;
+  font-size: 11px;
+  font-weight: 700;
+  color: #2d6bff;
+}
+
 .now:disabled {
   opacity: 0.4;
   cursor: default;
