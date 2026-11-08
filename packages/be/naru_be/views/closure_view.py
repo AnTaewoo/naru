@@ -19,9 +19,12 @@ def render(states: Sequence[ClosureState]) -> Response:
     return jsonify(to_collection(states).model_dump(mode="json"))
 
 
-def render_events(events: Sequence[ClosureEvent]) -> Response:
-    """통제 사건 목록 (INTERFACE §3.1). 창은 +09:00 그대로, 계약이 순서를 검증한다."""
-    return jsonify(ClosureEventsResponse(events=list(events)).model_dump(mode="json"))
+def render_events(
+    events: Sequence[ClosureEvent], coverage: tuple[float, float, float, float]
+) -> Response:
+    """통제 사건 목록 + 보행망 bbox (INTERFACE §3.1 v0.10). 계약이 순서·범위를 검증한다."""
+    body = ClosureEventsResponse(events=list(events), coverage=coverage)
+    return jsonify(body.model_dump(mode="json"))
 
 
 def to_collection(states: Sequence[ClosureState]) -> FeatureCollection:

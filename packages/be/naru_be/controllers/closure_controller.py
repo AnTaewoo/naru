@@ -27,4 +27,5 @@ def get_closures() -> Response:
 def get_closure_events() -> Response:
     query = ClosureEventsQuery.model_validate(request.args.to_dict())  # 실패 → error_view 400
     bbox = parse_bbox(query.bbox) if query.bbox is not None else None
-    return closure_view.render_events(naru_models().repo.events(bbox))
+    m = naru_models()
+    return closure_view.render_events(m.repo.events(bbox), m.ped.bounds())

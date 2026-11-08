@@ -171,6 +171,12 @@ def test_closure_events_group_by_reason_window(
     ]
     assert seg1.crosswalks == 6
     assert resp.get_json()["events"][0]["window"]["start"].endswith("+09:00")
+    # coverage (v0.10) — 보행망 bbox: recorded 출발·도착(교보빌딩·대한문)은 안,
+    # 잠실(태우 실서버 요청)은 밖
+    w, s, e, n = body.coverage
+    for lat, lng in (map(float, KYOBO.split(",")), map(float, DAEHANMUN.split(","))):
+        assert w <= lng <= e and s <= lat <= n
+    assert not (w <= 127.0980 <= e and s <= 37.5133 <= n)
     assert "세종대로" in resp.get_data(as_text=True)  # 한글 그대로
 
 

@@ -117,6 +117,13 @@ class PedGraph:
         self._tree = STRtree(
             [shapely.Point(graph.nodes[n]["x"], graph.nodes[n]["y"]) for n in self._node_ids]
         )
+        lngs = [float(d["lng"]) for _, d in graph.nodes(data=True)]
+        lats = [float(d["lat"]) for _, d in graph.nodes(data=True)]
+        self._bounds = (min(lngs), min(lats), max(lngs), max(lats))
+
+    def bounds(self) -> tuple[float, float, float, float]:
+        """노드 경위도 범위 (minLng, minLat, maxLng, maxLat) — /closures/events 의 coverage."""
+        return self._bounds
 
     def nearest_node(self, lng: float, lat: float) -> tuple[str, float]:
         """가장 가까운 노드와 거리(m)."""
