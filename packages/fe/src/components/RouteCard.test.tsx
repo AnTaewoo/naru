@@ -17,7 +17,7 @@ import type { ErrorBody, RouteResponse } from "../types/contracts";
 import { evidenceGroups } from "./EvidencePopover";
 import { legRows } from "./LegList";
 import { RouteCard, fastestCard, originalCard, routeCrossing } from "./RouteCard";
-import { RoutePanel, coordLabel } from "./RoutePanel";
+import { RoutePanel } from "./RoutePanel";
 
 const T745 = "2026-03-15T07:45:00+09:00";
 const T1330 = "2026-03-15T13:30:00+09:00";
@@ -278,20 +278,27 @@ describe("RouteCard 렌더", () => {
 });
 
 describe("RoutePanel", () => {
-  it("출발·도착 좌표(위도, 경도 5자리)·탭 분, 바꾸기·뒤로", () => {
+  // 칸 이름 = recorded naru_api/geocode_reverse_{kyobo,daehanmun}.json 의 label (T5.8). 좌표는 안 보인다
+  const fromName = (recorded("geocode_reverse_kyobo").body as { label: string }).label;
+  const toName = (recorded("geocode_reverse_daehanmun").body as { label: string }).label;
+  const names = {
+    from: od.from ? { point: od.from, text: fromName } : null,
+    to: od.to ? { point: od.to, text: toName } : null,
+  };
+
+  it("출발·도착 주소(좌표는 안 보임)·탭 분, 바꾸기·뒤로", () => {
     render(
-      <Providers at={T745} route={ready(r0745, T745)}>
+      <Providers at={T745} route={{ ...ready(r0745, T745), names }}>
         <RoutePanel />
       </Providers>,
     );
-    const from = coordLabel(od.from ?? [0, 0]);
-    const to = coordLabel(od.to ?? [0, 0]);
-    expect(from).toBe("37.57097, 126.97790");
-    expect(to).toBe("37.56504, 126.97654");
-    expect(screen.getByRole("button", { name: `출발 ${from}` })).toBeDefined();
+    expect([fromName, toName]).toEqual(["종로구 종로 1", "중구 세종대로 99"]);
+    expect(screen.getByRole("button", { name: "출발 종로구 종로 1" })).toBeDefined();
+    const panel = screen.getByRole("region", { name: "출발·도착" });
+    expect(panel.textContent).not.toMatch(/\d+\.\d{4}/); // 위경도 숫자 없음
     expect(screen.getByRole("tab", { selected: true }).textContent).toContain("12분");
     fireEvent.click(screen.getByRole("button", { name: "출발·도착 바꾸기" }));
-    expect(screen.getByRole("button", { name: `출발 ${to}` })).toBeDefined();
+    expect(screen.getByRole("button", { name: "출발 중구 세종대로 99" })).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "뒤로" }));
     expect(screen.getByRole("button", { name: "길찾기" })).toBeDefined(); // 홈의 길찾기 바로
     fireEvent.click(screen.getByRole("button", { name: "길찾기" }));
@@ -307,8 +314,8 @@ describe("RoutePanel", () => {
       </Providers>,
     );
     expect(screen.getByRole("button", { name: "출발 내 위치" })).toBeDefined();
-    const to = coordLabel(od.to ?? [0, 0]);
-    expect(screen.getByRole("button", { name: `도착 ${to}` })).toBeDefined();
+    // 주소를 아직 못 받았으면(네트워크 없음) "선택한 위치" — 좌표는 쓰지 않는다 (T5.8)
+    expect(screen.getByRole("button", { name: "도착 선택한 위치" })).toBeDefined();
     const toMine = screen.getByRole("button", { name: "도착을 내 위치로" });
     expect(toMine.getAttribute("aria-busy")).toBe("false");
     fireEvent.click(toMine);
