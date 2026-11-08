@@ -76,6 +76,15 @@ class ClosureEvent(Contract):
 
 class ClosureEventsResponse(Contract):
     events: list[ClosureEvent]
+    # v0.10 (ADR-011 C) — 보행망 노드의 minLng, minLat, maxLng, maxLat. 내 위치가 밖이면 FE 가 안내
+    coverage: tuple[float, float, float, float]
+
+    @model_validator(mode="after")
+    def _coverage_min_max(self) -> "ClosureEventsResponse":
+        min_lng, min_lat, max_lng, max_lat = self.coverage
+        if min_lng > max_lng or min_lat > max_lat:
+            raise ValueError(f"coverage 의 min 이 max 보다 크다: {list(self.coverage)}")
+        return self
 
     @model_validator(mode="after")
     def _latest_first(self) -> "ClosureEventsResponse":

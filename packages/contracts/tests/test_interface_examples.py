@@ -284,28 +284,39 @@ def test_closure_events_example() -> None:  # §3.1 v0.8, ADR-010
     assert seg1.window.start is not None and seg1.window.start.utcoffset() is not None
     assert seg1.window.start.isoformat() == "2026-03-15T07:20:00+09:00"
     assert seg1.bbox == (126.9757, 37.5608, 126.9772, 37.5701) and seg1.approx is False
+    # v0.10 — 보행망 bbox (2026-11-08 종로·중구 그래프 노드 15,183개의 경위도 범위)
+    assert r.coverage == (126.948108, 37.54265, 127.026684, 37.631483)
     assert ClosureEventsResponse.model_validate(r.model_dump(mode="json")) == r
 
 
 def test_closure_events_rules() -> None:  # §3.1 — 순서·bbox·개수, 질의 bbox 는 선택
     data = _json(5)
-    swapped = {"events": [data["events"][1], data["events"][0]]}
+    cov = data["coverage"]
+    swapped = {"events": [data["events"][1], data["events"][0]], "coverage": cov}
     with pytest.raises(ValidationError, match="늦은 것 먼저"):
         ClosureEventsResponse.model_validate(swapped)
     no_start = {**data["events"][1], "window": {"end": data["events"][1]["window"]["end"]}}
     ClosureEventsResponse.model_validate(
-        {"events": [data["events"][0], no_start]}
+        {"events": [data["events"][0], no_start], "coverage": cov}
     )  # start 없으면 끝
     with pytest.raises(ValidationError, match="늦은 것 먼저"):
-        ClosureEventsResponse.model_validate({"events": [no_start, data["events"][0]]})
+        ClosureEventsResponse.model_validate(
+            {"events": [no_start, data["events"][0]], "coverage": cov}
+        )
     bad_bbox = {**data["events"][1], "bbox": [126.9772, 37.5608, 126.9757, 37.5701]}
     with pytest.raises(ValidationError, match="bbox"):
-        ClosureEventsResponse.model_validate({"events": [bad_bbox]})
+        ClosureEventsResponse.model_validate({"events": [bad_bbox], "coverage": cov})
     with pytest.raises(ValidationError):
-        ClosureEventsResponse.model_validate({"events": [{**data["events"][1], "crosswalks": 0}]})
+        ClosureEventsResponse.model_validate(
+            {"events": [{**data["events"][1], "crosswalks": 0}], "coverage": cov}
+        )
     with pytest.raises(ValidationError):
         ClosureEventsResponse.model_validate(
             {"events": [{**data["events"][1], "status": "confirmed"}]}
         )
+    with pytest.raises(ValidationError):  # coverage 필수 (v0.10)
+        ClosureEventsResponse.model_validate({"events": []})
+    with pytest.raises(ValidationError, match="coverage"):
+        ClosureEventsResponse.model_validate({"events": [], "coverage": [127.0, 37.6, 126.9, 37.5]})
     assert ClosureEventsQuery().bbox is None
     assert ClosureEventsQuery.model_validate({"bbox": "126.965,37.555,126.990,37.580"}).bbox

@@ -139,6 +139,11 @@ export type Crosswalks = number;
 export type Bbox2 = [unknown, unknown, unknown, unknown];
 export type Approx4 = boolean;
 export type Events = ClosureEvent[];
+/**
+ * @minItems 4
+ * @maxItems 4
+ */
+export type Coverage = [unknown, unknown, unknown, unknown];
 export type Code = "invalid_query" | "unauthorized" | "not_found" | "no_route" | "out_of_coverage" | "internal";
 export type Message = string;
 export type Field = string | null;
@@ -366,6 +371,7 @@ export interface ClosureEvent {
 }
 export interface ClosureEventsResponse {
   events: Events;
+  coverage: Coverage;
 }
 export interface ErrorDetail {
   code: Code;
