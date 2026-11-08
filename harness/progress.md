@@ -225,3 +225,9 @@
 - 정한 것: OSM 타일을 쓰는 동안 숨기기·ⓘ 접기는 안 함 — OSMF 타일 정책 §2 "Do not hide attribution beneath UI, behind toggles, or off-screen"(2026-11-08 원문 확인). 출처 칸 위치는 오른쪽 위 그대로(아래는 시트가 덮는다). fork 2개(OSM 고지·크롤링 점검)는 읽기만 했고, 크롤링 점검이 짚은 ADR-011 E 범위는 태우 결정 "웹 페이지 수집에만" → ADR-013(T6.1 시작 때)
 - 막힌 것 / 태우 대기: 공개 반영 `sudo systemctl restart naru`(T5.6~T5.12 함께)
 - 커밋: 7294110 617c011 (하네스 a02b0d2 9ed8c0f) / 이 항목의 커밋
+
+## 2026-11-08 · T6.1 DONE
+- 한 것: 워커 `--loop`(코스 1회·공지 5분·돌발 5분, `tick(now)`, 소스 격리·연속 3회 실패 ERROR). TOPIS 실시간 돌발(OA-13315) → 원문 기록 → 집회(10B02)만 TOPIS 링크 선 후보(확신도 0.9·topis_incident) → POST. BE 가 같은 횡단보도·겹치는 시각의 공지 후보 전체에 돌발 근거(어느 쪽이 먼저 와도), 돌발 배치 받은 시각 = data_as_of(빈 배치·재전송 포함). deploy/naru-worker.service, make serve 에서 워커 뺌. ADR-013(승인) 커밋 — 버스 확신도 보정, ADR-011 E 범위는 웹 페이지만. 실데이터: 기록 AccInfo 11/7 15:40 → 후보 9·횡단보도 16, r04 숭례문 쪽 16곳에 근거(0.75 라 예정 그대로)
+- 정한 것: 유형은 집회만(11/7 범위 안 집회 8·차 없는 거리 2·축제 1·버스 무정차 2·시설물보수 3 — 나머지는 README impact 상 none), "(인도)" 보도 집회 뺌, 같은 링크·시각은 한 후보, 선 버퍼 15 m(방향별 링크 4곳), "같은 링크" = 같은 횡단보도 + 겹치는 시각, 원문은 바뀔 때만 새 파일, `--once` 는 코스·공지 그대로, alembic fileConfig 가 기존 로거를 끄지 않게
+- 막힌 것 / 태우 대기: 🧑 `sudo cp deploy/naru-worker.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart naru && sudo systemctl enable --now naru-worker`. 확인 적재로 개발 DB(공개와 같음)에 11/7 돌발 사건 5개·r04 근거가 들어갔다 — 재시작 전 공개 BE 는 돌발 기준 시각을 11/7 15:40 으로 보인다. 돌발이 예상 종료 전에 사라지는 경우·acc_road_code 009/010 뜻은 미확인. live 7회(링크 6·AccInfo 1)
+- 커밋: 9da0968 071e8b4 67127c7 48c0477 6c88255 fb6621f 1493451 2be5444 84176a4 (하네스 b7b875d 11df7d6 f5cd1ae) / 이 항목의 커밋

@@ -303,14 +303,14 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 ## P6 — 운영 워커·실시간 신호 (태우 2026-11-08: 실서버 점검 뒤 당김)
 
 ### T6.1 워커 상시 실행 + TOPIS 실시간 돌발
-- status: DOING
+- status: DONE
 - depends: T5.10
 - 계기(실서버 확인): `/api/closures/events` 가 7건뿐(11/7 집회 2, 3/15 마라톤 5구간), 11/8 서울 전체 0건. `make serve` 의 워커가 `--once` 로 기록 5건만 재생(live 0)하고 끝난다
 - 산출: `naru_ai.worker --loop` — 소스별 주기 실행, 한 소스 실패가 다른 소스를 안 막음, 연속 3회 실패면 ERROR 로그. batch_id 는 원문 해시(같은 내용이면 멱등). 첫 소스: OA-13315 5분마다 → 원문 기록(결정 E) → IncidentIngestor → POST /internal/candidates. 기존 notice 후보와 같은 링크·시간이면 confirmed 증거로 붙는지 확인. `deploy/naru-worker.service`(naru.service 와 같은 형식: User=antaewoo, WorkingDirectory, PATH 에 uv 경로, ExecStart=uv run python -m naru_ai.worker --loop, Restart=on-failure). 설치 명령은 보고에 적는다. `make serve` 에서는 워커를 안 띄운다(서비스 분리)
 - 🧑 태우: 서비스 설치
 
 ### T6.2 버스 관측 수집 (ADR-013, 태우 2026-11-08)
-- status: TODO
+- status: DOING
 - depends: T6.1
 - 계기: 버스 신호를 "2대 이탈 → 통제 중 / 정상 통과 → 해제" 이진 규칙에서 기존 통제의 확신도 보정으로 바꾼다(태우 제안, ADR-013 — T6.1 시작 때 커밋). 테스트는 통제일의 실제 버스 기록이 있어야 하는데 지금은 11/7 예시 노선 스냅샷 1장뿐이고 지난 날 위치는 못 받는다 → 수집부터 당겨 다음 통제일부터 기록
 - 산출: 노선 마스터 — 그래프 범위를 지나는 노선의 경로·정류소 순서(열린데이터광장 파일이 있으면 그것, 없으면 노선정보 API — 시작 때 열어 확인), `make fetch SRC=bus_routes`. 계약 `BusPosition`·`BusPositionBatch`(API 필드 그대로, 판단 없음) INTERFACE v0.13. AI `naru_ai/signal/bus_poller.py` — `/closures/events` 의 창·범위로 겹치는 노선 최대 3개를 시작 1시간 전 ~ 끝+30분 60초마다, 원문 기록, 배치 POST, 일 상한 `NARU_BUS_DAILY_CAP`(기본 900, 개발계정 1,000/일 아래). BE `POST /internal/bus-positions` → `BusIntake` → `bus_positions`·`bus_corrections`(Alembic 0004)
