@@ -238,6 +238,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·버스 우회 감지�
 - status: TODO
 - depends: T5.2, T4.4
 - 산출: Flask + AI 워커 `--once`(홈서버, 기록 재생) + Next.js 배포(Vercel 또는 홈서버) → **배포 링크**. Playwright e2e: 교보빌딩 앞 → 대한문, 통제 중 시각 선택 → 우회 경로·지하보도 레그. 시연 영상 스크립트 `harness/plans/active/demo_script.md`
+- 산출(고지, 태우 2026-11-08): 지도 attribution(VWorld 키 전까지 OSM "© OpenStreetMap contributors") + `/licenses` 페이지 — maplibre-gl(BSD-3-Clause, LICENSE.txt 의 MapLibre·Mapbox 저작권 고지 전문) 등 오픈소스 고지
 - 🧑 태우: 영상 촬영, 포스터 A0, 보고서 결과 칸 채우기(T4.3 표, 사용성 테스트)
 
 ### PC-5 (태우) — 11/16 제출
