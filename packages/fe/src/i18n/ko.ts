@@ -1,5 +1,12 @@
 // enum 코드값 → 한국어 라벨. 한국어는 이 파일에만 (INTERFACE §4, CONVENTIONS §5.8)
-import type { ClosureType, EvidenceKind, Impact, LegKind, Status } from "../types/contracts";
+import type {
+  ClosureType,
+  Evidence,
+  EvidenceKind,
+  Impact,
+  LegKind,
+  Status,
+} from "../types/contracts";
 
 export const STATUS_KO: Record<Status, string> = {
   scheduled: "예정",
@@ -29,10 +36,15 @@ export const TYPE_KO: Record<ClosureType, string> = {
  * 화면에선 그 앞머리만 한국어로 바꾼다 (BE 는 한국어 라벨을 넣지 않는다 — CONVENTIONS §4.5)
  */
 export function reasonKo(reason: string): string {
+  const type = reasonType(reason);
+  return type ? TYPE_KO[type] + reason.slice(type.length) : reason;
+}
+
+/** reason 앞머리의 type 코드값 ("marathon 1구간 …" → marathon). 자유 문장이면 null */
+export function reasonType(reason: string): ClosureType | null {
   const space = reason.indexOf(" ");
   const head = space < 0 ? reason : reason.slice(0, space);
-  if (head in TYPE_KO) return TYPE_KO[head as ClosureType] + reason.slice(head.length);
-  return reason;
+  return head in TYPE_KO ? (head as ClosureType) : null;
 }
 
 export const IMPACT_KO: Record<Impact, string> = {
@@ -86,4 +98,79 @@ export function untilKo(end: string | null | undefined, t: string): string {
   const h = Math.floor(diffMin / 60);
   const m = diffMin % 60;
   return m ? `${h}시간 ${m}분 뒤 해제` : `${h}시간 뒤 해제`;
+}
+
+/** t 와 같은 날(KST)이면 "HH:MM", 다른 날이면 "M/D HH:MM" — 근거 시각 (시각표 게시일 등) */
+export function whenKo(at: string | null | undefined, t: string): string {
+  if (!at || Number.isNaN(new Date(at).getTime())) return "—";
+  const day = (iso: string) => new Date(new Date(iso).getTime() + KST_OFFSET_MIN * 60_000);
+  const a = day(at);
+  const b = day(t);
+  const sameDay =
+    a.getUTCFullYear() === b.getUTCFullYear() &&
+    a.getUTCMonth() === b.getUTCMonth() &&
+    a.getUTCDate() === b.getUTCDate();
+  return sameDay ? hhmm(at) : `${a.getUTCMonth() + 1}/${a.getUTCDate()} ${hhmm(at)}`;
+}
+
+/** 거리: 1 km 아래는 m 반올림("840m"), 넘으면 km 소수 한 자리("1.7km") */
+export function distanceKo(m: number): string {
+  const r = Math.round(m);
+  return r < 1000 ? `${r}m` : `${(m / 1000).toFixed(1)}km`;
+}
+
+/** 조사 "로/으로" — 받침이 없거나 ㄹ 받침이면 "로". 한글로 끝나지 않으면 "(으)로" */
+export function josaRo(word: string): string {
+  const code = word.trimEnd().codePointAt(word.trimEnd().length - 1) ?? 0;
+  if (code < 0xac00 || code > 0xd7a3) return "(으)로";
+  const jong = (code - 0xac00) % 28;
+  return jong === 0 || jong === 8 ? "로" : "으로";
+}
+
+/** 길찾기 안내 문장 (시안 02 하단 note). crossing = 경로가 건너는 지하보도·육교 이름 */
+export function routeNoteKo(p: {
+  crosswalks: number;
+  until: string | null;
+  blocked: boolean;
+  crossing: string | null;
+}): string {
+  if (p.crosswalks === 0) return "이 시각엔 경로에 걸린 통제가 없어요.";
+  const via = p.crossing ? `${p.crossing}${josaRo(p.crossing)} 건너는` : null;
+  if (!p.blocked) {
+    return `횡단보도 ${p.crosswalks}곳이 곧 통제될 예정이라 ${via ?? "피해 가는"} 길을 골랐어요.`;
+  }
+  const until = p.until ? `${hhmm(p.until)}까지 ` : "";
+  return `횡단보도 ${p.crosswalks}곳이 ${until}막혀 있어 ${via ?? "돌아가는"} 길을 골랐어요.`;
+}
+
+/**
+ * 근거 한 줄 (시안 03 "이렇게 판단했어요"): detail 의 상태 전이 → 구간 label·section → 공지 excerpt 순.
+ * 없으면 근거 종류 라벨. 기준 시각보다 뒤의 전이(해제 등)는 "예정"
+ */
+export function evidenceTextKo(e: Evidence, t: string): string {
+  const d = e.detail ?? {};
+  const transition = d["transition"];
+  if (typeof transition === "string") {
+    const [a, b] = transition.split("→");
+    if (a && b && a in STATUS_KO && b in STATUS_KO) {
+      const future = new Date(e.at).getTime() > new Date(t).getTime();
+      return `${STATUS_KO[a as Status]} → ${STATUS_KO[b as Status]}${future ? " 예정" : ""}`;
+    }
+  }
+  const parts = [d["label"], d["section"]].filter(
+    (x): x is string => typeof x === "string" && x !== "",
+  );
+  if (parts.length > 0) return parts.join(" ");
+  if (typeof d["excerpt"] === "string") return d["excerpt"];
+  return EVIDENCE_KO[e.kind];
+}
+
+/** /route 오류 코드(INTERFACE §6) → 화면 문구 */
+export const ROUTE_ERROR_KO: Record<string, string> = {
+  no_route: "이 시각엔 갈 수 있는 길을 찾지 못했어요",
+  invalid_query: "출발·도착을 다시 골라 주세요",
+};
+
+export function routeErrorKo(code: string | null): string {
+  return (code && ROUTE_ERROR_KO[code]) || "경로를 받지 못했어요. 잠시 뒤 다시 해 주세요";
 }

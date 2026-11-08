@@ -1,5 +1,5 @@
 // 상태 색 — 화면 시안 01_home.html 의 CSS 변수에서 옮김 (CONVENTIONS §5.8·§5.9)
-import type { Status } from "../types/contracts";
+import type { LegKind, Status } from "../types/contracts";
 
 export const COLORS = {
   stop: "#e5322d", // confirmed — 지금 못 건너는 횡단보도 (빨강 X)
@@ -12,6 +12,7 @@ export const COLORS = {
   blueBg: "#eaf1ff",
   tunnel: "#16357f", // 시안 02 "남색 터널" — 지하보도·육교로 길을 건너는 구간 (ADR-009)
   tunnelDash: "#9cc0ff", // 터널 위 점선
+  baseline: "#6b6f76", // 시안 02 "회색 점선" — 원래 최단 경로 (지금은 못 가는 길)
   ok: "#1f9d55", // released — 해제
   okBg: "#e6f6ec",
   gray: "#9a9a9a",
@@ -33,4 +34,15 @@ export const STATUS_BG: Record<Status, string> = {
   scheduled: COLORS.slowBg,
   released: COLORS.grayBg,
   zone_scheduled: COLORS.zoneBg,
+};
+
+/** LegList 아이콘 바탕 — 건너는 구조물은 남색, 오르내림은 파랑, 걷는 길은 회색 */
+export const LEG_COLOR: Record<LegKind, string> = {
+  underpass: COLORS.tunnel,
+  overpass: COLORS.tunnel,
+  stairs: COLORS.blue,
+  elevator: COLORS.blue,
+  station: COLORS.blue,
+  crosswalk: COLORS.ink2,
+  sidewalk: COLORS.gray,
 };
