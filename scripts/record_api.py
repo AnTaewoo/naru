@@ -9,7 +9,8 @@ api, endpoint(키 가림), params(키 없음), called_at, status, raw). 손으�
             LinkInfo(도로명·노드명) + LinkVerInfo(vertex TM 좌표). 링크당 2회, --limit 로 상한.
             --links 1010005900,... 이면 그 링크만 (T6.1)
   rtd       서울 실시간 도시데이터 citydata (json) — 광화문·덕수궁 1회
-  bus       서울 버스위치정보 getBusPosByRtid (ws.bus.go.kr, data.go.kr 키) 1회
+  bus       서울 버스위치정보 getBusPosByRtid (ws.bus.go.kr, data.go.kr 키) 1회.
+            --routes 100900007,... 이면 노선마다 1회 (T6.2)
   kakao     카카오 로컬 키워드 검색 — 숭례문·덕수궁 1회씩. 리졸버 재생용으로
             data/recorded/kakao/keyword/<sha1(검색어)>.json 에 둔다 (real-data-testing §4.3)
   geocode   BE 지오코딩(ADR-011 B, T5.8) 재생용 — 역지오코딩 4점 + 지도 기본 중심에서 가까운 순
@@ -196,22 +197,22 @@ def record_rtd(client: httpx.Client, settings: Settings, out: Path) -> None:
     write_record(out / "rtd" / f"{stamp}_citydata.json", "rtd", masked, params, r, called_at)
 
 
-def record_bus(client: httpx.Client, settings: Settings, out: Path) -> None:
+def record_bus(
+    client: httpx.Client, settings: Settings, out: Path, routes: tuple[str, ...] = ()
+) -> None:
+    """routes 가 있으면 노선마다 `<ts>_getBusPosByRtid_<노선>.json`(T6.2), 없으면 예시 노선."""
     key = unquote(
         need(settings.data_go_kr_key, "DATA_GO_KR_KEY")
     )  # 인코딩 키면 풀어서 httpx가 다시 인코딩
-    params = {"busRouteId": BUS_ROUTE_ID, "resultType": "json"}
-    called_at = datetime.now(KST)
-    r = client.get(BUS_API, params={"serviceKey": key, **params})
-    stamp = called_at.strftime("%Y%m%dT%H%M%S")
-    write_record(
-        out / "bus" / f"{stamp}_getBusPosByRtid.json",
-        "bus",
-        f"{BUS_API}?serviceKey=<키>",
-        params,
-        r,
-        called_at,
-    )
+    for route in routes or (BUS_ROUTE_ID,):
+        params = {"busRouteId": route, "resultType": "json"}
+        called_at = datetime.now(KST)
+        r = client.get(BUS_API, params={"serviceKey": key, **params})
+        stamp = called_at.strftime("%Y%m%dT%H%M%S")
+        name = (
+            f"{stamp}_getBusPosByRtid_{route}.json" if routes else f"{stamp}_getBusPosByRtid.json"
+        )
+        write_record(out / "bus" / name, "bus", f"{BUS_API}?serviceKey=<키>", params, r, called_at)
 
 
 def record_kakao(
@@ -264,6 +265,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--limit", type=int, default=4, help="links: 기록할 링크 수 (링크당 2회 호출)")
     ap.add_argument("--queries", default="", help="kakao: 검색어 쉼표 구분 (없으면 KAKAO_QUERIES)")
     ap.add_argument("--links", default="", help="links: 링크 ID 쉼표 (없으면 AccInfo 에서)")
+    ap.add_argument("--routes", default="", help="bus: 노선 ID 쉼표 (없으면 예시 노선)")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)  # URL에 키가 있다
@@ -287,7 +289,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.api in ("rtd", "all"):
             record_rtd(client, settings, args.recorded)
         if args.api in ("bus", "all"):
-            record_bus(client, settings, args.recorded)
+            routes = tuple(x.strip() for x in args.routes.split(",") if x.strip())
+            record_bus(client, settings, args.recorded, routes)
         if args.api in ("kakao", "all"):
             queries = tuple(q.strip() for q in args.queries.split(",") if q.strip())
             record_kakao(client, settings, args.recorded, queries or KAKAO_QUERIES)
