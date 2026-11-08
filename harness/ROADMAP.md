@@ -302,6 +302,8 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 
 ## P6 — 운영 워커·실시간 신호 (태우 2026-11-08: 실서버 점검 뒤 당김)
 
+> 순서(태우 2026-11-08): T6.1 → T6.2 → **T6.4 → T6.6**(11/13(금) 18:00 전 운영) → T6.3 → T6.5 → T6.7 → T6.8. 번호는 그대로 두고 블록만 이 순서로 놓았다
+
 ### T6.1 워커 상시 실행 + TOPIS 실시간 돌발
 - status: DONE
 - depends: T5.10
@@ -313,34 +315,34 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - status: DOING
 - depends: T6.1
 - 계기: 버스 신호를 "2대 이탈 → 통제 중 / 정상 통과 → 해제" 이진 규칙에서 기존 통제의 확신도 보정으로 바꾼다(태우 제안, ADR-013 — T6.1 시작 때 커밋). 테스트는 통제일의 실제 버스 기록이 있어야 하는데 지금은 11/7 예시 노선 스냅샷 1장뿐이고 지난 날 위치는 못 받는다 → 수집부터 당겨 다음 통제일부터 기록
-- 산출: 노선 마스터 — 그래프 범위를 지나는 노선의 경로·정류소 순서(열린데이터광장 파일이 있으면 그것, 없으면 노선정보 API — 시작 때 열어 확인), `make fetch SRC=bus_routes`. 계약 `BusPosition`·`BusPositionBatch`(API 필드 그대로, 판단 없음) INTERFACE v0.13. AI `naru_ai/signal/bus_poller.py` — `/closures/events` 의 창·범위로 겹치는 노선 최대 3개를 시작 1시간 전 ~ 끝+30분 60초마다, 원문 기록, 배치 POST, 일 상한 `NARU_BUS_DAILY_CAP`(기본 900, 개발계정 1,000/일 아래). BE `POST /internal/bus-positions` → `BusIntake` → `bus_positions`·`bus_corrections`(Alembic 0004)
+- 산출: 노선 마스터 — 정류소 순서는 열린데이터광장 OA-1095(`make fetch SRC=bus_routes`), 노선 경로는 노선정보 API getRoutePath(노선당 하루 한 번 `bus_routes/<날짜>/path_<노선>.json`(raw), 도로 그래프로 정류소 잇기 금지 — 태우 2026-11-08). 계약 `BusPosition`·`BusPositionBatch`(API 필드 그대로, 판단 없음) INTERFACE v0.13. AI `naru_ai/signal/bus_feed.py`·`bus_poller.py` — 1순위 공지 통제(시작 1시간 전 ~ 끝+30분, 통제 횡단보도 100 m 안 노선 3개, 60초, 쿼터 먼저), 2순위 TOPIS 집회·행사 돌발(기준 데이터 — 돌발마다 노선 1개, 120초, 하루 300·돌발 하나 30, 공지가 쓰고 남은 만큼), 원문은 `bus/notice/`·`bus/incident/`(recorded), 전체 하루 900. BE `POST /internal/bus-positions` → `BusIntake` → `bus_positions`(Alembic 0004, `bus_corrections` 는 T6.3)
 - 테스트: 평일 실제 기록(Task live ≤10, 광화문 노선)으로 파싱·배치·적재
-- 🧑 태우: 노선정보 API 활용신청(필요하면), 워커 재시작 → 다음 통제일부터 자동 기록. 마라톤·M2 는 운영계정 상향
-
-### T6.3 버스 확신도 보정 (ADR-013)
-- status: TODO
-- depends: T6.2
-- 산출: BE `bus_correction.py` — 통제 구간(같은 후보의 횡단보도 묶음)마다 최근 20분 관측으로 항목(서로 다른 2대 이상이 15분 안에 피해 감 +0.20·구간 정류소를 2대 이상 건너뜀 +0.10·통과 시간이 평소 2배 초과 2대 이상 +0.10·1대만 피해 감 +0.05·2대 이상 정상 통과 −0.30) → 합 [−0.30, +0.25] → 최종 clamp(공지 + 보정, 0, 0.95). 보정은 시각의 함수(at 기준, 저장값 = base_confidence), bus_skip 은 20분 안에서만 확인 근거, 정상 통과 −0.30 이 20분 간격으로 2번이면 끝 시각 전 해제(bus_return), impact unknown 승격 후보는 지점 30 m 안 노선에서 2대 이탈일 때만 0.65 위로. /closures `confidence` 는 보정 후, `base_confidence` 추가, EvidenceKind `bus`, INTERFACE v0.14. `/route` 는 depart_at 보정으로(0.7 이상·창 안이면 +300초, 0.8 이상 + bus_skip·시작 뒤면 제외, 0.7 아래·해제면 보통). FE 통제 근거 "버스 2대가 16:02·16:06에 세종대로 구간을 피해 감 +0.20 → 확신도 0.95". README 확신도 절. 규칙서(파서 확신도)는 그대로(태우 결정)
-- 테스트: 순수 함수(합·clamp·20분 창·상한·해제 순서)는 실데이터 상수로, 감지 부품은 평일 기록으로, 통제일 통합은 그날 기록으로 — 없으면 "실측 대기"로 보고하고 멈춘다
+- 🧑 태우: 노선정보 API(data.go.kr 15000193) 활용신청 — 2026-11-08 getRoutePath 가 HTTP 401 "등록되지 않은 서비스키". 워커 재시작. 마라톤·M2 는 운영계정 상향
 
 ### T6.4 TOPIS 통제 공지 게시판
 - status: TODO
-- depends: T6.3
+- depends: T6.2 (태우 2026-11-08 — 11/13(금) 18:00 전 운영)
 - 산출: https://topis.seoul.go.kr/notice/openNoticeList.do 를 10분마다(robots 허용 확인됨: /visit/, /map/openTotalMap.do 만 금지). 새 글만 → 원문 기록 → notice_v2 live 파싱(결정 D) → 후보 발행. 기존 N045·N046 문장이 이 게시판 형식이다 — 파싱 결과가 cases 와 같은 형식인지 확인
-
-### T6.5 추가 소스 확인 (구현 말고 보고만)
-- status: TODO
-- depends: T6.4
-- 산출: 각각 한 번만 호출해서 응답 구조·서울 도심 집회 포함 여부·좌표 유무·라이선스를 표로 보고. 쓸지는 태우가 정한다 — TOPIS 통제지도 https://topis.seoul.go.kr/map/openControlMap.do 가 내부적으로 부르는 AJAX 엔드포인트와 응답(좌표가 있는지), 서울 실시간 도시데이터 OA-21285 의 사고통제현황(OA-13315 와 중복인지), 경찰청_교통돌발정보서비스(data.go.kr 15088841 — 서울 도심 집회가 나오는지, 고속도로·국도뿐인지)
 
 ### T6.6 경찰청 PDF inbox
 - status: TODO
-- depends: T6.5
+- depends: T6.4 (태우 2026-11-08 — 11/13(금) 18:00 전 운영)
 - 산출: smpa 는 robots.txt 가 막혀 있어 자동 수집 안 한다. `data/raw/notices/smpa/inbox/` 에 태우가 PDF 를 넣으면 워커가 새 파일을 감지 → 표 추출 → notice_v2 live 파싱 → 후보 발행 → 처리한 파일은 `data/raw/notices/smpa/<날짜>.pdf` 로 옮기고 MANIFEST 갱신
+
+### T6.3 버스 확신도 보정 (ADR-013)
+- status: TODO
+- depends: T6.6 (태우 2026-11-08 순서: T6.4 → T6.6 → T6.3)
+- 산출: BE `bus_correction.py` — 통제 구간(같은 후보의 횡단보도 묶음)마다 최근 20분 관측으로 항목(서로 다른 2대 이상이 15분 안에 피해 감 +0.20·구간 정류소를 2대 이상 건너뜀 +0.10·통과 시간이 평소 2배 초과 2대 이상 +0.10·1대만 피해 감 +0.05·2대 이상 정상 통과 −0.30) → 합 [−0.30, +0.25] → 최종 clamp(공지 + 보정, 0, 0.95). 보정은 시각의 함수(at 기준, 저장값 = base_confidence), bus_skip 은 20분 안에서만 확인 근거, 정상 통과 −0.30 이 20분 간격으로 2번이면 끝 시각 전 해제(bus_return), impact unknown 승격 후보는 지점 30 m 안 노선에서 2대 이탈일 때만 0.65 위로. /closures `confidence` 는 보정 후, `base_confidence` 추가, EvidenceKind `bus`, INTERFACE v0.14. `/route` 는 depart_at 보정으로(0.7 이상·창 안이면 +300초, 0.8 이상 + bus_skip·시작 뒤면 제외, 0.7 아래·해제면 보통). FE 통제 근거 "버스 2대가 16:02·16:06에 세종대로 구간을 피해 감 +0.20 → 확신도 0.95". README 확신도 절. 규칙서(파서 확신도)는 그대로(태우 결정). 이탈 60 m·보정값은 2순위 돌발 기록(`bus/incident/`, 실제로 막힌 구간의 버스 움직임 = 정답)으로 실측 맞춤. 노선 경로는 getRoutePath(도로 그래프 잇기 금지). `bus_corrections` 표(Alembic)
+- 테스트: 순수 함수(합·clamp·20분 창·상한·해제 순서)는 실데이터 상수로, 감지 부품은 평일 기록으로, 통제일 통합은 그날 기록으로 — 없으면 "실측 대기"로 보고하고 멈춘다
+
+### T6.5 추가 소스 확인 (구현 말고 보고만)
+- status: TODO
+- depends: T6.3
+- 산출: 각각 한 번만 호출해서 응답 구조·서울 도심 집회 포함 여부·좌표 유무·라이선스를 표로 보고. 쓸지는 태우가 정한다 — TOPIS 통제지도 https://topis.seoul.go.kr/map/openControlMap.do 가 내부적으로 부르는 AJAX 엔드포인트와 응답(좌표가 있는지), 서울 실시간 도시데이터 OA-21285 의 사고통제현황(OA-13315 와 중복인지), 경찰청_교통돌발정보서비스(data.go.kr 15088841 — 서울 도심 집회가 나오는지, 고속도로·국도뿐인지)
 
 ### T6.7 커버리지 확장 판단 (보고)
 - status: TODO
-- depends: T6.6
+- depends: T6.5
 - 산출: 서울 전체 도보망+노드링크 그래프의 적재 시간·메모리·/route 응답 시간을 실측해서 보고(홈서버 32GB). 적재 60초·4GB 이내면 전체로, 넘으면 도심+마라톤 코스 주변 버퍼 — 숫자 보고 태우가 정한다. 마라톤 15구간 중 5구간만 들어간 것도 이것 때문인지 확인
 
 ### T6.8 마감
