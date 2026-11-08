@@ -20,6 +20,8 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from naru_contracts import (
+    BusPositionBatch,
+    BusPositionBatchResponse,
     CandidateBatch,
     CandidateBatchResponse,
     ClosureCandidate,
@@ -72,9 +74,12 @@ def _json(i: int) -> dict[str, Any]:
     return data
 
 
-def test_document_has_nine_json_blocks() -> None:
-    # §1.1·§3.1·§7.1·§7.2 는 ### 소제목이라 상위 § 로 잡힌다
-    assert [s for s, _ in BLOCKS] == ["§1", "§1", "§1", "§2", "§3", "§3", "§6", "§7", "§7"]
+def test_document_has_eleven_json_blocks() -> None:
+    # §1.1·§1.2·§3.1·§7.1·§7.2 는 ### 소제목이라 상위 § 로 잡힌다
+    assert [s for s, _ in BLOCKS] == [
+        *("§1", "§1", "§1", "§1", "§1"),
+        *("§2", "§3", "§3", "§6", "§7", "§7"),
+    ]
 
 
 def test_closure_candidate_example() -> None:  # §1
@@ -105,7 +110,7 @@ def test_candidate_batch_request_example() -> None:  # §1.1 요청
     assert set(raw) == {"batch_id", "produced_at", "producer", "candidates"}
     assert raw["candidates"] == [{"...": "§1 ClosureCandidate"}]  # 문서의 자리표시자
     producers = [p.strip() for p in raw["producer"].split("|")]
-    assert producers == ["bus_deviation", "course", "incident", "notice", "congestion"]
+    assert producers == ["course", "incident", "notice", "congestion"]  # 버스는 §1.2 (ADR-013)
     batch = CandidateBatch.model_validate({**raw, "producer": "notice", "candidates": [_json(0)]})
     assert batch.batch_id == "worker-20270321-080015-bus" and len(batch.candidates) == 1
     with pytest.raises(ValidationError):
@@ -117,8 +122,24 @@ def test_candidate_batch_response_example() -> None:  # §1.1 응답
     assert (r.accepted, r.review_required, r.crosswalks_updated) == (3, 1, 12)
 
 
+def test_bus_position_batch_example() -> None:  # §1.2 요청 (v0.13, ADR-013 D)
+    # 2026-11-08 18:38 실제 기록 recorded/bus/20261108T183832_getBusPosByRtid_100100001.json 첫 차량
+    b = BusPositionBatch.model_validate(_json(3))
+    assert (b.route_id, b.batch_id) == ("100100001", "bus-100100001-67062dc1ad5c")
+    (p,) = b.positions
+    assert (p.veh_id, p.sect_ord, p.stop_flag, p.is_run) == ("106024536", 3, False, True)
+    assert p.data_tm.utcoffset() == timedelta(hours=9)
+    assert (p.lng, p.lat, p.sect_dist) == (126.998005, 37.562053, 0.327)
+    assert BusPositionBatch.model_validate(b.model_dump(mode="json")) == b
+
+
+def test_bus_position_batch_response_example() -> None:  # §1.2 응답
+    r = BusPositionBatchResponse.model_validate(_json(4))
+    assert (r.batch_id, r.accepted) == ("bus-100100001-67062dc1ad5c", 1)
+
+
 def test_route_response_example() -> None:  # §2
-    r = RouteResponse.model_validate(_json(3))
+    r = RouteResponse.model_validate(_json(5))
     assert r.duration_s == 840 and r.distance_m == 1120
     assert [leg.kind for leg in r.legs] == [LegKind.sidewalk, LegKind.underpass, LegKind.sidewalk]
     assert r.legs[1].name == "시청역 지하보도" and r.legs[1].coord_range == (1, 2)
@@ -132,7 +153,7 @@ def test_route_response_example() -> None:  # §2
 
 
 def test_error_body_example() -> None:  # §6
-    e = ErrorBody.model_validate(_json(6))
+    e = ErrorBody.model_validate(_json(8))
     assert e.error.code == "invalid_query" and e.error.field == "depart_at"
     assert set(ErrorCode.__args__) == {
         "invalid_query",
@@ -146,7 +167,7 @@ def test_error_body_example() -> None:  # §6
 
 
 def test_closures_example_is_not_json_yet() -> None:  # §3 — 태우 보고용 사실 고정
-    section, raw = BLOCKS[4]
+    section, raw = BLOCKS[6]
     assert section == "§3"
     with pytest.raises(json.JSONDecodeError):
         json.loads(raw)
@@ -256,11 +277,11 @@ def test_adr_008_impact_toward_approx() -> None:
         ClosureCandidate.model_validate({**raw, "geometry": line, "toward": "을지로입구역"})
     seg = ClosureCandidate.model_validate({**raw, "toward": "을지로입구역", "approx": True})
     assert seg.toward == "을지로입구역" and seg.approx is True
-    assert RouteResponse.model_validate(_json(3)).avoided[0].approx is False
+    assert RouteResponse.model_validate(_json(5)).avoided[0].approx is False
 
 
 def test_route_legs_must_partition_route() -> None:  # §2 v0.7, ADR-009
-    raw = _json(3)
+    raw = _json(5)
     RouteResponse.model_validate(raw)
 
     def broken(**leg_changes: object) -> dict[str, object]:
@@ -287,7 +308,7 @@ def test_route_legs_must_partition_route() -> None:  # §2 v0.7, ADR-009
 
 
 def test_closure_events_example() -> None:  # §3.1 v0.8, ADR-010
-    r = ClosureEventsResponse.model_validate(_json(5))
+    r = ClosureEventsResponse.model_validate(_json(7))
     assert [e.crosswalks for e in r.events] == [31, 6]
     rally, seg1 = r.events
     assert rally.reason.startswith("15:00~16:00 시의회~숭례문R")
@@ -323,7 +344,7 @@ def test_closure_events_example() -> None:  # §3.1 v0.8, ADR-010
 
 
 def test_closure_events_rules() -> None:  # §3.1 — 순서·bbox·개수, 질의 bbox 는 선택
-    data = _json(5)
+    data = _json(7)
     cov = data["coverage"]
     asof = data["data_as_of"]
     swapped = {
@@ -381,7 +402,7 @@ def test_closure_events_rules() -> None:  # §3.1 — 순서·bbox·개수, 질�
 
 
 def test_geocode_examples() -> None:  # §7 v0.11, ADR-011 B
-    found = GeocodeSearchResponse.model_validate(_json(7))
+    found = GeocodeSearchResponse.model_validate(_json(9))
     kyobo, foundation = found.places
     # 카카오 기록(q=교보빌딩, near 126.98,37.57, 반경 5 km 정확도 순)의 1·2위
     assert (kyobo.id, kyobo.name, kyobo.address) == (
@@ -392,7 +413,7 @@ def test_geocode_examples() -> None:  # §7 v0.11, ADR-011 B
     assert kyobo.coord == (126.9779039768265, 37.5709686446227)  # = route_0745 출발점
     assert foundation.name == "교보재단빌딩"
     assert GeocodeSearchResponse.model_validate(found.model_dump(mode="json")) == found
-    rev = GeocodeReverseResponse.model_validate(_json(8))
+    rev = GeocodeReverseResponse.model_validate(_json(10))
     assert rev.label == "종로구 종로 1" and rev.road_address == "서울특별시 종로구 종로 1"
     assert rev.address == "서울 종로구 종로1가 1"
 
@@ -403,7 +424,7 @@ def test_geocode_rules() -> None:  # §7 — 검색어 2~50자(앞뒤 공백 뺌
     for bad in ("시", "   시  ", "가" * 51):
         with pytest.raises(ValidationError):
             GeocodeSearchQuery.model_validate({"q": bad})
-    place = _json(7)["places"][0]
+    place = _json(9)["places"][0]
     with pytest.raises(ValidationError):
         GeocodeSearchResponse.model_validate({"places": [place] * 11})
     with pytest.raises(ValidationError):

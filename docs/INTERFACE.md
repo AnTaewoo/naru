@@ -1,4 +1,4 @@
-# INTERFACE.md — 파트 간 계약 v0.12
+# INTERFACE.md — 파트 간 계약 v0.13
 
 파트 경계의 단일 기준. 스키마를 바꾸면 **이 파일 먼저** 고치고, 하위호환이 깨지면 버전을 올린다. 변경은 ADR + 태우 승인.
 코드 구현은 `packages/contracts`(`naru_contracts`, pydantic v2) 하나뿐이다. 테스트가 이 문서의 예시 JSON 블록을 그대로 파싱하므로, 예시를 고치면 코드도 고쳐야 한다. FE 타입은 `make schema`로 생성한다.
@@ -43,13 +43,13 @@ AI 워커가 내놓는 유일한 출력. BE의 `CandidateIntake`(Model)가 `Cros
 | kind | 필드 | 누가 만드나 | BE 처리 (`CrosswalkIndex`) |
 |---|---|---|---|
 | `point` | `coordinates: [lng, lat]` | 리졸버 (교차로·장소·주소) | `from_point` 반경 30m. `impact: unknown`이면 먼저 도로 30 m 규칙(ADR-008) — 승격 안 되면 `zone_scheduled` |
-| `line` | `coordinates: [[lng, lat], …]` | 코스 GPX, 버스 이탈 구간, 돌발 링크 | `from_line` 버퍼 15m (코스·돌발 — TOPIS 링크는 방향별이라 그 방향 차로를 건너는 쪽 횡단보도) |
+| `line` | `coordinates: [[lng, lat], …]` | 코스 GPX, 돌발 링크 | `from_line` 버퍼 15m (코스·돌발 — TOPIS 링크는 방향별이라 그 방향 차로를 건너는 쪽 횡단보도) |
 | `segment` | `from_`, `to`, `via[]`: `PlacePoint` · `road`, `road_class` | 리졸버 (Claude segments 출력) | `from_segment`: 도로 그래프 최단경로(from→via→to, road 있으면 그 도로만) → LineString → 등급별 버퍼(대로 25 / 로 15 / 길 8 m) → `from_line` |
 | `zone` | `zone_name`, `polygon` | ZoneMatcher | 라우팅 무관, `zone_scheduled` 표시만 |
 
 - `from_`·`to` 중 하나라도 리졸버가 못 풀면 `segment`를 만들지 않고 풀린 쪽만 `point`로 보낸다. 틀린 선보다 빠진 점이 낫다.
 - `confidence < 0.7` → `review_required: true`. BE는 적재하되 라우팅에 쓰지 않는다.
-- `impact ∈ {blocks, unknown}` **필수** (ADR-008, 파서 규칙서 §9). 파서의 `none`(자동차전용도로·차 없는 거리·보도·차량 조치·해제·안내)은 AI가 후보를 만들지 않는다. `unknown`(점유 표현 없는 지점 집회)이면 `confidence ≤ 0.65`여야 하고(→ review_required), BE `CandidateIntake`가 지점이 도로 링크 30 m 안이거나 지점들이 도로를 감싸면 `blocks`로 승격(evidence `detail.rule: unknown_near_road`), 아니면 `zone_scheduled`로 표시만. 코스·돌발·버스는 항상 `blocks`.
+- `impact ∈ {blocks, unknown}` **필수** (ADR-008, 파서 규칙서 §9). 파서의 `none`(자동차전용도로·차 없는 거리·보도·차량 조치·해제·안내)은 AI가 후보를 만들지 않는다. `unknown`(점유 표현 없는 지점 집회)이면 `confidence ≤ 0.65`여야 하고(→ review_required), BE `CandidateIntake`가 지점이 도로 링크 30 m 안이거나 지점들이 도로를 감싸면 `blocks`로 승격(evidence `detail.rule: unknown_near_road`), 아니면 `zone_scheduled`로 표시만. 코스·돌발은 항상 `blocks`. 버스는 후보를 만들지 않는다(§1.2, ADR-013).
 - `toward`: 종료 지점 없는 행진의 방향 표현을 **문장 그대로**(예: `"을지로입구역"`). `geometry.kind ∈ {point, segment}`일 때만. 리졸버가 풀면 AI가 `segment`(출발지 → toward)를 만들고 `confidence`를 0.65로 상한(검토 큐), 못 풀면 `point`만 보낸다.
 - `approx`: 파서가 근사 시간("14시경", "오후")을 양끝 10분씩 넓혔으면 `true`. BE는 window를 넓히지도 좁히지도 않고 상태·응답에 그대로 싣는다. 평가는 ±10분 허용.
 - `window.end`가 null이면 "종료 미정". 엔진은 시작+6시간을 임시 end로 두고 evidence에 남긴다.
@@ -66,7 +66,7 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 {
   "batch_id": "worker-20270321-080015-bus",
   "produced_at": "2027-03-21T08:00:15+09:00",
-  "producer": "bus_deviation | course | incident | notice | congestion",
+  "producer": "course | incident | notice | congestion",
   "candidates": [ { "...": "§1 ClosureCandidate" } ]
 }
 ```
@@ -77,6 +77,32 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 - 토큰이 없거나 다르면 `401` + §6 `unauthorized`. 스키마 위반이면 `400` + `invalid_query`.
 - 같은 `batch_id`를 다시 보내면 중복 적용하지 않는다(멱등). 재시도 안전.
 - 브라우저에서 부르지 않는다. Next.js rewrites 대상에서 `/internal/*`는 제외한다.
+
+### §1.2 전송: `POST /internal/bus-positions` (AI 워커 → BE, v0.13 ADR-013 D)
+버스는 후보(통제)를 만들지 않는다. 워커가 통제 창(시작 1시간 전 ~ 끝+30분)에 겹치는 노선 — 그 통제 횡단보도 100 m 안 정류소가 많은 순, 심야(N)·새벽 노선 제외, 사건마다 최대 3개 — 을 60초마다 부르고(하루 900회 상한, 원문은 `data/recorded/bus/`), 받은 위치를 판단 없이 그대로 보낸다. BE 는 저장만 한다(T6.2). 확신도 보정은 T6.3.
+
+**요청** 헤더는 §1.1 과 같다. 예시는 2026-11-08 18:38 실제 기록(노선 01A 의 첫 차량).
+```json
+{
+  "batch_id": "bus-100100001-67062dc1ad5c",
+  "produced_at": "2026-11-08T18:38:33+09:00",
+  "route_id": "100100001",
+  "ref": "data/recorded/bus/20261108T183832_getBusPosByRtid_100100001.json",
+  "called_at": "2026-11-08T18:38:32+09:00",
+  "positions": [
+    {"veh_id": "106024536", "plain_no": "서울74사6145", "data_tm": "2026-11-08T18:38:19+09:00",
+     "lng": 126.998005, "lat": 37.562053, "sect_ord": 3, "section_id": "101600172", "sect_dist": 0.327,
+     "stop_flag": false, "last_stn_id": "101000054", "next_st_id": "101000117", "is_run": true}
+  ]
+}
+```
+**응답** `202 Accepted`
+```json
+{"batch_id": "bus-100100001-67062dc1ad5c", "accepted": 1}
+```
+- 필드는 getBusPosByRtid `itemList` 그대로 — `vehId`→`veh_id`, `plainNo`→`plain_no`, `dataTm`(YYYYMMDDHHmmss KST)→`data_tm`, `gpsX`·`gpsY`→`lng`·`lat`, `sectOrd`, `sectionId`, `sectDist`(응답 값 그대로), `stopFlag`(1 = 정류소 도착), `lastStnId`, `nextStId`(마을버스는 "0"), `isrunyn`. `batch_id` = `bus-<노선>-<원문 sha1 앞 12자리>`.
+- 같은 (노선, 차량, `data_tm`)은 한 번만 저장한다(멱등). `accepted` = 새로 저장한 위치 수.
+- 토큰·스키마 오류는 §1.1 과 같다(`401`·`400`).
 
 ## §2 BE → FE: `GET /route` (v0.7)
 
@@ -234,3 +260,4 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 | 2026-11-08 | v0.12 | §1 `summary`(구조화 칸: 구간·지점 이름·reported_people·roads), §3.1 사건 `type`·`source`·`summary`·`notice`, 응답 `data_as_of` 필수 (ADR-012, ADR-011 C) | 태우 승인 |
 | 2026-11-08 | v0.12 (보충) | §2 `legs[].name` 뜻 — 횡단보도는 교차로명, 없으면 가까운 도로명. 스키마 그대로 (ROADMAP T5.10) | 태우 (T5.10) |
 | 2026-11-08 | v0.12 (보충) | §1 돌발 후보(집회 10B02만·TOPIS 링크 선·0.9·`topis_incident` 를 같은 횡단보도·겹치는 시각의 공지 후보에도), §3.1 `data_as_of.topis_incident` = 돌발 배치를 마지막으로 받은 시각. 스키마 그대로 (ROADMAP T6.1) | 태우 (T6.1) |
+| 2026-11-08 | v0.13 | §1.2 `POST /internal/bus-positions` 버스 위치 전송 추가(getBusPosByRtid 필드 그대로, 같은 노선·차량·시각은 한 번) — 버스는 후보를 만들지 않는다 (ADR-013 D) | 태우 승인 (ADR-013) |

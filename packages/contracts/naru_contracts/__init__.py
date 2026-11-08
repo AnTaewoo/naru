@@ -4,6 +4,7 @@ AI(naru_ai)와 BE(naru_be)는 서로를 import하지 않고 이 패키지만 imp
 FE 타입은 `make schema`로 여기서 생성한다. 문서와 코드가 다르면 테스트가 깨진다(T2.1).
 """
 
+from naru_contracts.bus import BusPosition, BusPositionBatch, BusPositionBatchResponse
 from naru_contracts.closure import (
     CandidateBatch,
     CandidateBatchResponse,
@@ -52,6 +53,9 @@ from naru_contracts.route import Avoided, Baseline, Leg, RouteQuery, RouteRespon
 __all__ = [
     "Avoided",
     "Baseline",
+    "BusPosition",
+    "BusPositionBatch",
+    "BusPositionBatchResponse",
     "CandidateBatch",
     "CandidateBatchResponse",
     "CandidateSummary",
