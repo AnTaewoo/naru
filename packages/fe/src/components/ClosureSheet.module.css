@@ -1,0 +1,116 @@
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 48%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -2px 14px rgba(0, 0, 0, 0.12);
+  padding: 8px 0 12px;
+  z-index: 4;
+}
+
+.handle {
+  width: 38px;
+  height: 4px;
+  border-radius: 2px;
+  background: #d6d6d6;
+  margin: 0 auto 12px;
+  flex: none;
+}
+
+.pad {
+  padding: 0 20px;
+}
+
+.title {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.sub {
+  font-size: 13.5px;
+  color: #666;
+  margin-top: 3px;
+}
+
+.loading {
+  color: #999;
+}
+
+.error {
+  color: #e5322d;
+}
+
+.rows {
+  margin-top: 10px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.row {
+  display: grid;
+  /* minmax(0, 1fr): 긴 제목(nowrap)이 칸을 넓혀 오른쪽 배지를 밀어내지 않게 */
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 20px;
+}
+
+.row + .row {
+  border-top: 1px solid #f1f1f1;
+}
+
+.ico {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.rowTitle {
+  font-size: 15px;
+  font-weight: 600;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.rowSub {
+  font-size: 13px;
+  color: #666;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowText {
+  min-width: 0;
+}
+
+.badge {
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 16px 20px;
+  color: #999;
+  font-size: 14px;
+}

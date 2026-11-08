@@ -1,0 +1,45 @@
+.slider {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 20px 0;
+}
+
+.step {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #f4f4f5;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.track {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.track input[type="range"] {
+  width: 100%;
+  accent-color: var(--naru-primary, #2d6bff);
+}
+
+.label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  color: #666;
+}
+
+.time {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  color: #1e1e1e;
+}
+
+.day {
+  font-variant-numeric: tabular-nums;
+}
