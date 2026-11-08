@@ -1,13 +1,18 @@
-// 순수 함수: /route 응답(RouteResponse) → 지하보도·육교 구간(남색 터널)과 그 입구 마커 (ADR-009)
-// 레그의 coord_range [i, j] 로 route.coordinates 를 잘라 쓴다. 경로선·baseline 은 T5.2 에서 이 파일에 더한다
+// 순수 함수: /route 응답(RouteResponse) → 경로 파란 실선 · 원래 길(baseline) 회색 점선 · 지하보도·육교 구간
+// (남색 터널)과 그 입구 마커. 시안 02 범례. 터널은 레그의 coord_range [i, j] 로 route.coordinates 를 자른다 (ADR-009)
 import type { LayerSpecification } from "maplibre-gl";
-import type { Leg, LegKind, RouteResponse } from "../../types/contracts";
+import type { Leg, LegKind, LineString, RouteResponse } from "../../types/contracts";
 import { COLORS } from "../colors";
 import { ICON_IDS } from "../icons";
 
+export const ROUTE_LINE_SOURCE_ID = "naru-route-line";
+export const ROUTE_BASELINE_SOURCE_ID = "naru-route-baseline";
 export const ROUTE_CROSSING_SOURCE_ID = "naru-route-crossings";
 export const ROUTE_ENTRANCE_SOURCE_ID = "naru-route-entrances";
 export const ROUTE_LAYER_IDS = {
+  baseline: "naru-route-baseline",
+  casing: "naru-route-casing",
+  line: "naru-route-line",
   tunnel: "naru-route-tunnel",
   tunnelDash: "naru-route-tunnel-dash",
   entrance: "naru-route-entrance",
@@ -22,6 +27,12 @@ export interface CrossingFeature {
   type: "Feature";
   geometry: { type: "LineString"; coordinates: LngLat[] };
   properties: { kind: LegKind; name: string; leg_index: number; distance_m: number };
+}
+
+export interface LineFeature {
+  type: "Feature";
+  geometry: { type: "LineString"; coordinates: LngLat[] };
+  properties: { role: "route" | "baseline"; duration_s: number; distance_m: number };
 }
 
 export interface EntranceFeature {
@@ -39,6 +50,70 @@ function toLngLat(c: unknown): LngLat | null {
   if (!Array.isArray(c)) return null;
   const [lng, lat] = c as unknown[];
   return typeof lng === "number" && typeof lat === "number" ? [lng, lat] : null;
+}
+
+/** LineString 좌표 — 생성 타입이 [unknown, unknown] 이라 숫자만 남긴다 */
+export function lineCoordinates(line: LineString): LngLat[] {
+  const out: LngLat[] = [];
+  for (const c of line.coordinates) {
+    const p = toLngLat(c);
+    if (p) out.push(p);
+  }
+  return out;
+}
+
+function lineFeature(
+  role: LineFeature["properties"]["role"],
+  coordinates: LngLat[],
+  durationS: number,
+  distanceM: number,
+): LineFeature {
+  return {
+    type: "Feature",
+    geometry: { type: "LineString", coordinates },
+    properties: { role, duration_s: durationS, distance_m: distanceM },
+  };
+}
+
+/** 지금 갈 수 있는 가장 빠른 길 — 파란 실선 */
+export function routeLine(route: RouteResponse | null): Collection<LineFeature> {
+  const coords = route ? lineCoordinates(route.route) : [];
+  if (!route || coords.length < 2) return { type: "FeatureCollection", features: [] };
+  return {
+    type: "FeatureCollection",
+    features: [lineFeature("route", coords, route.duration_s, route.distance_m)],
+  };
+}
+
+function sameLine(a: LngLat[], b: LngLat[]): boolean {
+  return a.length === b.length && a.every((p, k) => p[0] === b[k]?.[0] && p[1] === b[k]?.[1]);
+}
+
+/** 원래 최단 경로(통제를 끈 경로) — 회색 점선. 지금 경로와 같으면 그리지 않는다 */
+export function baselineLine(route: RouteResponse | null): Collection<LineFeature> {
+  if (!route) return { type: "FeatureCollection", features: [] };
+  const coords = lineCoordinates(route.baseline.route);
+  if (coords.length < 2 || sameLine(coords, lineCoordinates(route.route))) {
+    return { type: "FeatureCollection", features: [] };
+  }
+  const b = route.baseline;
+  return {
+    type: "FeatureCollection",
+    features: [lineFeature("baseline", coords, b.duration_s, b.distance_m)],
+  };
+}
+
+/** 경로와 원래 길을 모두 담는 [[서, 남], [동, 북]] — 지도를 맞출 때 */
+export function routeBounds(route: RouteResponse | null): [LngLat, LngLat] | null {
+  if (!route) return null;
+  const all = [...lineCoordinates(route.route), ...lineCoordinates(route.baseline.route)];
+  if (all.length === 0) return null;
+  const lngs = all.map((p) => p[0]);
+  const lats = all.map((p) => p[1]);
+  return [
+    [Math.min(...lngs), Math.min(...lats)],
+    [Math.max(...lngs), Math.max(...lats)],
+  ];
 }
 
 /** 레그의 [i, j] (ADR-009). 생성 타입이 unknown 이라 여기서 숫자를 확인한다 */
@@ -138,6 +213,49 @@ export function entranceLayers(sourceId: string = ROUTE_ENTRANCE_SOURCE_ID): Lay
         "icon-size": ["interpolate", ["linear"], ["zoom"], 13, 0.6, 17, 1],
         "icon-allow-overlap": true,
         "icon-ignore-placement": true,
+      },
+    },
+  ];
+}
+
+/** 경로: 흰 테두리 위 파란 실선 (시안 02) */
+export function routeLayers(sourceId: string = ROUTE_LINE_SOURCE_ID): LayerSpecification[] {
+  return [
+    {
+      id: ROUTE_LAYER_IDS.casing,
+      type: "line",
+      source: sourceId,
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": "#ffffff",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 13, 6, 17, 13],
+      },
+    },
+    {
+      id: ROUTE_LAYER_IDS.line,
+      type: "line",
+      source: sourceId,
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": COLORS.blue,
+        "line-width": ["interpolate", ["linear"], ["zoom"], 13, 3.5, 17, 8],
+      },
+    },
+  ];
+}
+
+/** 원래 길: 회색 점선 — 길이 0 대시 + 둥근 끝으로 점을 찍는다 */
+export function baselineLayers(sourceId: string = ROUTE_BASELINE_SOURCE_ID): LayerSpecification[] {
+  return [
+    {
+      id: ROUTE_LAYER_IDS.baseline,
+      type: "line",
+      source: sourceId,
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": COLORS.baseline,
+        "line-width": ["interpolate", ["linear"], ["zoom"], 13, 3, 17, 5],
+        "line-dasharray": [0, 2],
       },
     },
   ];
