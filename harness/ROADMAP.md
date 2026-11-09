@@ -332,7 +332,8 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - 결과(2026-11-09): inbox → 행마다 notice_v2(TOPIS 와 같은 상한) → 후보 → `smpa/<집회 날짜>.pdf` 로 옮기고 `smpa/inbox_manifest.jsonl`(git 밖) 한 줄. 행 ID 에 기준 작성 버전, 후보 ID 는 버전 없이. 같은 파일은 `inbox/duplicate/`, 표가 아니면 `inbox/failed/` — 지우지 않는다
 
 ### T6.3 버스 확신도 보정 (ADR-013)
-- status: DOING
+- status: 보류
+- 보류(태우 2026-11-09): ADR-013 보류 — 11/9 실측(docs/eval/bus_20261109.md: 1개 차로 행진 시간 안에 버스가 구간을 124회 경로대로 지나감, 무정차 0, 경로 60 m 이탈 0). 엔진·라우터의 버스 경로 삭제('통제 중' 근거 = 시간표 + TOPIS 돌발), `bus_corrections` 안 만듦, 보정 순수 함수 뺌(`RoutePath` 만 남김), 버스 폴러는 전면 통제·마라톤 기록만(`NARU_BUS_RECORD_ONLY=1`). 다음은 T6.8
 - depends: T6.6 (태우 2026-11-08 순서: T6.4 → T6.6 → T6.3)
 - 산출: BE `bus_correction.py` — 통제 구간(같은 후보의 횡단보도 묶음)마다 최근 20분 관측으로 항목(서로 다른 2대 이상이 15분 안에 피해 감 +0.20·구간 정류소를 2대 이상 건너뜀 +0.10·통과 시간이 평소 2배 초과 2대 이상 +0.10·1대만 피해 감 +0.05·2대 이상 정상 통과 −0.30) → 합 [−0.30, +0.25] → 최종 clamp(공지 + 보정, 0, 0.95). 보정은 시각의 함수(at 기준, 저장값 = base_confidence), bus_skip 은 20분 안에서만 확인 근거, 정상 통과 −0.30 이 20분 간격으로 2번이면 끝 시각 전 해제(bus_return), impact unknown 승격 후보는 지점 30 m 안 노선에서 2대 이탈일 때만 0.65 위로. /closures `confidence` 는 보정 후, `base_confidence` 추가, EvidenceKind `bus`, INTERFACE v0.14. `/route` 는 depart_at 보정으로(0.7 이상·창 안이면 +300초, 0.8 이상 + bus_skip·시작 뒤면 제외, 0.7 아래·해제면 보통). FE 통제 근거 "버스 2대가 16:02·16:06에 세종대로 구간을 피해 감 +0.20 → 확신도 0.95". README 확신도 절. 규칙서(파서 확신도)는 그대로(태우 결정). 이탈 60 m·보정값은 2순위 돌발 기록(`bus/incident/`, 실제로 막힌 구간의 버스 움직임 = 정답)으로 실측 맞춤. 노선 경로는 getRoutePath(도로 그래프 잇기 금지). `bus_corrections` 표(Alembic)
 - 테스트: 순수 함수(합·clamp·20분 창·상한·해제 순서)는 실데이터 상수로, 감지 부품은 평일 기록으로, 통제일 통합은 그날 기록으로 — 없으면 "실측 대기"로 보고하고 멈춘다
@@ -361,7 +362,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - 산출: VWorld 키 넣으면 타일 교체(그 전까진 OSM). docker-compose MySQL 포트 127.0.0.1:3307:3306. 2026 JTBC 서울마라톤(11/1) 교통통제 안내(news.seoul.go.kr)로 코스 시각표 추가 가능한지 보고 — 3/15 보다 최근이라 시연용
 
 ### P6 이후 (해커톤 이후, M2)
-버스 운영계정 상향(🧑 태우, 마라톤·M2 전). 버스 이진 규칙(RouteSectionIndex·BusDeviationDetector: 2대 이탈 → 통제 중, 복귀 → 해제)은 ADR-013 확신도 보정으로 대체 — T6.2·T6.3. (IncidentIngestor 는 T6.1 로 당김)
+버스 운영계정 상향(🧑 태우, 마라톤·M2 전). 버스 확신도 보정(ADR-013)은 보류 — 2027년 3월 서울마라톤에서 버스 정류소 건너뜀으로 구간별 실제 통제·해제 시각을 확인한다(폴러 기록 + `RoutePath`). (IncidentIngestor 는 T6.1 로 당김)
 
 ## P7 — 현장 실증 (2027-03)
 현장 데이터 규칙(`data/raw/field/<YYYYMMDD>/`: smpa.pdf, topis_notices.json, track.gpx, photos/<HHMMSS>_*.jpg, notes.md + 같은 시각 recorded)은 v0.4와 같다. 예측 통제 vs 관측 대조 → 보고서.
