@@ -375,15 +375,15 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 ### T7.2 BE 통제 구역 — 사건 area·centroid
 - status: DONE
 - depends: T7.1
-- 산출: 접수 때 후보 모양(구간 경로 + 등급 버퍼, 선 15 m, 점 30 m)을 사건 단위 union → 5 m 단순화 → `area`·`centroid`, 표 `closure_events`(Alembic 0005)
+- 산출: 접수 때 후보 모양(구간 경로 + 등급 버퍼, 선 15 m, 점 30 m)을 사건 단위 union → 2 m 단순화 + 2 m 여유 → `area`·`centroid`, 표 `closure_events`(Alembic 0005)
 
 ### T7.3 TOPIS 통제지도 예정 통제 소스 (T6.5)
-- status: DOING
+- status: DONE
 - depends: T7.1
-- 산출: 목록·통제 도로 AJAX 10분(ADR-011 E) → 예정 통제 후보(링크 순서 경로, 꼭짓점 OA-13311, 후보 ID = 돌발과 같은 acc_id, 예정 근거는 공지처럼 0.85, 전체 통제는 버스 기록 대상)
+- 산출: 목록·통제 도로 AJAX 10분(ADR-011 E) → 예정 통제 후보(링크 순서 경로, 꼭짓점 OA-13311, 출처 topis·후보 ID `topismap-<acc>-<k>` — 시작하면 T6.1 돌발 연결로 통제 중, 예정 근거는 공지처럼 0.85, 전체 통제는 버스 기록 대상)
 
 ### T7.4 FE 실시간 지도 — 줌 3단계·칩 필터·60초 갱신
-- status: TODO
+- status: DOING
 - depends: T7.2
 - 산출: 앱 열면 서울 전체 사건 — 클러스터(< 12)·구역(12~15)·횡단보도(≥ 15), 상태 5종, 칩 = 필터, 60초 ETag, data_as_of. "통제 불러오기"·빈 상태 삭제. 성능 측정 보고
 
