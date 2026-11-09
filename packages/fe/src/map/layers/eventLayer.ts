@@ -1,7 +1,12 @@
 // 순수 함수: 지금 지도 사건(/closures/events v0.14) → 클러스터용 중심점·통제 구역 + MapLibre 레이어 스펙
 // (T7.4, ADR-014 A). 줌 12 아래 사건 중심점 클러스터, 12 부터 구역(BE 가 접수 때 만든 area), 15 부터 횡단보도
 // 점(closureLayer). 공간 연산은 하지 않는다 — 구역·중심은 BE 값 그대로 (CLAUDE.md §3-5)
-import type { GeoJSONSourceSpecification } from "maplibre-gl";
+import type {
+  CircleLayerSpecification,
+  ExpressionSpecification,
+  GeoJSONSourceSpecification,
+  LayerSpecification,
+} from "maplibre-gl";
 import type { ClosureEvent } from "../../types/contracts";
 import { COLORS } from "../colors";
 import {
@@ -13,6 +18,7 @@ import {
   type ChipKind,
   type EventKind,
 } from "../eventKinds";
+import { COUNT_ICON_PREFIX } from "../icons";
 
 export const EVENT_POINT_SOURCE_ID = "naru-events-points";
 export const EVENT_AREA_SOURCE_ID = "naru-events-areas";
@@ -164,4 +170,118 @@ export function eventPointSource(fc: EventPointCollection): GeoJSONSourceSpecifi
 
 export function eventAreaSource(fc: EventAreaCollection): GeoJSONSourceSpecification {
   return { type: "geojson", data: fc };
+}
+
+export const EVENT_LAYER_IDS = {
+  areaFill: "naru-events-area-fill",
+  areaLine: "naru-events-area-line",
+  cluster: "naru-events-cluster",
+  count: "naru-events-count",
+  dot: "naru-events-dot",
+  dotNoArea: "naru-events-dot-noarea",
+} as const;
+
+const SEV_COLOR: ExpressionSpecification = [
+  "step",
+  ["get", "sev"],
+  COLORS.stop,
+  1,
+  COLORS.soon,
+  2,
+  COLORS.slow,
+  3,
+  COLORS.zone,
+  LOW_SEV,
+  COLORS.gray,
+];
+const IS_SOON: ExpressionSpecification = ["==", ["get", "kind"], "soon"];
+const LOW: ExpressionSpecification = ["get", "low"];
+const IS_ZONE: ExpressionSpecification = ["==", ["get", "kind"], "zone"];
+
+/** 구역 채움 — 흐림·예정 구역은 옅게, 나머지는 줌이 커질수록 옅게(횡단보도 점이 위에 온다) */
+function fillAt(opacity: number): ExpressionSpecification {
+  return ["case", LOW, 0.06, IS_ZONE, 0.1, opacity];
+}
+
+/** 레이어 6장 — 구역 채움·윤곽(12~), 클러스터 원·개수(~12), 낱개 점(~12), 구역 없는 사건 점(12~) */
+export function eventLayers(
+  pointSource: string = EVENT_POINT_SOURCE_ID,
+  areaSource: string = EVENT_AREA_SOURCE_ID,
+): LayerSpecification[] {
+  return [
+    {
+      id: EVENT_LAYER_IDS.areaFill,
+      type: "fill",
+      source: areaSource,
+      minzoom: AREA_MIN_ZOOM,
+      paint: {
+        "fill-color": ["get", "color"],
+        "fill-opacity": ["interpolate", ["linear"], ["zoom"], 12, fillAt(0.3), 16, fillAt(0.12)],
+      },
+    },
+    {
+      id: EVENT_LAYER_IDS.areaLine,
+      type: "line",
+      source: areaSource,
+      minzoom: AREA_MIN_ZOOM,
+      paint: {
+        "line-color": ["get", "color"],
+        "line-width": ["case", IS_SOON, 3, 2],
+        "line-opacity": ["case", LOW, 0.7, 1],
+        "line-dasharray": ["case", ["any", LOW, IS_ZONE], ["literal", [2, 2]], ["literal", [1, 0]]],
+      },
+    },
+    {
+      id: EVENT_LAYER_IDS.cluster,
+      type: "circle",
+      source: pointSource,
+      maxzoom: AREA_MIN_ZOOM,
+      filter: ["has", "point_count"],
+      paint: {
+        "circle-color": SEV_COLOR,
+        "circle-radius": ["step", ["get", "point_count"], 14, 5, 17, 20, 21],
+        "circle-opacity": ["case", [">=", ["get", "sev"], LOW_SEV], 0.6, 0.95],
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 2,
+      },
+    },
+    {
+      id: EVENT_LAYER_IDS.count,
+      type: "symbol",
+      source: pointSource,
+      maxzoom: AREA_MIN_ZOOM,
+      filter: ["has", "point_count"],
+      layout: {
+        "icon-image": ["concat", COUNT_ICON_PREFIX, ["to-string", ["get", "point_count"]]],
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true,
+      },
+    },
+    {
+      id: EVENT_LAYER_IDS.dot,
+      type: "circle",
+      source: pointSource,
+      maxzoom: AREA_MIN_ZOOM,
+      filter: ["!", ["has", "point_count"]],
+      paint: dotPaint(7),
+    },
+    {
+      id: EVENT_LAYER_IDS.dotNoArea,
+      type: "circle",
+      source: pointSource,
+      minzoom: AREA_MIN_ZOOM,
+      filter: ["==", ["get", "noArea"], true],
+      paint: dotPaint(9),
+    },
+  ];
+}
+
+function dotPaint(radius: number): CircleLayerSpecification["paint"] {
+  return {
+    "circle-color": ["get", "color"],
+    "circle-radius": radius,
+    "circle-opacity": ["case", LOW, 0.6, 0.95],
+    "circle-stroke-color": "#ffffff",
+    "circle-stroke-width": ["case", IS_SOON, 3, 2],
+  };
 }

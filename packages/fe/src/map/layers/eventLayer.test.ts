@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import { eventById, recordedLive } from "../../test/recorded";
 import { COLORS } from "../colors";
 import { CHIP_KINDS } from "../eventKinds";
-import { eventAreas, eventPoints } from "./eventLayer";
+import { countFromIconId, countLabel } from "../icons";
+import { EVENT_LAYER_IDS, eventAreas, eventLayers, eventPoints } from "./eventLayer";
 
 describe("eventPoints", () => {
   const { body, atMs } = recordedLive("closure_events_live_1107_1530");
@@ -57,5 +58,25 @@ describe("eventAreas", () => {
     expect(eventAreas(body.events, atMs, ["scheduled"]).features).toHaveLength(5);
     const live = recordedLive("closure_events_live_1109_1330");
     expect(eventAreas(live.body.events, live.atMs, CHIP_KINDS).features).toHaveLength(4);
+  });
+});
+
+describe("eventLayers·개수 아이콘", () => {
+  it("레이어 — 구역은 12 부터, 클러스터·점은 12 까지, 구역이 없는 사건은 12 부터 점으로", () => {
+    const byId = new Map(eventLayers().map((l) => [l.id, l]));
+    expect(byId.get(EVENT_LAYER_IDS.areaFill)?.minzoom).toBe(12);
+    expect(byId.get(EVENT_LAYER_IDS.areaLine)?.minzoom).toBe(12);
+    expect(byId.get(EVENT_LAYER_IDS.cluster)?.maxzoom).toBe(12);
+    expect(byId.get(EVENT_LAYER_IDS.count)?.maxzoom).toBe(12);
+    expect(byId.get(EVENT_LAYER_IDS.dot)?.maxzoom).toBe(12);
+    expect(byId.get(EVENT_LAYER_IDS.dotNoArea)?.minzoom).toBe(12);
+  });
+
+  it("클러스터 개수 아이콘 id 는 naru-n-<개수>, 100 부터 99+ (사건 상한 300)", () => {
+    expect(countFromIconId("naru-n-13")).toBe(13); // 11/7 15:30 사건 13 이 한 묶음일 때
+    expect(countFromIconId("naru-x")).toBeNull();
+    expect(countFromIconId("naru-n-0")).toBeNull();
+    expect(countLabel(16)).toBe("16");
+    expect(countLabel(300)).toBe("99+");
   });
 });

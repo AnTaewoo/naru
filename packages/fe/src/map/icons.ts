@@ -97,9 +97,34 @@ export const ICON_DRAWS: Record<IconId, { draw: Draw; size: number }> = {
   [ICON_IDS.entrance]: { draw: drawEntrance, size: ICON_SIZE },
 };
 
-/** 브라우저에서만 — 캔버스에 그려 ImageData 로. 2D 컨텍스트가 없으면 null */
-export function renderIcon(id: IconId): ImageData | null {
-  const { draw, size } = ICON_DRAWS[id];
+/**
+ * 클러스터 개수 (T7.4) — 글리프 서버가 없어 숫자도 캔버스로. 레이어는 "naru-n-<개수>" 를 찾고, 지도에 없는
+ * 이미지면(styleimagemissing) 그때 그린다
+ */
+export const COUNT_ICON_PREFIX = "naru-n-";
+
+export function countFromIconId(id: string): number | null {
+  if (!id.startsWith(COUNT_ICON_PREFIX)) return null;
+  const n = Number(id.slice(COUNT_ICON_PREFIX.length));
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+export function countLabel(n: number): string {
+  return n > 99 ? "99+" : String(n);
+}
+
+/** 흰 굵은 숫자 (클러스터 원 위에 얹는다) */
+export function drawCount(label: string): Draw {
+  return (ctx, size) => {
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `700 ${Math.round(size * (label.length > 2 ? 0.4 : 0.5))}px system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, size / 2, size * 0.54);
+  };
+}
+
+function render(draw: Draw, size: number): ImageData | null {
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
@@ -107,4 +132,16 @@ export function renderIcon(id: IconId): ImageData | null {
   if (!ctx) return null;
   draw(ctx, size);
   return ctx.getImageData(0, 0, size, size);
+}
+
+/** 브라우저에서만 — 개수 아이콘. id 가 개수 아이콘이 아니면 null */
+export function renderCount(id: string): ImageData | null {
+  const n = countFromIconId(id);
+  return n === null ? null : render(drawCount(countLabel(n)), ICON_SIZE);
+}
+
+/** 브라우저에서만 — 캔버스에 그려 ImageData 로. 2D 컨텍스트가 없으면 null */
+export function renderIcon(id: IconId): ImageData | null {
+  const { draw, size } = ICON_DRAWS[id];
+  return render(draw, size);
 }
