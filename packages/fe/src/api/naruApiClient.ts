@@ -28,6 +28,9 @@ export interface EventsParams {
   bbox?: string;
   /** ISO 8601 + 오프셋 — 사건 status 의 기준 시각, 기본 창 = 그때 진행 중 + 다음 날 24:00 KST (v0.14) */
   at?: string;
+  /** at 과 같이 — 창을 넓힌다(시트 목록 T7.12: at 앞뒤 365일) */
+  from?: string;
+  to?: string;
 }
 
 /** 사건 조건부 요청 결과 (T7.4) — 304 면 바뀐 것 없음(본문 없음) */
@@ -70,6 +73,8 @@ export function closuresUrl(baseUrl: string, p: ClosuresParams): string {
 export function eventsUrl(baseUrl: string, p: EventsParams = {}): string {
   const q = new URLSearchParams();
   if (p.at) q.set("at", p.at);
+  if (p.from) q.set("from", p.from);
+  if (p.to) q.set("to", p.to);
   if (p.bbox) q.set("bbox", p.bbox);
   const qs = q.toString();
   return `${baseUrl}/closures/events${qs ? `?${qs}` : ""}`;

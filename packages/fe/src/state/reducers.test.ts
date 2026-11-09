@@ -20,6 +20,7 @@ import {
   DEFAULT_BBOX,
   EMPTY_CLOSURES,
   asBbox4,
+  catalogParams,
   closureReducer,
   eventFromLocation,
   inBbox,
@@ -358,6 +359,23 @@ describe("closureReducer — 지금 지도 사건·지도 맞춤 (T5.4·T7.4)", 
     expect(f1.frame).toEqual({ bbox, seq: 1 });
     expect([f1.selected, f1.picked]).toEqual([null, null]);
     expect(closureReducer(f1, { type: "frame", bbox }).frame?.seq).toBe(2);
+  });
+
+  it("시트 목록 (T7.12) — 넓은 창 질의는 기준 시각 앞뒤 365일, receiveCatalog 로 사건·기준 시각·ETag", () => {
+    // 넓은 창 기록 closure_events_catalog_1107_1530 의 질의와 같다
+    const wide = recorded("closure_events_catalog_1107_1530");
+    expect(catalogParams("2026-11-07T15:30:00+09:00")).toEqual(wide.query);
+    const body = wide.body as ClosureEventsResponse;
+    const s = closureReducer(initialClosureState(), {
+      type: "receiveCatalog",
+      events: body.events,
+      at: body.at,
+      etag: wide.etag ?? null,
+    });
+    expect(s.catalog).toBe(body.events);
+    expect(s.catalogAt).toBe("2026-11-07T15:30:00+09:00");
+    expect(s.catalogEtag).toBe(wide.etag);
+    expect(initialClosureState().catalog).toBeNull();
   });
 
   it("?event= — 사건 id(12자 소문자 16진)만 받는다", () => {

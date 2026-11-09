@@ -127,6 +127,16 @@ describe("naruApiClient", () => {
     expect(got.body.events).toHaveLength(13);
     expect(got.body.truncated).toBe(false);
     // 브라우저 캐시를 거치지 않고 If-None-Match 를 직접 단다 — 304 를 JS 가 본다
+    // 시트 목록(T7.12)은 넓은 창 — from·to 를 같이 (넓은 창 기록의 질의 그대로)
+    const wide = recorded("closure_events_catalog_1107_1530").query ?? {};
+    const w = new URL(
+      eventsUrl("/api", { at: wide["at"], from: wide["from"], to: wide["to"] }),
+      "http://naru.test",
+    );
+    expect([w.searchParams.get("from"), w.searchParams.get("to")]).toEqual([
+      "2025-11-07T15:30:00+09:00",
+      "2027-11-07T15:30:00+09:00",
+    ]);
     expect(eventsInit(null)).toMatchObject({ cache: "no-store", headers: {} });
     expect(eventsInit(null).headers).not.toHaveProperty("if-none-match");
     expect(eventsInit(etag).headers).toMatchObject({ "if-none-match": etag });

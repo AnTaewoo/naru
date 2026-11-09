@@ -13,7 +13,7 @@ import {
 import { NaruApiError } from "../api/naruApiClient";
 import type { ClosureEvent, DataAsOf, FeatureCollection } from "../types/contracts";
 import { useNaruApi } from "./ApiProvider";
-import { useTime } from "./TimeProvider";
+import { kstIso, useTime } from "./TimeProvider";
 
 // Provider 3/4 — 지금 지도 사건(/api/closures/events?at=t, 60초 ETag)과 화면의 횡단보도(/api/closures,
 // 줌 14 이상·길찾기 때만). t·화면이 바뀌면 다시 받는다 (이전 요청은 Abort). CONVENTIONS §5.5, T7.4
@@ -37,6 +37,10 @@ export interface ClosureState {
   eventsEtag: string | null;
   /** 300건 상한에 잘렸나 */
   truncated: boolean;
+  /** 시트 목록 (T7.12) — t 앞뒤 365일 넓은 창 사건(상태는 t 기준). null = 아직 못 받음 */
+  catalog: ClosureEvent[] | null;
+  catalogAt: string | null;
+  catalogEtag: string | null;
   eventsError: string | null;
   /** 보행망 범위 (같은 응답의 coverage, INTERFACE v0.10) — 내 위치가 밖이면 안내 (T5.7). null = 모름 */
   coverage: Bbox4 | null;
@@ -87,12 +91,46 @@ export type ClosureAction =
       dataAsOf: DataAsOf | null;
     }
   | { type: "failEvents"; error: string }
+  | { type: "receiveCatalog"; events: ClosureEvent[]; at: string; etag: string | null }
   | { type: "select"; id: string | null }
   | { type: "pick"; ids: string[] }
   | { type: "unpick" }
   | { type: "frame"; bbox: Bbox4 };
 
 export const EMPTY_CLOSURES: FeatureCollection = { type: "FeatureCollection", features: [] };
+
+/** 시트 목록 질의 (T7.12) — 기준 시각 앞뒤 365일. t 가 그대로면 같은 질의라 ETag 가 맞으면 304 */
+export function catalogParams(t: string): { at: string; from: string; to: string } {
+  const at = Date.parse(t);
+  const year = 365 * 24 * 60 * 60_000;
+  return { at: kstIso(at), from: kstIso(at - year), to: kstIso(at + year) };
+}
+
+/**
+ * 받기를 되풀이한다 — 바로 한 번, 그 뒤 pollMs 마다(숨은 탭은 건너뛰고 다시 보이면 바로). 이전 요청은 Abort.
+ * 정리 함수를 돌려준다 (useEffect)
+ */
+function poll(load: (signal: AbortSignal) => void, pollMs: number): () => void {
+  let controller: AbortController | null = null;
+  const run = () => {
+    controller?.abort();
+    controller = new AbortController();
+    load(controller.signal);
+  };
+  run();
+  const timer = setInterval(() => {
+    if (document.visibilityState !== "hidden") run();
+  }, pollMs);
+  const onVisible = () => {
+    if (document.visibilityState === "visible") run();
+  };
+  document.addEventListener("visibilitychange", onVisible);
+  return () => {
+    clearInterval(timer);
+    document.removeEventListener("visibilitychange", onVisible);
+    controller?.abort();
+  };
+}
 
 /** ?event=<사건 id> (T7.5, 알림 클릭은 T7.10) — 12자 소문자 16진만 (INTERFACE §3.1 v0.14 id) */
 export function eventFromLocation(search: string): string | null {
@@ -114,6 +152,9 @@ export function initialClosureState(partial: Partial<ClosureState> = {}): Closur
     eventsAt: null,
     eventsEtag: null,
     truncated: false,
+    catalog: null,
+    catalogAt: null,
+    catalogEtag: null,
     eventsError: null,
     coverage: null,
     dataAsOf: null,
@@ -154,6 +195,8 @@ export function closureReducer(state: ClosureState, action: ClosureAction): Clos
         dataAsOf: action.dataAsOf,
         eventsError: null,
       };
+    case "receiveCatalog":
+      return { ...state, catalog: action.events, catalogAt: action.at, catalogEtag: action.etag };
     case "failEvents":
       return { ...state, eventsError: action.error };
     case "select":
@@ -238,13 +281,9 @@ export function ClosureProvider({
   }, [state.eventsEtag]);
   useEffect(() => {
     if (!fetchEnabled || !ready) return;
-    let controller: AbortController | null = null;
-    const load = () => {
-      controller?.abort();
-      const c = new AbortController();
-      controller = c;
+    return poll((signal) => {
       api
-        .events({ at: t }, c.signal, etag.current)
+        .events({ at: t }, signal, etag.current)
         .then((r) => {
           if (!r.changed) return;
           dispatch({
@@ -258,24 +297,29 @@ export function ClosureProvider({
           });
         })
         .catch((e: unknown) => {
-          if (c.signal.aborted) return;
+          if (signal.aborted) return;
           const msg = e instanceof NaruApiError ? e.message : "통제 목록을 받지 못했다";
           dispatch({ type: "failEvents", error: msg });
         });
-    };
-    load();
-    const timer = setInterval(() => {
-      if (document.visibilityState !== "hidden") load();
     }, pollMs);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") load();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-      controller?.abort();
-    };
+  }, [api, t, ready, fetchEnabled, pollMs]);
+
+  // 시트 목록 (T7.12) — t 앞뒤 365일 넓은 창, 지도 사건과 따로 같은 주기·ETag. 실패하면 받아 둔 목록 그대로
+  const catalogEtag = useRef(state.catalogEtag);
+  useEffect(() => {
+    catalogEtag.current = state.catalogEtag;
+  }, [state.catalogEtag]);
+  useEffect(() => {
+    if (!fetchEnabled || !ready) return;
+    return poll((signal) => {
+      api
+        .events(catalogParams(t), signal, catalogEtag.current)
+        .then((r) => {
+          if (!r.changed) return;
+          dispatch({ type: "receiveCatalog", events: r.body.events, at: r.body.at, etag: r.etag });
+        })
+        .catch(() => undefined); // 목록은 지도 사건 실패 문구(eventsError)로 충분 — 받아 둔 것을 쓴다
+    }, pollMs);
   }, [api, t, ready, fetchEnabled, pollMs]);
 
   const value = useMemo(() => state, [state]);
