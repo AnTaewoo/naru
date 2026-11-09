@@ -108,7 +108,10 @@ def test_candidates(recorded_dir: Path) -> None:
     rally = got["topismap-1109234-0"]
     assert rally.type is ClosureType.march  # '※행진: 논현역→…→교대역 7出'
     assert isinstance(rally.geometry, LineGeom) and rally.summary is not None
-    assert rally.summary.segments == []  # 통제 도로가 없으면 구간 이름도 없다
+    # 통제 도로가 없으면 대표 링크 이름 — links LinkInfo_1220027800(강남대로
+    # 논현역~교보타워사거리)
+    assert [(x.from_, x.to) for x in rally.summary.segments] == [("논현역", "교보타워사거리")]
+    assert rally.summary.roads == ["강남대로"]
 
 
 def test_next_request() -> None:

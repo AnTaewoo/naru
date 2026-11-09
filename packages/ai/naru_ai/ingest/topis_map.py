@@ -190,13 +190,18 @@ class TopisMapIngestor:
             found = link_lists.get(c.acc_id)
             groups = chains(found) if found else []
             lines = [ln for g in groups for ln in self._lines(g)]
+            named: list[
+                tuple[str, str, str]
+            ] = []  # 통제 도로가 없을 때 대표 링크 이름 (도로, 시작, 끝)
             if not lines and c.link_id:  # 통제 도로를 아직 못 받았으면 대표 링크
                 one = self.links.get(c.link_id)
                 lines = [list(one.coords)] if one is not None else []
+                if one is not None and one.start_name and one.end_name:
+                    named = [(one.road_name or "", one.start_name, one.end_name)]
             geoms: list[LineGeom | PointGeom] = [LineGeom(coordinates=ln) for ln in lines] or [
                 PointGeom(coordinates=lnglat_5181(c.x, c.y))
             ]
-            out.extend(self._candidates(c, geoms, groups, ref, fetched_at))
+            out.extend(self._candidates(c, geoms, groups, named, ref, fetched_at))
         return out
 
     @staticmethod
@@ -204,10 +209,11 @@ class TopisMapIngestor:
         c: MapControl,
         geoms: Sequence[LineGeom | PointGeom],
         groups: Sequence[Sequence[MapLink]],
+        named: Sequence[tuple[str, str, str]],
         ref: str,
         fetched_at: datetime,
     ) -> list[ClosureCandidate]:
-        roads: list[str] = []
+        roads: list[str] = [road for road, _, _ in named if road]
         for link in (x for g in groups for x in g):
             if link.road and link.road not in roads:
                 roads.append(link.road)
@@ -218,7 +224,7 @@ class TopisMapIngestor:
                 via=[x.end_name for x, y in itertools.pairwise(g) if x.road != y.road],
             )
             for g in groups
-        ]
+        ] or [SummarySegment(from_=start, to=end) for _, start, end in named]
         evidence = Evidence(
             kind=EvidenceKind.notice,
             ref=f"{ref}#acc-{c.acc_id}",
