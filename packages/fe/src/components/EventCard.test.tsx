@@ -10,7 +10,7 @@ const a = recordedLive("closure_events_live_1107_1530");
 const m = recordedLive("closure_events_live_0315_0745");
 
 describe("EventCard", () => {
-  it("11/9 13:30 국회대로 지도 행진 — 통제 중·행진, 짧은 제목과 지나는 곳 전부, 날짜·창·해제 예정", () => {
+  it("11/9 13:30 국회대로 지도 행진 — 통제 중·행진, 짧은 제목과 지나는 곳 전부, 해제 예정·출처·확신도·75곳", () => {
     let closed = 0;
     render(
       <EventCard
@@ -26,11 +26,19 @@ describe("EventCard", () => {
     expect(screen.getByText("11월 9일 (월)")).toBeDefined();
     expect(screen.getByText("11:00–15:30")).toBeDefined();
     expect(screen.getByText("15:30 해제 예정")).toBeDefined();
+    expect(screen.getByText("TOPIS 통제지도")).toBeDefined();
+    expect(screen.getByText("높음")).toBeDefined();
+    expect(screen.getByText("75곳")).toBeDefined();
+    // 통제 근거 = TOPIS 통제지도 글(공지 원문) — 누르기 전엔 없다
+    const excerpt = /※행진:의사당역→마포대교→공덕역/;
+    expect(screen.queryByText(excerpt)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "통제 근거 보기" }));
+    expect(screen.getByText(excerpt)).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "카드 닫기" }));
     expect(closed).toBe(1);
   });
 
-  it("11/7 15:30 경찰청 r01 — 시작했는데 근거가 없으면 '확인 전'", () => {
+  it("11/7 15:30 경찰청 r01 — 시작했는데 근거가 없으면 '확인 전', 확신도 높음(0.85)·경찰청 공지", () => {
     render(
       <EventCard
         event={eventById(a.body.events, "be5f89a4ebf3")}
@@ -40,10 +48,11 @@ describe("EventCard", () => {
     );
     expect(screen.getByText("확인 전")).toBeDefined();
     expect(screen.getByText("12:00 시작 · 확인 전")).toBeDefined();
+    expect(screen.getByText("경찰청 공지")).toBeDefined();
     expect(screen.getByText("5만 명 · 세종대로")).toBeDefined();
   });
 
-  it("3/15 07:45 마라톤 10구간 — 1시간 27분 뒤 시작", () => {
+  it("3/15 07:45 마라톤 10구간 — 공지가 없으면 근거 버튼이 없다, 1시간 27분 뒤 시작·마라톤 시간표", () => {
     render(
       <EventCard
         event={eventById(m.body.events, "e1d0e06932a8")}
@@ -52,5 +61,8 @@ describe("EventCard", () => {
       />,
     );
     expect(screen.getByText("1시간 27분 뒤 시작")).toBeDefined();
+    expect(screen.getByText("마라톤 시간표")).toBeDefined();
+    expect(screen.getByText("8곳")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "통제 근거 보기" })).toBeNull();
   });
 });
