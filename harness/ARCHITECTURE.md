@@ -75,7 +75,7 @@
 | `BusCorrection` | `correction(candidate_id, at) -> Correction` | 최근 20분 관측 → 항목 합 [−0.30, +0.25] → clamp(base + 합, 0, 0.95), bus_skip 은 20분 안에서만, 정상 통과 2번(20분 간격)이면 해제. 읽을 때 적용 (ADR-013, T6.3) |
 | `ClosureStateEntity` | SQLAlchemy ORM, 테이블 `closure_states` | crosswalk_id, status, confidence, window_start/end(UTC), evidence(JSON), lng/lat |
 | `ClosureRepository` | `upsert(state)` · `active_at(t, bbox)` · `active_horizon(t, bbox)`(t~t+60분 안 시작 포함, `/route`·`/closures` 공통) `-> list[ClosureState]` | DB 접근은 여기만 |
-| `PedGraph` | `edge.kind ∈ {sidewalk, crosswalk, underpass, overpass, stairs, elevator, station}` | NetworkX 인메모리 |
+| `PedGraph` | `edge.kind ∈ {sidewalk, crosswalk, underpass, overpass, stairs, elevator, station}` | NetworkX 인메모리. 서울 25개 구(T6.9, 2026-11-09 측정): 노드 217,782 · 엣지 282,006 · 횡단보도 21,775(도로 그래프 46,273 · 63,341), 적재 약 13초, gunicorn 워커당 RSS 약 1.5 GB(워커 2개 ≈ 3 GB) |
 | `TimeDependentRouter` | `route(src, dst, t, closures) -> Path` | A*. cost = dist + vertical + degraded. closed(t) → 제외 |
 | `BaselineRouter` | `route(src, dst) -> Path` | 같은 PedGraph, closures 미적용 |
 | `RoutePlanner` | `plan(query: RouteQuery) -> RouteResult` | 활성 폐쇄 조회 → 두 라우터 → 도메인 결과 |
