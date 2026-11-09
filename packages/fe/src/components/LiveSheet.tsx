@@ -3,13 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   EXAMPLE_KO,
-  GROUP_KO,
+  SECTION_KO,
+  bannerKo,
   dataAsOfKo,
+  dayLabelKo,
   eventDetailKo,
   eventTitleKo,
   hhmm,
   liveTitleKo,
-  rowBadgeKo,
+  moreKo,
+  nowEmptyKo,
+  sheetBadgeKo,
   windowKo,
 } from "../i18n/ko";
 import {
@@ -18,52 +22,75 @@ import {
   byDistrict,
   chipCounts,
   districtChips,
-  listedEvents,
-  liveGroups,
+  isLow,
+  sheetSections,
   type ListedEvent,
 } from "../map/eventKinds";
 import { EXAMPLES } from "../map/examples";
 import { asBbox4, useClosureDispatch, useClosures } from "../state/ClosureProvider";
-import { useTime, useTimeDispatch } from "../state/TimeProvider";
+import { isNowAt, kstIso, useTime, useTimeDispatch } from "../state/TimeProvider";
+import type { ClosureEvent } from "../types/contracts";
 import { BottomSheet, type SheetStage } from "./BottomSheet";
 import { ClosureTimeline } from "./ClosureTimeline";
 import { EventCard } from "./EventCard";
 import styles from "./LiveSheet.module.css";
 import { TimeSlider } from "./TimeSlider";
 
-// 지금 서울 통제 (T7.5, ADR-014 A) — 하단 시트 기본. 제목·부제·기준 시각 → 시간표·슬라이더 → 구 칩 → 묶음
-// (통제 중 → 1시간 안 시작 → 오늘 → 내일) 행. 행·지도를 누르면 사건 카드, 클러스터·겹친 구역이면 그 묶음 목록.
-// 해제·확신도 0.7 미만은 목록에 없다(칩과 같다) — 지도에서 고른 묶음엔 흐린 사건도
+/** 지난 통제는 처음에 이만큼, 나머지는 "더 보기" (태우 11/10) */
+const PAST_FIRST = 5;
+
+// 서울 통제 시트 (T7.5 → T7.12 세 묶음, ADR-014 A) — 하단 시트 기본. (지금이 아니면 "M월 D일 HH:MM 기준 ·
+// 지금으로 돌아가기") 제목·부제 → 시간표·슬라이더 → 구 칩 → 지금(통제 중·1시간 안) · 다가오는 통제(날짜별) ·
+// 지난 통제(최근 5 + 더 보기) → 예시로 보기. 목록은 t 앞뒤 365일 넓은 창(catalog, 아직이면 지도 사건).
+// 지금 행은 카드, 다가오는·지난 행은 그 시작 시각으로 옮기고 카드. 0.7 미만은 목록에 없다(지도에서 고른 묶음엔 있다)
 export function LiveSheet() {
-  const { events, eventsAt, eventsError, truncated, dataAsOf, bbox, selected, picked } =
-    useClosures();
+  const {
+    events,
+    eventsAt,
+    eventsError,
+    truncated,
+    dataAsOf,
+    bbox,
+    selected,
+    picked,
+    catalog,
+    catalogAt,
+  } = useClosures();
   const dispatch = useClosureDispatch();
   const timeDispatch = useTimeDispatch();
-  const { t, ready } = useTime();
+  const { t, ready, live: following } = useTime();
   const atMs = eventsAt ? Date.parse(eventsAt) : 0;
+  // 목록 — 넓은 창(t 기준 상태)을 받기 전엔 지도 사건으로
+  const list = useMemo(() => catalog ?? events ?? [], [catalog, events]);
+  const listAtMs = catalog && catalogAt ? Date.parse(catalogAt) : atMs;
   const [district, setDistrict] = useState<string | null>(null);
+  const [allPast, setAllPast] = useState(false);
   const [stage, setStage] = useState<SheetStage>("half");
-  const card = (selected && events?.find((e) => e.id === selected)) || null;
-  // 지도·?event= 로 카드나 묶음을 열면 접힌 시트를 절반으로
+  // 지금 모드(1분마다 확인해 5분마다 따라간다)면 몇 분 뒤처져도 지금이다
+  const live = ready && (following || isNowAt(t, Date.now()));
+  const fromMap = selected ? events?.find((e) => e.id === selected) : undefined;
+  const fromList = selected ? catalog?.find((e) => e.id === selected) : undefined;
+  const card: ClosureEvent | null = fromMap ?? fromList ?? null;
+  const cardAtMs = fromMap ? atMs : listAtMs;
+  // 지도·?event=·목록으로 카드나 묶음을 열면 접힌 시트를 절반으로
   useEffect(() => {
     if (card || picked) setStage((s) => (s === "collapsed" ? "half" : s));
   }, [card, picked]);
-  const listed = useMemo(
-    () => listedEvents(events ?? [], atMs).map((r) => r.event),
-    [events, atMs],
-  );
   const chips = useMemo(
-    () => districtChips(listed, asBbox4(bbox.split(",").map(Number))),
-    [listed, bbox],
+    () =>
+      districtChips(
+        list.filter((e) => !isLow(e)),
+        asBbox4(bbox.split(",").map(Number)),
+      ),
+    [list, bbox],
   );
-  const groups = useMemo(() => {
-    const all = events ?? [];
-    const scope = picked ? all.filter((e) => picked.includes(e.id)) : byDistrict(all, district);
-    return liveGroups(scope, atMs, picked !== null);
-  }, [events, atMs, picked, district]);
+  const sections = useMemo(() => {
+    const scope = picked ? list.filter((e) => picked.includes(e.id)) : byDistrict(list, district);
+    return sheetSections(scope, listAtMs, picked !== null);
+  }, [list, listAtMs, picked, district]);
   const counts = useMemo(() => chipCounts(events ?? [], atMs), [events, atMs]);
   // 서버 렌더·하이드레이션 중엔 시각이 없다 — 정해진 뒤에야 지금과 비교한다
-  const title = ready ? liveTitleKo(t, Date.now()) : "지금 서울 통제";
+  const title = liveTitleKo(!ready || live);
   const total = counts.confirmed + counts.scheduled + counts.zone;
   const zone = counts.zone > 0 ? `, 예정 구역 ${counts.zone}건` : "";
   const subtitle = !ready
@@ -76,15 +103,20 @@ export function LiveSheet() {
   // 슬라이더를 옮겨 새 시각의 사건을 받는 중
   const loading = ready && (events === null || (eventsAt !== null && atMs !== Date.parse(t)));
   const asof = ready && dataAsOf ? dataAsOfKo(dataAsOf, Date.now()) : null;
-  const row = ({ event, kind }: ListedEvent) => {
+  // 다가오는·지난 행 — 예전 '통제 불러오기'처럼 그 시작 시각으로(지금 모드 끔) + 카드 + 지도 맞춤
+  const jump = (e: ClosureEvent) => {
+    if (e.window.start) timeDispatch({ type: "set", t: e.window.start });
+    dispatch({ type: "select", id: e.id });
+  };
+  const backToNow = () => {
+    timeDispatch({ type: "set", t: kstIso(Date.now()), live: true });
+    dispatch({ type: "select", id: null });
+    dispatch({ type: "unpick" });
+  };
+  const row = ({ event, kind }: ListedEvent, open: (e: ClosureEvent) => void) => {
     const detail = eventDetailKo(event);
     return (
-      <button
-        key={event.id}
-        type="button"
-        className={styles.row}
-        onClick={() => dispatch({ type: "select", id: event.id })}
-      >
+      <button key={event.id} type="button" className={styles.row} onClick={() => open(event)}>
         <span className={styles.ico} style={{ background: KIND_BG[kind] }}>
           <span className={styles.dot} style={{ background: KIND_COLOR[kind] }} />
         </span>
@@ -97,17 +129,26 @@ export function LiveSheet() {
           </span>
         </span>
         <em className={styles.badge} style={{ color: KIND_COLOR[kind] }}>
-          {rowBadgeKo(event, atMs)}
+          {sheetBadgeKo(event, listAtMs)}
         </em>
       </button>
     );
   };
   return (
     <BottomSheet label={title} stage={stage} onStage={setStage}>
+      {/* 지금이 아닌 시각이면 시트 맨 위 — 카드를 열어도 (목록에서 지난·다가오는 통제를 누르면 시각이 옮겨진다) */}
+      {ready && !live && (
+        <div className={styles.banner}>
+          <span>{bannerKo(t)}</span>
+          <button type="button" className={styles.back} onClick={backToNow}>
+            지금으로 돌아가기
+          </button>
+        </div>
+      )}
       {card ? (
         <EventCard
           event={card}
-          atMs={atMs}
+          atMs={cardAtMs}
           onClose={() => dispatch({ type: "select", id: null })}
         />
       ) : (
@@ -128,47 +169,70 @@ export function LiveSheet() {
             )}
           </div>
           <ClosureTimeline />
-          <TimeSlider />
-          {picked ? (
-            <div className={styles.picked}>
-              <span>여기 통제 {picked.length}건</span>
-              <button
-                type="button"
-                className={styles.back}
-                onClick={() => dispatch({ type: "unpick" })}
-              >
-                전체 보기
-              </button>
-            </div>
-          ) : (
-            chips.length > 0 && (
-              <div role="group" aria-label="구 필터" className={styles.chips}>
-                {[null, ...chips].map((d) => (
-                  <button
-                    key={d ?? "all"}
-                    type="button"
-                    className={styles.chip}
-                    aria-pressed={district === d}
-                    onClick={() => setDistrict(d)}
-                  >
-                    {d ?? "전체"}
-                  </button>
-                ))}
-              </div>
-            )
-          )}
+          <TimeSlider nowButton={false} />
           <div className={styles.rows}>
-            {groups.map((g) => (
-              <section key={g.key} aria-label={GROUP_KO[g.key]}>
-                <h3 className={styles.groupHead}>
-                  {GROUP_KO[g.key]}
-                  <span>{g.items.length}</span>
-                </h3>
-                {g.items.map(row)}
+            {picked ? (
+              <div className={styles.picked}>
+                <span>여기 통제 {picked.length}건</span>
+                <button
+                  type="button"
+                  className={styles.back}
+                  onClick={() => dispatch({ type: "unpick" })}
+                >
+                  전체 보기
+                </button>
+              </div>
+            ) : (
+              chips.length > 0 && (
+                <div role="group" aria-label="구 필터" className={styles.chips}>
+                  {[null, ...chips].map((d) => (
+                    <button
+                      key={d ?? "all"}
+                      type="button"
+                      className={styles.chip}
+                      aria-pressed={district === d}
+                      onClick={() => setDistrict(d)}
+                    >
+                      {d ?? "전체"}
+                    </button>
+                  ))}
+                </div>
+              )
+            )}
+            <section aria-label={live ? SECTION_KO.now : SECTION_KO.nowAt}>
+              <h3 className={styles.groupHead}>
+                {live ? SECTION_KO.now : SECTION_KO.nowAt}
+                <span>{sections.now.length}</span>
+              </h3>
+              {sections.now.map((r) => row(r, (e) => dispatch({ type: "select", id: e.id })))}
+              {sections.now.length === 0 && <p className={styles.empty}>{nowEmptyKo(live)}</p>}
+            </section>
+            {sections.upcoming.length > 0 && (
+              <section aria-label={SECTION_KO.upcoming}>
+                <h3 className={styles.groupHead}>{SECTION_KO.upcoming}</h3>
+                {sections.upcoming.map((g) => (
+                  <div key={g.day} role="group" aria-label={dayLabelKo(g.day, listAtMs)}>
+                    <h4 className={styles.dayHead}>{dayLabelKo(g.day, listAtMs)}</h4>
+                    {g.items.map((r) => row(r, jump))}
+                  </div>
+                ))}
               </section>
-            ))}
-            {events !== null && groups.length === 0 && (
-              <p className={styles.empty}>이 시각부터 내일까지 서울에 잡힌 통제가 없어요.</p>
+            )}
+            {sections.past.length > 0 && (
+              <section aria-label={SECTION_KO.past}>
+                <h3 className={styles.groupHead}>
+                  {SECTION_KO.past}
+                  <span>{sections.past.length}</span>
+                </h3>
+                {(allPast ? sections.past : sections.past.slice(0, PAST_FIRST)).map((r) =>
+                  row(r, jump),
+                )}
+                {!allPast && sections.past.length > PAST_FIRST && (
+                  <button type="button" className={styles.more} onClick={() => setAllPast(true)}>
+                    {moreKo(sections.past.length - PAST_FIRST)}
+                  </button>
+                )}
+              </section>
             )}
             {/* 예시로 보기 (T7.11) — 그 날짜·시각으로 옮기고 지도를 그 통제 구역에 */}
             <section aria-label="예시로 보기" className={styles.examples}>

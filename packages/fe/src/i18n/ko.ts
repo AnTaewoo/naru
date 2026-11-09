@@ -376,10 +376,9 @@ export function dayKo(iso: string | null | undefined): string {
   return p ? `${p.m}월 ${p.d}일 (${WEEKDAY_KO[p.wd] ?? ""})` : "시간 미정";
 }
 
-/** 지금 서울 통제 시트 제목 (T7.5) — 기준 시각이 지금(±5분)이면 "지금 서울 통제", 아니면 그 날짜·시각 */
-export function liveTitleKo(t: string, nowMs: number): string {
-  if (Math.abs(Date.parse(t) - nowMs) <= 5 * 60_000) return "지금 서울 통제";
-  return `${dateKo(t)} ${hhmm(t)} 서울 통제`;
+/** 시트 제목 — 지금을 보면 "지금 서울 통제", 아니면 "서울 통제"(날짜·시각은 시트 맨 위 기준 줄 bannerKo, T7.12) */
+export function liveTitleKo(live: boolean): string {
+  return live ? "지금 서울 통제" : "서울 통제";
 }
 
 /** 하단 시트 제목 — 기준 시각 t 가 지금과 같은 날(KST)이면 "오늘 통제", 아니면 "3월 15일 통제" */
