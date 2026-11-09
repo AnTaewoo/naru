@@ -4,6 +4,7 @@
 import type {
   CircleLayerSpecification,
   ExpressionSpecification,
+  FilterSpecification,
   GeoJSONSourceSpecification,
   LayerSpecification,
 } from "maplibre-gl";
@@ -202,7 +203,25 @@ export const EVENT_LAYER_IDS = {
   count: "naru-events-count",
   dot: "naru-events-dot",
   dotNoArea: "naru-events-dot-noarea",
+  selected: "naru-events-selected",
 } as const;
+
+/** 고른 사건 윤곽 필터 (T7.5) — null 이면 아무것도 */
+export function selectedFilter(id: string | null): FilterSpecification {
+  return ["==", ["get", "id"], id ?? ""];
+}
+
+/** 누른 곳의 렌더 피처 → 사건 id (순서대로, 같은 사건은 하나로 — MultiPolygon 조각·타일 경계) (T7.5) */
+export function clickedIds(
+  features: readonly { properties: Record<string, unknown> | null }[],
+): string[] {
+  const out: string[] = [];
+  for (const f of features) {
+    const id = f.properties?.["id"];
+    if (typeof id === "string" && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
 
 const SEV_COLOR: ExpressionSpecification = [
   "step",
@@ -226,7 +245,7 @@ function fillAt(opacity: number): ExpressionSpecification {
   return ["case", LOW, 0.06, IS_ZONE, 0.1, opacity];
 }
 
-/** 레이어 6장 — 구역 채움·윤곽(12~), 클러스터 원·개수(~12), 낱개 점(~12), 구역 없는 사건 점(12~) */
+/** 레이어 7장 — 구역 채움·윤곽(12~), 고른 사건 윤곽, 클러스터 원·개수(~12), 낱개 점(~12), 구역 없는 사건 점(12~) */
 export function eventLayers(
   pointSource: string = EVENT_POINT_SOURCE_ID,
   areaSource: string = EVENT_AREA_SOURCE_ID,
@@ -253,6 +272,14 @@ export function eventLayers(
         "line-opacity": ["case", LOW, 0.7, 1],
         "line-dasharray": ["case", ["any", LOW, IS_ZONE], ["literal", [2, 2]], ["literal", [1, 0]]],
       },
+    },
+    {
+      // 고른 사건 (T7.5) — 줌 제한 없이: 긴 행진은 카드를 열면 12 아래로 맞춰진다
+      id: EVENT_LAYER_IDS.selected,
+      type: "line",
+      source: areaSource,
+      filter: selectedFilter(null),
+      paint: { "line-color": ["get", "color"], "line-width": 5, "line-opacity": 0.9 },
     },
     {
       id: EVENT_LAYER_IDS.cluster,

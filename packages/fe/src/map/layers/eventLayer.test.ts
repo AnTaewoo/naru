@@ -5,7 +5,15 @@ import { eventById, recordedLive } from "../../test/recorded";
 import { COLORS } from "../colors";
 import { CHIP_KINDS } from "../eventKinds";
 import { countFromIconId, countLabel } from "../icons";
-import { EVENT_LAYER_IDS, eventAreas, eventLayers, eventPoints, eventsBounds } from "./eventLayer";
+import {
+  EVENT_LAYER_IDS,
+  clickedIds,
+  eventAreas,
+  eventLayers,
+  eventPoints,
+  eventsBounds,
+  selectedFilter,
+} from "./eventLayer";
 
 describe("eventPoints", () => {
   const { body, atMs } = recordedLive("closure_events_live_1107_1530");
@@ -100,6 +108,22 @@ describe("eventLayers·개수 아이콘", () => {
     expect(byId.get(EVENT_LAYER_IDS.count)?.maxzoom).toBe(12);
     expect(byId.get(EVENT_LAYER_IDS.dot)?.maxzoom).toBe(12);
     expect(byId.get(EVENT_LAYER_IDS.dotNoArea)?.minzoom).toBe(12);
+  });
+
+  it("고른 사건 윤곽 (T7.5) — 줌 제한 없이(긴 행진은 12 아래로 맞춰진다), 처음엔 아무것도", () => {
+    const layer = eventLayers().find((l) => l.id === EVENT_LAYER_IDS.selected);
+    expect(layer?.minzoom).toBeUndefined();
+    expect(layer && "filter" in layer ? layer.filter : null).toEqual(selectedFilter(null));
+    expect(selectedFilter("ccaa9980c6ac")).toEqual(["==", ["get", "id"], "ccaa9980c6ac"]);
+  });
+
+  it("누른 곳의 사건 id — 겹친 구역은 여럿, 같은 사건 조각은 하나로 (T7.5)", () => {
+    // 11/7 15:30 구역 피처(실제 기록에서 만든 것) — 세종대로 돌발 둘이 겹친다
+    const { body, atMs } = recordedLive("closure_events_live_1107_1530");
+    const areas = eventAreas(body.events, atMs, CHIP_KINDS).features;
+    const sejong = areas.filter((f) => ["905defcd0853", "7cb2d47cff09"].includes(f.properties.id));
+    expect(clickedIds([...sejong, ...sejong])).toEqual(["905defcd0853", "7cb2d47cff09"]);
+    expect(clickedIds([{ properties: null }, { properties: { cluster: true } }])).toEqual([]);
   });
 
   it("클러스터 개수 아이콘 id 는 naru-n-<개수>, 100 부터 99+ (사건 상한 300)", () => {

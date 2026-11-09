@@ -41,10 +41,10 @@ export function LiveSheet() {
   const [district, setDistrict] = useState<string | null>(null);
   const [stage, setStage] = useState<SheetStage>("half");
   const card = (selected && events?.find((e) => e.id === selected)) || null;
-  // 지도·?event= 로 카드를 열면 접힌 시트를 절반으로
+  // 지도·?event= 로 카드나 묶음을 열면 접힌 시트를 절반으로
   useEffect(() => {
-    if (card) setStage((s) => (s === "collapsed" ? "half" : s));
-  }, [card]);
+    if (card || picked) setStage((s) => (s === "collapsed" ? "half" : s));
+  }, [card, picked]);
   const listed = useMemo(
     () => listedEvents(events ?? [], atMs).map((r) => r.event),
     [events, atMs],

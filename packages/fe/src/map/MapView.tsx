@@ -23,14 +23,7 @@ import {
 } from "../state/ClosureProvider";
 import { POSITION_OPTIONS, useRoute, useRouteDispatch } from "../state/RouteProvider";
 import type { ClosureEvent, FeatureCollection, RouteResponse, Status } from "../types/contracts";
-import {
-  AREA_MIN_ZOOM,
-  CHIP_KINDS,
-  chipStatuses,
-  zoomBand,
-  type ChipKind,
-  type ZoomBand,
-} from "./eventKinds";
+import { CHIP_KINDS, chipStatuses, zoomBand, type ChipKind, type ZoomBand } from "./eventKinds";
 import { ICON_IDS, ICON_PIXEL_RATIO, renderCount, renderIcon } from "./icons";
 import {
   CLOSURE_LAYER_IDS,
@@ -70,6 +63,8 @@ import {
   eventPointSource,
   eventPoints,
   eventsBounds,
+  clickedIds,
+  selectedFilter,
 } from "./layers/eventLayer";
 import { ZONE_SOURCE_ID, zoneLayers, zonePolygons } from "./layers/zoneLayer";
 import styles from "./MapView.module.css";
@@ -87,6 +82,15 @@ export interface MapViewProps {
   /** 켜진 칩 (T7.4) — 사건 구역·클러스터와 횡단보도 점에 같이 건다. 없으면 전부 */
   visible?: readonly ChipKind[];
 }
+
+/** 누르면 사건을 여는 레이어 (T7.5) — 낱개 점(~12)·구역 없는 사건 점·구역 채움(12~) */
+const EVENT_HIT_LAYERS: readonly string[] = [
+  EVENT_LAYER_IDS.dot,
+  EVENT_LAYER_IDS.dotNoArea,
+  EVENT_LAYER_IDS.areaFill,
+];
+/** 클러스터 묶음 목록은 사건 응답 상한(300)까지 */
+const MAX_LEAVES = 300;
 
 /** 처음 화면 — 서울 쪽(줌 10). 사건 응답이 오면 그 사건들(없으면 coverage)에 맞춘다 (T7.4) */
 const START_ZOOM = 10;
@@ -262,6 +266,7 @@ export function MapView({ visible }: MapViewProps) {
   const originalRef = useRef(original);
   const routeDispatch = useRouteDispatch();
   const activeRef = useRef(active);
+  const selectedRef = useRef(selected);
   const fromPin = useRef<Marker | null>(null);
   const toPin = useRef<Marker | null>(null);
   const fitted = useRef<string | null>(null);
@@ -320,7 +325,11 @@ export function MapView({ visible }: MapViewProps) {
         if (image && !map.hasImage(id)) map.addImage(id, image, { pixelRatio: ICON_PIXEL_RATIO });
       }
       const layers = eventLayers();
-      const below = new Set<string>([EVENT_LAYER_IDS.areaFill, EVENT_LAYER_IDS.areaLine]);
+      const below = new Set<string>([
+        EVENT_LAYER_IDS.areaFill,
+        EVENT_LAYER_IDS.areaLine,
+        EVENT_LAYER_IDS.selected,
+      ]);
       map.addSource(EVENT_AREA_SOURCE_ID, eventAreaSource(eventAreas([], 0, CHIP_KINDS)));
       map.addSource(EVENT_POINT_SOURCE_ID, eventPointSource(eventPoints([], 0, CHIP_KINDS)));
       map.addSource(ZONE_SOURCE_ID, {
@@ -357,6 +366,7 @@ export function MapView({ visible }: MapViewProps) {
       const now = eventsRef.current;
       applyEvents(map, now.events, now.atMs, visibleRef.current ?? CHIP_KINDS);
       applyFilter(map, visibleRef.current);
+      map.setFilter(EVENT_LAYER_IDS.selected, selectedFilter(selectedRef.current));
       applyRoute(map, routeRef.current);
       applyView(map, routeRef.current, originalRef.current, closuresRef.current);
       fitRoute(map, routeRef.current, fitted);
@@ -372,7 +382,8 @@ export function MapView({ visible }: MapViewProps) {
       const image = renderCount(id);
       if (image && !map.hasImage(id)) map.addImage(id, image, { pixelRatio: ICON_PIXEL_RATIO });
     });
-    // 클러스터를 누르면 풀리는 줌으로, 낱개 사건 점은 구역이 보이는 줌으로 (카드는 T7.5)
+    // 사건을 누르면 (T7.5) — 하나면 카드, 여럿(클러스터·겹친 구역)이면 그 묶음 목록. 클러스터는 풀리는 줌으로도.
+    // 길찾기 중엔 지도 고르기(출발·도착)가 먼저라 사건을 열지 않는다
     map.on("click", EVENT_LAYER_IDS.cluster, (e) => {
       const f = e.features?.[0];
       const id: unknown = f?.properties.cluster_id;
@@ -380,10 +391,25 @@ export function MapView({ visible }: MapViewProps) {
       if (!f || typeof id !== "number" || !(source instanceof GeoJSONSource)) return;
       const center = e.lngLat;
       void source.getClusterExpansionZoom(id).then((zoom) => map.easeTo({ center, zoom }));
+      void source.getClusterLeaves(id, MAX_LEAVES, 0).then((leaves) => {
+        const ids = clickedIds(leaves);
+        if (!activeRef.current && ids.length) dispatch({ type: "pick", ids });
+      });
     });
-    map.on("click", EVENT_LAYER_IDS.dot, (e) => {
-      map.easeTo({ center: e.lngLat, zoom: AREA_MIN_ZOOM + 2 });
+    map.on("click", (e) => {
+      if (activeRef.current) return;
+      const layers = EVENT_HIT_LAYERS.filter((id) => map.getLayer(id));
+      const ids = clickedIds(map.queryRenderedFeatures(e.point, { layers }));
+      if (ids.length) dispatch({ type: "pick", ids });
     });
+    for (const layer of [EVENT_LAYER_IDS.cluster, ...EVENT_HIT_LAYERS]) {
+      map.on("mouseenter", layer, () => {
+        if (!activeRef.current) map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", layer, () => {
+        if (!activeRef.current) map.getCanvas().style.cursor = "";
+      });
+    }
     // 길찾기가 켜져 있을 때만 reducer 가 받는다 — 출발, 다음 도착
     map.on("click", (e) => routeDispatch({ type: "pick", point: [e.lngLat.lng, e.lngLat.lat] }));
     mapRef.current = map;
@@ -499,6 +525,15 @@ export function MapView({ visible }: MapViewProps) {
     if (!changed || !map || !loaded.current || !bounds) return;
     map.fitBounds(bounds, { padding: fitPadding(map), maxZoom: 17 });
   }, [original, route]);
+
+  // 고른 사건 윤곽 (T7.5)
+  useEffect(() => {
+    selectedRef.current = selected;
+    const map = mapRef.current;
+    if (map && loaded.current && map.getLayer(EVENT_LAYER_IDS.selected)) {
+      map.setFilter(EVENT_LAYER_IDS.selected, selectedFilter(selected));
+    }
+  }, [selected]);
 
   // 사건 카드를 열면(T7.5) 그 사건 범위로 — 절반 시트 위에. 고른 사건이 바뀔 때 한 번(60초 갱신엔 안 움직인다)
   const fittedEvent = useRef<string | null>(null);
