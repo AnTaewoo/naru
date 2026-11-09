@@ -17,6 +17,7 @@ from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.orm import Session, sessionmaker
 
 from naru_be.config import Settings
+from naru_be.models.domain.closure_events import EventWindow, event_id, overlaps, worst
 from naru_be.models.domain.types import CandidateMeta, IntakeResult
 from naru_be.models.entities.candidate_batch import CandidateBatchEntity
 from naru_be.models.entities.closure_state import ClosureStateEntity
@@ -36,6 +37,9 @@ from naru_contracts import (
 
 KST = timezone(timedelta(hours=9))
 Bbox = tuple[float, float, float, float]  # minLng, minLat, maxLng, maxLat
+
+
+EventKey = tuple[str, datetime | None, datetime | None]  # (reason, 시작, 끝) — 저장값 UTC
 
 
 def to_utc_naive(value: datetime | None) -> datetime | None:
@@ -156,58 +160,68 @@ class ClosureRepository:
             return [self._state(row) for row in s.scalars(stmt)]
 
     def events(
-        self, bbox: Bbox | None = None, district_of: Callable[[str], str | None] | None = None
+        self,
+        bbox: Bbox | None = None,
+        district_of: Callable[[str], str | None] | None = None,
+        *,
+        status_of: Callable[[ClosureState], Status],
+        window: EventWindow | None = None,
     ) -> list[ClosureEvent]:
-        """(reason, window) 사건 묶음 — 서로 다른 횡단보도 수·범위·approx (INTERFACE §3.1, ADR-010).
+        """(reason, window) 사건 묶음 — 서로 다른 횡단보도 수·범위·approx·id·상태·확신도
+        (INTERFACE §3.1, ADR-010·ADR-014 A).
 
-        bbox 면 그 안의 상태만 묶는다. 순서는 시작 늦은 것 먼저, 시작 없는 것은 끝.
-        district_of 를 주면 사건마다 횡단보도들의 자치구(가나다순, T6.9 구 칩).
+        bbox 면 그 안의 상태만 묶는다. window 면 그 창과 겹치는 사건만(closure_events.overlaps).
+        status_of 는 상태 하나의 그 시각 판정(엔진) — 사건 status 는 가장 심한 것.
+        순서는 시작 늦은 것 먼저, 시작 없는 것은 끝. district_of 를 주면 자치구(가나다순, T6.9).
         """
         e = ClosureStateEntity
-        stmt = select(
-            e.reason,
-            e.window_start,
-            e.window_end,
-            func.count(func.distinct(e.crosswalk_id)),
-            func.min(e.lng),
-            func.min(e.lat),
-            func.max(e.lng),
-            func.max(e.lat),
-            func.max(e.approx),
-        ).group_by(e.reason, e.window_start, e.window_end)
+        stmt = select(e)
         if bbox is not None:
             stmt = stmt.where(e.lng.between(Decimal(str(bbox[0])), Decimal(str(bbox[2])))).where(
                 e.lat.between(Decimal(str(bbox[1])), Decimal(str(bbox[3])))
             )
-        stmt = stmt.order_by(e.window_start.is_(None), e.window_start.desc(), e.reason)
-        # 사건마다 후보 메타(ADR-012) — 같은 사건의 행은 같은 item 에서 와서 메타가 같다
-        meta_stmt = select(
-            e.reason, e.window_start, e.window_end, e.source, e.type, e.summary, e.notice
-        ).where(e.source.is_not(None))
-        cw_stmt = select(e.reason, e.window_start, e.window_end, e.crosswalk_id).distinct()
-        districts: dict[tuple[object, ...], set[str]] = {}
+        if window is not None:  # 끝 있는 행은 미리 거른다 — 끝 없는 행은 overlaps 가 본다
+            grace = timedelta(minutes=self.settings.released_grace_min)
+            t0, t1 = to_utc_naive(window.start), to_utc_naive(window.end)
+            assert t0 is not None and t1 is not None
+            stmt = stmt.where(e.window_start.is_not(None)).where(e.window_start <= t1)
+            stmt = stmt.where(or_(e.window_end.is_(None), e.window_end >= t0 - grace))
+        out: list[ClosureEvent] = []
         with self._sessions.begin() as s:
-            rows = s.execute(stmt).all()
-            metas: dict[tuple[object, ...], tuple[object, ...]] = {}
-            for reason, start, end, *meta in s.execute(meta_stmt).all():
-                metas.setdefault((reason, start, end), tuple(meta))
-            if district_of is not None:
-                for reason, start, end, cid in s.execute(cw_stmt).all():
-                    d = district_of(cid)
-                    if d:
-                        districts.setdefault((reason, start, end), set()).add(d)
-        return [
-            ClosureEvent(
-                reason=reason,
-                window=Window(start=to_kst(start), end=to_kst(end)),
-                crosswalks=int(n),
-                bbox=(float(min_lng), float(min_lat), float(max_lng), float(max_lat)),
-                approx=bool(approx),
-                districts=sorted(districts.get((reason, start, end), ())),
-                **_event_meta(metas.get((reason, start, end))),
-            )
-            for reason, start, end, n, min_lng, min_lat, max_lng, max_lat, approx in rows
-        ]
+            groups: dict[EventKey, list[ClosureStateEntity]] = {}
+            for row in s.scalars(stmt):
+                groups.setdefault((row.reason, row.window_start, row.window_end), []).append(row)
+            for (reason, start_utc, end_utc), rows in groups.items():
+                start, end = to_kst(start_utc), to_kst(end_utc)
+                if window is not None and not overlaps(start, end, window, self.settings):
+                    continue
+                states = [self._state(r) for r in rows]
+                meta = next(
+                    ((r.source, r.type, r.summary, r.notice) for r in rows if r.source is not None),
+                    None,
+                )
+                lngs, lats = [float(r.lng) for r in rows], [float(r.lat) for r in rows]
+                names = {district_of(r.crosswalk_id) for r in rows} if district_of else set()
+                out.append(
+                    ClosureEvent(
+                        reason=reason,
+                        window=Window(start=start, end=end),
+                        crosswalks=len({r.crosswalk_id for r in rows}),
+                        bbox=(min(lngs), min(lats), max(lngs), max(lats)),
+                        approx=any(r.approx for r in rows),
+                        districts=sorted(d for d in names if d),
+                        id=event_id(reason, start, end),
+                        status=worst(status_of(st) for st in states),
+                        confidence=max(st.confidence for st in states),
+                        **_event_meta(meta),
+                    )
+                )
+
+        def order(ev: ClosureEvent) -> tuple[bool, float, str]:
+            t = ev.window.start
+            return (t is None, -t.timestamp() if t is not None else 0.0, ev.reason)
+
+        return sorted(out, key=order)
 
     def data_as_of(self) -> DataAsOf:
         """출처마다 저장된 통제의 가장 늦은 근거 시각 (INTERFACE §3.1 v0.12, ADR-011 C·ADR-012).

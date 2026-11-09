@@ -6,13 +6,14 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Sequence
 
 from flask import Response, jsonify
 
+from naru_be.models.domain.closure_events import EventsResult
 from naru_be.views._time import evidence_kst, kst
 from naru_contracts import (
-    ClosureEvent,
     ClosureEventsResponse,
     ClosureState,
     DataAsOf,
@@ -26,13 +27,28 @@ def render(states: Sequence[ClosureState]) -> Response:
 
 
 def render_events(
-    events: Sequence[ClosureEvent],
+    result: EventsResult,
     coverage: tuple[float, float, float, float],
     data_as_of: DataAsOf,
+    if_none_match: str | None = None,
 ) -> Response:
-    """통제 사건 + 보행망 bbox + 출처별 기준 시각 (INTERFACE §3.1 v0.12). 계약이 검증한다."""
-    body = ClosureEventsResponse(events=list(events), coverage=coverage, data_as_of=data_as_of)
-    return jsonify(body.model_dump(mode="json"))
+    """통제 사건 + 보행망 bbox + 출처별 기준 시각 + 기준 시각·잘림 (INTERFACE §3.1 v0.14).
+    ETag = 본문 sha1 — If-None-Match 가 같으면 304(본문 없음). 계약이 검증한다."""
+    body = ClosureEventsResponse(
+        events=result.events,
+        coverage=coverage,
+        data_as_of=data_as_of,
+        at=result.at,
+        truncated=result.truncated,
+    )
+    resp = jsonify(body.model_dump(mode="json"))
+    etag = f'"{hashlib.sha1(resp.get_data()).hexdigest()}"'
+    seen = {t.strip().removeprefix("W/") for t in (if_none_match or "").split(",")}
+    if etag in seen:
+        resp = Response(status=304)
+    resp.headers["ETag"] = etag
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 
 def to_collection(states: Sequence[ClosureState]) -> FeatureCollection:
