@@ -243,6 +243,22 @@ def test_bus_round_saves_positions_for_notice_windows(app: Flask, worker: Ingest
     assert w.bus.watched(datetime(2026, 11, 7, 17, 0, tzinfo=KST)) == []
 
 
+def test_bus_targets_logged_on_change_and_every_10_minutes(
+    app: Flask, worker: IngestWorker, caplog: pytest.LogCaptureFixture
+) -> None:
+    """태우 11/9 — 버스 소스가 쉬는 건지 고장인지 로그로: 대상 수가 바뀔 때 + 10분에 한 번."""
+    worker.run_once()
+    w, _ = _worker(app)
+    at = datetime(2026, 11, 7, 15, 30, tzinfo=KST)
+    with caplog.at_level(logging.INFO, logger="naru_ai.signal.bus_poller"):
+        for minutes in (0, 1, 10, 70):  # 15:30 · 15:31(그대로) · 15:40(10분) · 16:40(창 밖)
+            w.bus_round(at + timedelta(minutes=minutes))
+    lines = [r.__dict__ for r in caplog.records if r.getMessage() == "bus targets"]
+    # 15:30 r04·r01 창 안 → 노선 6(위 테스트), 16:40 은 둘 다 끝+30분이 지나 0
+    counts = [(x["notice_events"], x["notice_routes"], x["incidents"]) for x in lines]
+    assert counts == [(2, 6, 0), (2, 6, 0), (0, 0, 0)]
+
+
 def test_bus_second_priority_follows_rally_incidents(app: Flask, worker: IngestWorker) -> None:
     """2순위(태우 2026-11-08) — TOPIS 집회·행사 돌발마다 노선 1개, 공지 노선과 겹치지 않게."""
     worker.run_once()

@@ -45,6 +45,7 @@ SKIP_ROUTES = ("N", "새벽")  # 심야·새벽 노선
 LEAD = timedelta(hours=1)  # 통제 시작 1시간 전부터 ("평소" 통과 시간, ADR-013 A)
 TAIL = timedelta(minutes=30)
 OPEN_END = timedelta(hours=6)  # 끝 없는 통제는 시작+6시간 (INTERFACE §1)
+TARGETS_LOG_EVERY = timedelta(minutes=10)  # 대상 수가 그대로여도 이만큼마다 한 줄 (태우 11/9)
 NOTICE_SOURCES = frozenset({Source.smpa, Source.topis, Source.news, Source.seoul_press})
 
 LngLat = tuple[float, float]
@@ -176,10 +177,14 @@ class BusPoller:
         self._incident_pick: dict[str, str | None] = {}
         self._incident_calls: dict[tuple[str, str], int] = defaultdict(int)  # (날짜, 돌발)
         self._last_incident: dict[str, datetime] = {}
+        self._counts: dict[str, int] = {}  # 대상 수 로그 (바뀔 때 + 10분에 한 번)
+        self._logged: dict[str, int] | None = None
+        self._counts_at: datetime | None = None
 
     def watched(self, now: datetime) -> list[str]:
         """1순위 — 창 안 공지 통제마다 근처 노선, 겹치면 한 번."""
         routes: list[str] = []
+        self._counts["notice_events"] = 0
         for ev in self.events().events:
             start = ev.window.start
             if ev.source not in NOTICE_SOURCES or start is None:
@@ -187,6 +192,7 @@ class BusPoller:
             end = ev.window.end or start + OPEN_END
             if not (start - LEAD <= now <= end + TAIL):
                 continue
+            self._counts["notice_events"] += 1
             key = (ev.reason, start.isoformat())
             if key not in self._picked:
                 bbox = ",".join(f"{v:.6f}" for v in ev.bbox)
@@ -204,6 +210,7 @@ class BusPoller:
     def incident_routes(self, now: datetime, taken: Sequence[str]) -> list[tuple[str, str]]:
         """2순위 — 지금 걸린 집회·행사 돌발마다 노선 1개: (노선, 돌발 key)."""
         live = [t for t in self.incidents() if t.start <= now <= (t.end or t.start + OPEN_END)]
+        self._counts["incidents"] = len(live)
         live.sort(key=lambda t: (not t.rally, -t.start.timestamp(), t.key))
         used = set(taken) | {r for r in self._incident_pick.values() if r}
         out: list[tuple[str, str]] = []
@@ -223,12 +230,14 @@ class BusPoller:
         day = now.astimezone(KST).strftime("%Y%m%d")
         out: list[BusPositionBatch] = []
         notice = self.watched(now)
+        incident = self.incident_routes(now, notice)
+        self._log_targets(now, len(notice), len(incident))
         for route in notice:
             if self.api.live and self.api.calls_today(now) >= self.daily_cap:
                 log.warning("bus daily cap", extra={"cap": self.daily_cap})
                 break
             out.extend(self._poll(route, "notice", now))
-        for route, key in self.incident_routes(now, notice):
+        for route, key in incident:
             last = self._last_incident.get(route)
             if last is not None and (now - last).total_seconds() < self.incident_every_s:
                 continue
@@ -248,6 +257,17 @@ class BusPoller:
         for b in out:
             self._ensure_path(b.route_id, now)
         return out
+
+    def _log_targets(self, now: datetime, notice_routes: int, incident_routes: int) -> None:
+        """대상 수 한 줄 — 바뀔 때와 10분에 한 번. 쉬는 것과 고장을 로그로 가린다."""
+        counts = {**self._counts, "notice_routes": notice_routes}
+        counts["incident_routes"] = incident_routes
+        due = self._counts_at is None or now - self._counts_at >= TARGETS_LOG_EVERY
+        if counts == self._logged and not due:
+            return
+        calls = self.api.calls_today(now) if self.api.live else None
+        log.info("bus targets", extra={**counts, "calls_today": calls})
+        self._logged, self._counts_at = counts, now
 
     def _poll(self, route: str, kind: str, now: datetime) -> list[BusPositionBatch]:
         try:
