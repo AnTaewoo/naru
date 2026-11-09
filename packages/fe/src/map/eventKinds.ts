@@ -125,47 +125,11 @@ export function listedEvents(
     );
 }
 
-/** 지금 서울 통제 묶음 (T7.5) — 통제 중 → 1시간 안 시작 → 오늘 → 내일 → 그 뒤. 날짜는 응답 at 의 KST 날짜 */
-export type GroupKey = "now" | "soon" | "today" | "tomorrow" | "later";
-
-export interface EventGroup {
-  key: GroupKey;
-  items: ListedEvent[];
-}
-
-const GROUP_ORDER: readonly GroupKey[] = ["now", "soon", "today", "tomorrow", "later"];
 const KST_MS = 9 * 60 * 60_000;
-const DAY_MS = 24 * 60 * 60_000;
 
-/** ms → KST 날짜 "YYYY-MM-DD" */
+/** ms → KST 날짜 "YYYY-MM-DD" — 시트 다가오는 통제 날짜 묶음 (T7.12) */
 export function kstDay(ms: number): string {
   return new Date(ms + KST_MS).toISOString().slice(0, 10);
-}
-
-function groupOf({ event, kind }: ListedEvent, atMs: number): GroupKey {
-  if (kind === "confirmed") return "now";
-  if (kind === "soon") return "soon";
-  if (!event.window.start) return "later";
-  const day = kstDay(Date.parse(event.window.start));
-  if (day <= kstDay(atMs)) return "today";
-  return day === kstDay(atMs + DAY_MS) ? "tomorrow" : "later";
-}
-
-/** withLow — 지도에서 고른 묶음(클러스터·겹친 구역)은 흐리게 그린 0.7 미만도 보여 준다 */
-export function liveGroups(
-  events: readonly ClosureEvent[],
-  atMs: number,
-  withLow = false,
-): EventGroup[] {
-  const by = new Map<GroupKey, ListedEvent[]>();
-  for (const row of listedEvents(events, atMs, withLow)) {
-    const key = groupOf(row, atMs);
-    by.set(key, [...(by.get(key) ?? []), row]);
-  }
-  return GROUP_ORDER.flatMap((key) => {
-    const items = by.get(key);
-    return items ? [{ key, items }] : [];
-  });
 }
 
 /** [minLng, minLat, maxLng, maxLat] */

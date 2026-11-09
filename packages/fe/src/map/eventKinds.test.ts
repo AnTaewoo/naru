@@ -11,7 +11,6 @@ import {
   districtChips,
   eventKind,
   listedEvents,
-  liveGroups,
   sheetSections,
   zoomBand,
 } from "./eventKinds";
@@ -96,30 +95,30 @@ describe("listedEvents — 시트 목록·시간표", () => {
   });
 });
 
-describe("지금 서울 통제 묶음·구 칩 (T7.5)", () => {
-  it("3/15 07:45 — 통제 중 9 → 1시간 안 시작 2 → 오늘 5 (내일 없음)", () => {
+describe("시트 묶음(지도 사건만일 때)·구 칩 (T7.5 → T7.12)", () => {
+  it("3/15 07:45 — 지금 11(통제 중 9 + 1시간 안 2) · 다가오는 3/15 다섯 · 지난 없음", () => {
+    // 기록 16건: confirmed 9 · scheduled 7(08:17·08:29 는 08:45 안, 08:46~09:12 다섯은 그 뒤), 모두 3/15
     const { body, atMs } = recordedLive("closure_events_live_0315_0745");
-    const groups = liveGroups(body.events, atMs);
-    expect(groups.map((g) => [g.key, g.items.length])).toEqual([
-      ["now", 9],
-      ["soon", 2],
-      ["today", 5],
-    ]);
+    const { now, upcoming, past } = sheetSections(body.events, atMs);
+    expect(now).toHaveLength(11);
+    expect(upcoming.map((g) => [g.day, g.items.length])).toEqual([["2026-03-15", 5]]);
+    expect(past).toEqual([]);
   });
 
-  it("11/8 20:00 — 다음 날 11/9 통제 다섯(하나증권 10:30 · 국회대로 11:00 둘 · 강남대로 14:00 둘)은 '내일'", () => {
+  it("11/8 20:00 — 다음 날 11/9 통제 다섯(하나증권 10:30 · 국회대로 11:00 둘 · 강남대로 14:00 둘)은 11/9 한 묶음", () => {
     const { body, atMs } = recordedLive("closure_events_live_1108_2000");
-    const [tomorrow, ...rest] = liveGroups(body.events, atMs);
-    expect(rest).toEqual([]);
-    expect(tomorrow?.key).toBe("tomorrow");
-    expect(tomorrow?.items.map((r) => hhmm(r.event.window.start))).toEqual([
+    const { now, upcoming } = sheetSections(body.events, atMs);
+    expect(now).toEqual([]);
+    expect(upcoming.map((g) => g.day)).toEqual(["2026-11-09"]);
+    const [day] = upcoming;
+    expect(day?.items.map((r) => hhmm(r.event.window.start))).toEqual([
       "10:30",
       "11:00",
       "11:00",
       "14:00",
       "14:00",
     ]);
-    expect(tomorrow?.items[0]?.event.id).toBe("1deaa20a0218");
+    expect(day?.items[0]?.event.id).toBe("1deaa20a0218");
   });
 
   it("11/7 15:30 구 칩 — 광화문 화면과 겹치는 사건의 구(종로구·중구 각 5) 먼저, 나머지 가나다", () => {

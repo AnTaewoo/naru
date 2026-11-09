@@ -10,7 +10,7 @@ import type {
   Status,
   SummarySegment,
 } from "../types/contracts";
-import { eventKind, kstDay, type ChipKind, type GroupKey } from "../map/eventKinds";
+import { eventKind, kstDay, type ChipKind } from "../map/eventKinds";
 import type { ExampleKey } from "../map/examples";
 
 export const STATUS_KO: Record<Status, string> = {
@@ -157,15 +157,6 @@ export function bannerKo(t: string): string {
 export function nowEmptyKo(live: boolean): string {
   return live ? "지금 서울에 걸린 통제가 없어요" : "이 시각 서울에 걸린 통제가 없어요";
 }
-
-/** 지금 서울 통제 묶음 머리 (T7.5) */
-export const GROUP_KO: Record<GroupKey, string> = {
-  now: "통제 중",
-  soon: "1시간 안 시작",
-  today: "오늘",
-  tomorrow: "내일",
-  later: "그 뒤",
-};
 
 /** 시트 세 묶음 머리 (T7.12) — 기준 시각이 지금이 아니면 "지금" 대신 "이 시각" */
 export const SECTION_KO = {

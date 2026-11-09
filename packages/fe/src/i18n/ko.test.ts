@@ -6,7 +6,6 @@ import type { ClosureEvent } from "../types/contracts";
 import {
   confidenceKo,
   dataAsOfKo,
-  GROUP_KO,
   bannerKo,
   dayLabelKo,
   kindBadgeKo,
@@ -106,7 +105,6 @@ describe("사건 카드 문구 (T7.5)", () => {
     expect(rowBadgeKo(ev(m, "adaea2f4cc02"), m.atMs)).toBe("23분 뒤 해제"); // 1구간 08:08
     expect(rowBadgeKo(ev(m, "e1d0e06932a8"), m.atMs)).toBe("1시간 27분 뒤 시작");
     expect(rowBadgeKo(ev(a, "be5f89a4ebf3"), a.atMs)).toBe("확인 전");
-    expect(Object.values(GROUP_KO)).toEqual(["통제 중", "1시간 안 시작", "오늘", "내일", "그 뒤"]);
   });
 
   it("시트 제목 — 지금이면 '지금 서울 통제', 아니면 '서울 통제'(날짜·시각은 기준 줄, T7.12)", () => {
