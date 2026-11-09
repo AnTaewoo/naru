@@ -6,6 +6,7 @@ export const COLORS = {
   stopBg: "#fdecec",
   slow: "#f5a300", // scheduled — 통제 예정 (노랑 ⚠, 느리게 계산)
   slowBg: "#fff5dc",
+  soon: "#ef6c00", // 지금 지도 — 1시간 안에 시작하는 예정 (진한 주황, 강조. T7.4)
   zone: "#7a5cf0", // zone_scheduled — 집회 예정 구역 (보라 빗금, 지도에만)
   zoneBg: "#efeafe",
   blue: "#2d6bff", // 경로·지하보도 입구

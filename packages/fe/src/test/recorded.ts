@@ -1,7 +1,12 @@
 // 테스트 입력 — data/recorded/naru_api (scripts/record_naru_api.py 가 실제 Flask 에서 받은 응답)
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import type { ClosureEventsResponse, FeatureCollection, RouteResponse } from "../types/contracts";
+import type {
+  ClosureEvent,
+  ClosureEventsResponse,
+  FeatureCollection,
+  RouteResponse,
+} from "../types/contracts";
 
 export const RECORDED_DIR = path.resolve(__dirname, "../../../../data/recorded/naru_api");
 
@@ -31,4 +36,17 @@ export function recordedRoute(name: string): RouteResponse {
 /** GET /closures/events (T5.4) — 기록할 때 개발 DB 에 있던 통제 사건 전부 */
 export function recordedEvents(name = "closure_events"): ClosureEventsResponse {
   return recorded(name).body as ClosureEventsResponse;
+}
+
+/** 사건 v2 기록 (scripts/record_live_events.py, T7.4) — 응답과 그 기준 시각(ms) */
+export function recordedLive(name: string): { body: ClosureEventsResponse; atMs: number } {
+  const body = recordedEvents(name);
+  return { body, atMs: Date.parse(body.at) };
+}
+
+/** 기록 사건 하나 — 없으면 테스트가 실패한다 */
+export function eventById(events: readonly ClosureEvent[], id: string): ClosureEvent {
+  const e = events.find((x) => x.id === id);
+  if (!e) throw new Error(`기록에 사건 ${id} 가 없다`);
+  return e;
 }
