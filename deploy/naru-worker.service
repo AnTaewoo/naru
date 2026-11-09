@@ -7,7 +7,7 @@
 # 경찰청 '오늘의 주요집회' PDF(T6.6): data/raw/notices/smpa/inbox/ 에 넣으면 1분 안에 읽어 보내고
 #   data/raw/notices/smpa/<집회 날짜>.pdf 로 옮긴다(처리 기록 inbox_manifest.jsonl, 읽을 수 없으면 inbox/failed/)
 [Unit]
-Description=Naru AI worker (--loop --live: course once, notices/TOPIS incidents 5 min, TOPIS notice posts 10 min, buses 60 s record-only)
+Description=Naru AI worker (--loop --live: course once, notices/TOPIS incidents 5 min, TOPIS notice posts 10 min, TOPIS control map 10 min, buses 60 s record-only)
 After=network-online.target naru.service
 Wants=network-online.target
 
@@ -22,6 +22,8 @@ Environment=NARU_BE_URL=http://127.0.0.1:5050
 Environment=NARU_INCIDENT_SOURCE=live
 Environment=NARU_BUS_SOURCE=live
 Environment=NARU_TOPIS_SOURCE=live
+# TOPIS 교통통제 지도 예정 통제(T7.3) — 웹 AJAX, 같은 곳 10분에 요청 하나(ADR-011 E)
+Environment=NARU_TOPIS_MAP_SOURCE=live
 # 버스는 전면 통제·마라톤 창만, 기록만(BE 로 안 보냄) — ADR-013 보류(2026-11-09)
 Environment=NARU_BUS_RECORD_ONLY=1
 ExecStart=/home/antaewoo/miniconda3/bin/uv run python -m naru_ai.worker --loop --live

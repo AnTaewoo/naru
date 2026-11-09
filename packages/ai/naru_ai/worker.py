@@ -12,7 +12,9 @@ NARU_BUS_RECORD_ONLY=1(기본)이면 BE 로 안 보낸다(ADR-013 보류, NARU_B
 TOPIS 공지(T6.4)는 NARU_TOPIS_SOURCE=live 면 NoticeList 를 10분마다 불러 기록하고,
 기록 없는 글(새 글·고친 글)은 --live 일 때만 Claude 로 — 한 번 NARU_LLM_MAX_CALLS ·
 하루 NARU_LLM_DAILY_CAP (ADR-011 D). 경찰청 '오늘의 주요집회' PDF(T6.6)는 태우가 smpa/inbox/ 에
-넣으면 1분 안에 같은 방식으로 읽어 보내고 smpa/<집회 날짜>.pdf 로 옮긴다(SmpaInbox).
+넣으면 1분 안에 같은 방식으로 읽어 보내고 smpa/<집회 날짜>.pdf 로 옮긴다(SmpaInbox). TOPIS 교통통제
+지도(T7.3)는 NARU_TOPIS_MAP_SOURCE=live 면 10분마다 요청 하나(목록 또는 통제 도로)로 예정 집회를
+후보로.
 batch_id 는 내용(돌발은 원문) 해시라 같은 배치를 다시 보내도 BE 가 멱등 처리한다.
 --loop 는 소스마다 따로 돈다 — 한 소스가 실패해도 다른 소스는 계속, 연속 3회 실패면 ERROR.
 """
@@ -36,6 +38,7 @@ from naru_ai.config import Settings
 from naru_ai.ingest.course import CourseIngestor
 from naru_ai.ingest.incident import IncidentIngestor, parse_accinfo
 from naru_ai.ingest.topis_api import IncidentFeed, LinkBook, SeoulOpenApi
+from naru_ai.ingest.topis_map import TopisMapFeed, TopisMapIngestor
 from naru_ai.llm.client import AnthropicClient, LLMRefusalError, LLMTruncatedError
 from naru_ai.llm.prompt import NoticeEnvelope
 from naru_ai.llm.recorder import LLMRecorder
@@ -166,6 +169,10 @@ class IngestWorker:
         self.smpa = SmpaInbox(settings.smpa_dir or raw / "notices" / "smpa")
         links = LinkBook(recorded / "links", api.fetch_link if api is not None else None)
         self.incident_ingestor = IncidentIngestor(links)
+        self.topis_map = TopisMapFeed(
+            recorded, settings.topis_map_source == "live", settings.topis_map_record
+        )
+        self.map_ingestor = TopisMapIngestor(links)  # 꼭짓점은 돌발과 같은 LinkBook(OA-13311)
         bus_key = settings.data_go_kr_key.get_secret_value()
         if settings.bus_source == "live" and not bus_key:
             raise ValueError("DATA_GO_KR_KEY 없음 — 버스 live 를 쓸 수 없다")
@@ -197,6 +204,7 @@ class IngestWorker:
                 "topis", settings.topis_interval_s, lambda now: self._send(self.topis_batch(now))
             ),
             _Source("smpa", settings.smpa_interval_s, self.smpa_round),
+            _Source("topis_map", settings.topis_map_interval_s, self.topis_map_round),
             _Source("bus", settings.bus_interval_s, self.bus_round),
         ]
 
@@ -287,6 +295,49 @@ class IngestWorker:
             extra={"posts": len(sentences), **got.counts(), "record": feed.path.name},
         )
         return self._notice_batch("topis", got)
+
+    def topis_map_batch(self) -> CandidateBatch | None:
+        """TOPIS 교통통제 지도 예정 집회(T7.3) — 가장 최근 목록 + 받아 둔 통제 도로 → 후보."""
+        got = self.topis_map.controls()
+        if got is None:
+            log.info("topis map record missing")
+            return None
+        controls, ref, fetched_at = got
+        targets = self.map_ingestor.targets(controls)
+        links = {c.acc_id: found for c in targets if (found := self.topis_map.links_of(c.acc_id))}
+        candidates = self.map_ingestor.build(controls, links, ref, fetched_at)
+        full = {f"topismap-{c.acc_id}-" for c in targets if c.full}
+        for cand in candidates:  # 전체 통제는 버스 기록 대상 (ADR-013 보류)
+            if cand.candidate_id.startswith(tuple(full)) and cand.notice_ref and cand.window.start:
+                self.full_closures.add((cand.notice_ref.excerpt, cand.window.start))
+        log.info(
+            "topis map",
+            extra={
+                "controls": len(controls),
+                "targets": len(targets),
+                "candidates": len(candidates),
+            },
+        )
+        if not candidates:
+            return None
+        parts = [c.model_dump_json(exclude={"evidence", "notice_ref"}) for c in candidates]
+        return CandidateBatch(
+            batch_id=_batch_id("topismap", parts),  # 통제 내용이 같으면 같은 배치(받은 시각 빼고)
+            produced_at=datetime.now(UTC),
+            producer="notice",
+            candidates=candidates,
+        )
+
+    def topis_map_round(self, now: datetime) -> list[Response]:
+        """live 면 요청 하나(목록 또는 통제 도로 — 같은 곳 10분) 뒤 후보 → BE."""
+        got = self.topis_map.controls()
+        pending = [
+            c.acc_id
+            for c in (self.map_ingestor.targets(got[0]) if got else [])
+            if self.topis_map.links_of(c.acc_id) is None
+        ]
+        self.topis_map.step(now, pending)
+        return self._send(self.topis_map_batch())
 
     def smpa_round(self, now: datetime) -> list[Response]:
         """경찰청 PDF inbox (T6.6) — 볼 PDF 의 행 → 후보 → BE. inbox PDF 는 남은 행이 없고 보낸
