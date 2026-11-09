@@ -41,7 +41,21 @@
 }
 
 .day {
+  display: inline-flex;
+  align-items: center;
   font-variant-numeric: tabular-nums;
+}
+
+/* 달력 (T7.11) — 누르면 기기 날짜 고르기 */
+.date {
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  color: #1e1e1e;
 }
 
 .now {

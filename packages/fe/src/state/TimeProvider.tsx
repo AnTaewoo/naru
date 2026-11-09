@@ -35,7 +35,8 @@ export type TimeAction =
   | { type: "set"; t: string; live?: boolean }
   | { type: "setMinutes"; minutesFromDayStart: number }
   | { type: "step"; deltaMin: number }
-  | { type: "tick"; nowMs: number };
+  | { type: "tick"; nowMs: number }
+  | { type: "setDay"; day: string };
 
 /** 지금 모드에서 t 를 지금으로 옮기는 간격 — TOPIS 돌발 수신(5분)·'지금' 배지(±5분)와 같다 */
 export const LIVE_STEP_MS = 5 * 60_000;
@@ -95,6 +96,13 @@ export function timeReducer(state: TimeState, action: TimeAction): TimeState {
     case "tick":
       if (!state.live || action.nowMs - Date.parse(state.t) < LIVE_STEP_MS) return state;
       return initialTimeState(kstIso(action.nowMs), state.stepMin, true);
+    case "setDay": {
+      // 달력 (T7.11) — 그날(KST) 같은 시각. 슬라이더 끝(24:00)이면 그날 23:59 로 머문다
+      const start = Date.parse(`${action.day}T00:00:00${KST}`);
+      if (!state.ready || Number.isNaN(start)) return state;
+      const minutes = Math.min(minutesFromDayStart(state), 24 * 60 - 1);
+      return initialTimeState(kstIso(start + minutes * MS_MIN), state.stepMin);
+    }
     case "step":
       return timeReducer(state, {
         type: "setMinutes",

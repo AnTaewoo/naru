@@ -80,3 +80,20 @@ describe("TimeSlider 재렌더 격리", () => {
     expect(screen.getByText("13:30")).toBeDefined();
   });
 });
+
+describe("TimeSlider 달력 (T7.11)", () => {
+  it("날짜 칸은 기준 날짜, 바꾸면 그날 같은 시각으로", () => {
+    render(
+      <Providers>
+        <TimeSlider />
+      </Providers>,
+    );
+    const date = screen.getByLabelText<HTMLInputElement>("날짜");
+    expect(date.value).toBe("2026-03-15");
+    act(() => {
+      fireEvent.change(date, { target: { value: "2026-11-07" } });
+    });
+    expect(screen.getByLabelText<HTMLInputElement>("날짜").value).toBe("2026-11-07");
+    expect(screen.getByText("07:45")).toBeDefined();
+  });
+});

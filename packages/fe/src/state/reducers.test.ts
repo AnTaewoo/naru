@@ -113,6 +113,31 @@ describe("지금 모드 (T7.4)", () => {
   });
 });
 
+describe("달력 (T7.11)", () => {
+  it("날짜를 바꾸면 그날 같은 시각 — live 끔, 날 범위도 그날", () => {
+    // 11/9 12:00 = 국회대로 행진 예시 시각, 3/15 = 서울마라톤 (사건 v2 기록의 날짜)
+    const live = timeReducer(pendingTimeState(), {
+      type: "set",
+      t: "2026-11-09T12:00:00+09:00",
+      live: true,
+    });
+    const day = timeReducer(live, { type: "setDay", day: "2026-03-15" });
+    expect(day.t).toBe("2026-03-15T12:00:00+09:00");
+    expect(day.dayStart).toBe("2026-03-15T00:00:00+09:00");
+    expect(day.live).toBe(false);
+  });
+  it("슬라이더 끝(24:00)에서 바꿔도 그날에 머문다(23:59), 읽을 수 없는 날짜·시각 전엔 그대로", () => {
+    const day = timeReducer(pendingTimeState(), { type: "set", t: "2026-03-15T07:45:00+09:00" });
+    const end = timeReducer(day, { type: "setMinutes", minutesFromDayStart: 24 * 60 });
+    expect(timeReducer(end, { type: "setDay", day: "2026-11-07" }).t).toBe(
+      "2026-11-07T23:59:00+09:00",
+    );
+    expect(timeReducer(day, { type: "setDay", day: "" })).toBe(day);
+    const pending = pendingTimeState();
+    expect(timeReducer(pending, { type: "setDay", day: "2026-03-15" })).toBe(pending);
+  });
+});
+
 describe("closureReducer", () => {
   const fc = recordedClosures("closures_0745");
   it("request → receive → setView", () => {
