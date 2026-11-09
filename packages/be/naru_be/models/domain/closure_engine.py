@@ -3,9 +3,10 @@
   scheduled  후보 그대로 (시각표·공지·돌발 예고). confidence < review_confidence 면 적재는 하되
              라우팅은 안 쓴다 (라우터 몫)
   confirmed  실측 증거가 있는 후보가 window.start 를 지났을 때 — 코스 시각표(timetable),
-             돌발 발생(topis_incident), 버스 이탈(bus_skip). 공지(notice)만 있는 후보는 시간이
-             지나도 scheduled (실측이 와야 confirmed)
-  released   window.end + released_grace_min 경과, 또는 bus_return 증거
+             돌발 발생(topis_incident) 둘만. 공지(notice)만 있는 후보는 시간이 지나도 scheduled.
+             버스(bus_skip·bus_return)는 상태를 바꾸지 않는다 — ADR-013 보류(태우 2026-11-09,
+             1개 차로 행진에서 버스 152회 정상 통과)
+  released   window.end + released_grace_min 경과
 전이마다 evidence 를 하나 더 붙인다 (detail.transition, detail.rule). window.end 가 없으면
 start + unknown_end_hours 를 임시 end 로 두고 evidence 에 남긴다 (INTERFACE §1).
 좌표는 CrosswalkIndex 의 관리번호 점. Flask·DB 모른다.
@@ -28,9 +29,7 @@ from naru_contracts import (
     Window,
 )
 
-CONFIRMING_EVIDENCE = frozenset(
-    {EvidenceKind.timetable, EvidenceKind.topis_incident, EvidenceKind.bus_skip}
-)
+CONFIRMING_EVIDENCE = frozenset({EvidenceKind.timetable, EvidenceKind.topis_incident})
 
 
 class ClosureEngine:
@@ -87,10 +86,6 @@ class ClosureEngine:
         )
         if end is not None and at >= end + timedelta(minutes=self.settings.released_grace_min):
             return Status.released
-        if state.status is Status.released and any(
-            e.kind is EvidenceKind.bus_return for e in state.evidence
-        ):
-            return Status.released  # 실측 해제만 시각과 무관. 창 종료 released 는 재판정
         if confirmable and start is not None and at >= start:
             return Status.confirmed
         return Status.scheduled
@@ -141,17 +136,6 @@ class ClosureEngine:
         confidence = min(1.0, max(state.confidence, self.settings.review_confidence))
         return state.model_copy(
             update={"confidence": confidence, "evidence": [*state.evidence, spike]}
-        )
-
-    def release_by_evidence(
-        self, state: ClosureState, evidence: Evidence, at: datetime
-    ) -> ClosureState:
-        """버스 복귀(bus_return) 등 실측 해제 신호 → released."""
-        if evidence.kind is not EvidenceKind.bus_return or state.status is Status.released:
-            return state
-        transition = _transition(evidence, at, f"{state.status.value}→released", "bus_return")
-        return state.model_copy(
-            update={"status": Status.released, "evidence": [*state.evidence, transition]}
         )
 
 

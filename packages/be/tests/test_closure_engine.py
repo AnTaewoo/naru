@@ -162,21 +162,31 @@ def test_unknown_end_uses_six_hours(engine: ClosureEngine, course_batch: Candida
     )
 
 
-def test_bus_evidence_transitions(engine: ClosureEngine, course_batch: CandidateBatch) -> None:
+def test_bus_evidence_changes_no_status(
+    engine: ClosureEngine, course_batch: CandidateBatch
+) -> None:
+    # ADR-013 보류(태우 2026-11-09): 통제 중 근거는 시간표·TOPIS 돌발 둘만. 버스 근거만 있는 후보는
+    # 시작이 지나도 예정, 시간표 통제에 버스 복귀가 붙어도 창 안이면 통제 중 그대로
     seg1 = _seg(course_batch, 1)
     start = seg1.window.start
     assert start is not None
-    state = engine.apply(seg1, ["06-0000029520"], at=start + timedelta(minutes=1))[0]
-    back = Evidence(
-        kind=EvidenceKind.bus_return,
-        ref="data/recorded/bus/20261107T155630_getBusPosByRtid.json",
-        at=start + timedelta(minutes=40),
+    record = "data/recorded/bus/20261107T155630_getBusPosByRtid.json"
+    skip = Evidence(kind=EvidenceKind.bus_skip, ref=record, at=start)
+    only_bus = seg1.model_copy(update={"evidence": [skip]})
+    after = start + timedelta(minutes=1)
+    assert engine.apply(only_bus, ["06-0000029520"], at=after)[0].status is Status.scheduled
+    state = engine.apply(seg1, ["06-0000029520"], at=after)[0]
+    back = Evidence(kind=EvidenceKind.bus_return, ref=record, at=start + timedelta(minutes=40))
+    with_back = state.model_copy(
+        update={"status": Status.released, "evidence": [*state.evidence, back]}
     )
-    released = engine.release_by_evidence(state, back, at=back.at)
-    assert released.status is Status.released and released.evidence[-1].detail == {
-        "transition": "confirmed→released",
-        "rule": "bus_return",
-    }
+    assert engine.status_of_state(with_back, back.at) is Status.confirmed  # 1구간 07:20~08:08
+
+
+def test_rtd_spike_bumps_confidence(engine: ClosureEngine, course_batch: CandidateBatch) -> None:
+    seg1 = _seg(course_batch, 1)
+    start = seg1.window.start
+    assert start is not None
     spike = Evidence(
         kind=EvidenceKind.rtd_spike, ref="data/recorded/rtd/20261107T154125_citydata.json", at=start
     )
