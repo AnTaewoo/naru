@@ -1,6 +1,6 @@
 // 서울 통제 시트 (T7.5 → T7.12 세 묶음) — 렌더 테스트. Provider 초기 state 에 사건 v2 기록(scripts/record_live_events.py)
 // 을 넣고 그린다. 네트워크 없음 (CONVENTIONS §5.7-2). 기대값은 기록을 열어 확인한 사건 id·창·구
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { createNaruApiClient } from "../api/naruApiClient";
@@ -16,6 +16,7 @@ const live1107 = recordedLive("closure_events_live_1107_1530");
 const live1109 = recordedLive("closure_events_live_1109_1330");
 // 넓은 창(at 앞뒤 365일) — 시트 목록 (T7.12)
 const catalog1107 = recordedLive("closure_events_catalog_1107_1530");
+const catalog1108 = recordedLive("closure_events_catalog_1108_1200");
 // 목록 위 기준 시각은 실시간 돌발이 없던 기록으로 — 있으면 '지금'에 따라 경고가 바뀐다 (T5.9)
 const dataAsOf = recordedEvents().data_as_of;
 
@@ -60,6 +61,72 @@ function Providers({
 function section(name: string) {
   return within(screen.getByRole("region", { name }));
 }
+
+describe("LiveSheet — 세 묶음 (T7.12)", () => {
+  it("11/7 15:30 — 지금이 아니니 '11월 7일 15:30 기준', 이 시각 12 · 다가오는 11/9 다섯 · 지난 5 + 더 보기", () => {
+    render(
+      <Providers live={live1107} catalog={catalog1107}>
+        <LiveSheet />
+      </Providers>,
+    );
+    expect(screen.getByRole("region", { name: "서울 통제" })).toBeDefined();
+    expect(screen.getByText("11월 7일 15:30 기준")).toBeDefined();
+    expect(screen.getByRole("button", { name: "지금으로 돌아가기" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "지금 시각으로" })).toBeNull(); // 슬라이더 쪽은 숨김
+    expect(section("이 시각").getAllByRole("button")).toHaveLength(12);
+    const upcoming = section("다가오는 통제");
+    expect(upcoming.getByText("11월 9일 (월)")).toBeDefined();
+    expect(upcoming.getAllByRole("button")).toHaveLength(5);
+    const past = section("지난 통제");
+    expect(past.getAllByRole("button", { name: /^마라톤/ })).toHaveLength(5); // 3/15 15구간부터
+    expect(past.getAllByRole("button")[0]?.textContent).toMatch(/3월 15일$/); // 지난 행 배지는 날짜
+    fireEvent.click(past.getByRole("button", { name: "더 보기 (11)" }));
+    expect(past.getAllByRole("button", { name: /^마라톤/ })).toHaveLength(16);
+  });
+
+  it("11/8 12:00 — 그 시각 걸린 통제가 없으면 한 줄 + 다가오는(내일)·지난 목록, 빈 화면이 아니다", () => {
+    render(
+      <Providers live={null} catalog={catalog1108}>
+        <LiveSheet />
+      </Providers>,
+    );
+    expect(section("이 시각").getByText("이 시각 서울에 걸린 통제가 없어요")).toBeDefined();
+    expect(section("다가오는 통제").getByText("내일")).toBeDefined();
+    expect(section("다가오는 통제").getAllByRole("button")).toHaveLength(5);
+    expect(section("지난 통제").getByRole("button", { name: "더 보기 (23)" })).toBeDefined();
+  });
+
+  it("지난 행을 누르면 그 시작 시각으로 옮기고 카드 — 경찰청 r06 11/7 16:00", () => {
+    render(
+      <Providers live={null} catalog={catalog1108}>
+        <LiveSheet />
+      </Providers>,
+    );
+    act(() => {
+      fireEvent.click(
+        section("지난 통제").getByRole("button", { name: /^의사당역 5번출구 → 민주당사 행진/ }),
+      );
+    });
+    expect(screen.getByRole("article", { name: "의사당역 5번출구 → 민주당사 행진" })).toBeDefined();
+    expect(screen.getByText("11월 7일 16:00 기준")).toBeDefined(); // 카드 위에도 기준 줄
+    fireEvent.click(screen.getByRole("button", { name: "카드 닫기" }));
+    expect(screen.getByLabelText<HTMLInputElement>("날짜").value).toBe("2026-11-07");
+    expect(screen.getByText("16:00")).toBeDefined();
+  });
+
+  it("지금으로 돌아가기 — 기준 시각이 지금이면 줄이 사라지고 제목이 '지금 서울 통제'", () => {
+    render(
+      <Providers live={live1107} catalog={catalog1107}>
+        <LiveSheet />
+      </Providers>,
+    );
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "지금으로 돌아가기" }));
+    });
+    expect(screen.queryByRole("button", { name: "지금으로 돌아가기" })).toBeNull();
+    expect(screen.getByRole("region", { name: "지금 서울 통제" })).toBeDefined();
+  });
+});
 
 describe("LiveSheet — 행·카드·구 칩·묶음 (T7.5)", () => {
   it("3/15 07:45 — 목록을 아직 못 받으면 지도 사건으로, 부제·행 배지는 남은 시간", () => {
