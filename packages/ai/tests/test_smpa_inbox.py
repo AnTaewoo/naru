@@ -70,12 +70,34 @@ def test_archive_moves_and_watches_until_the_day_passes(smpa_dir: Path, smpa: Pa
 def test_same_file_again_is_set_aside(smpa_dir: Path, smpa: Path) -> None:
     inbox = SmpaInbox(smpa)
     smpa.mkdir()
-    shutil.copy2(smpa_dir / NOV9, smpa / NOV9)  # T0.5 처럼 옛 이름으로 이미 있다
-    _drop(smpa, smpa_dir / NOV9)  # 같은 파일을 또 넣었다
-    scan = inbox.scan(EVE)
-    assert scan.duplicates == [smpa / "inbox" / NOV9] and scan.inbox == scan.publish == []
-    inbox.set_aside(scan.duplicates[0], EVE)
+    shutil.copy2(smpa_dir / NOV9, smpa / NOV9)  # T0.5 옛 이름으로 이미 있다 — 그래도 읽는다(T6.9)
+    _drop(smpa, smpa_dir / NOV9)
+    first = inbox.scan(EVE)
+    assert first.duplicates == [] and [p.dest.name for p in first.inbox] == ["20261109.pdf"]
+    inbox.archive(first.inbox[0], EVE, [])
+    assert inbox.archived_dates() == {"2026-11-09"}
+    _drop(smpa, smpa_dir / NOV9)  # inbox 가 읽은 것과 같은 파일을 또 넣었다
+    again = inbox.scan(EVE)
+    assert again.duplicates == [smpa / "inbox" / NOV9] and again.inbox == []
+    inbox.set_aside(again.duplicates[0], EVE)
     assert [p.name for p in (smpa / "inbox" / "duplicate").iterdir()] == [f"20261108T200000_{NOV9}"]
+
+
+def test_notice_source_leaves_inbox_dates(smpa_dir: Path, smpa: Path) -> None:
+    # sentences.jsonl 공지(기록 재생)는 11/9 r01·r02 를 보낸다. inbox 가 11/9 PDF 를 읽고 나면 그
+    # 날짜는 inbox 몫 — 같은 후보 ID 를 두 출처가 번갈아 덮지 않게(T6.9)
+    publisher = CandidatePublisher("http://127.0.0.1:9", "-")  # 보내지 않는다
+    w = IngestWorker(Settings(NARU_SMPA_DIR=str(smpa)), publisher)
+
+    def nov9() -> list[str]:
+        batch = w.notice_batch(live=False)
+        assert batch is not None
+        return sorted(c.candidate_id for c in batch.candidates if "20261109" in c.candidate_id)
+
+    assert nov9() == ["smpa-20261109-r01-i1-seg1", "smpa-20261109-r02-i1-seg1-from"]
+    _drop(smpa, smpa_dir / NOV9)
+    w.smpa.archive(w.smpa.scan(EVE).inbox[0], EVE, [])
+    assert nov9() == []
 
 
 def test_two_days_dropped_together(smpa_dir: Path, smpa: Path) -> None:
@@ -93,7 +115,7 @@ def test_round_keeps_the_pdf_when_sending_fails(smpa_dir: Path, smpa: Path) -> N
     _drop(smpa, smpa_dir / NOV9)
     publisher = CandidatePublisher("http://127.0.0.1:9", "unused", backoff_s=0.0)
     w = IngestWorker(Settings(NARU_SMPA_DIR=str(smpa)), publisher)
-    with pytest.raises(PublishError, match="회 실패"):
+    with pytest.raises(PublishError):  # BE 범위 보기(T6.9)·보내기 어느 쪽이든 연결 거부
         w.smpa_round(EVE)
     assert [p.name for p in (smpa / "inbox").glob("*.pdf")] == [NOV9]
     assert not (smpa / "inbox_manifest.jsonl").exists() and w.parse_failed == set()

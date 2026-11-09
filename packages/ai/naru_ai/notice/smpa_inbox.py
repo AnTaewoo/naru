@@ -5,8 +5,9 @@
 - sentence_id = smpa-<집회 날짜>-r<행>-u<기준 작성 YYYYMMDDHHMM>: 같은 날짜의 고친 PDF(기준 작성이
   늦다)는 다시 파싱하고, 후보 ID 는 버전을 떼(candidate_stem) 같은 행을 덮는다
 - 다 읽은 PDF 는 후보를 보낸 뒤 `<smpa>/<집회 날짜>.pdf` 로 옮긴다(있으면 -u<기준 작성>, 그것도
-  있으면 -<sha256 앞 8>). `<smpa>` 에 똑같은 파일(sha256)이 이미 있으면 `inbox/duplicate/` 로 —
-  보내지 않는다. 옮길 때마다 `<smpa>/inbox_manifest.jsonl` 에 한 줄(출처·넣은 시각·sha256·행 수)
+  있으면 -<sha256 앞 8>). inbox 가 이미 읽은 파일(manifest 의 sha256)과 똑같으면 `inbox/duplicate/`
+  로 — 보내지 않는다. 옛 이름 3개(T0.5)와 같아도 읽는다(그 날짜 행은 sentences.jsonl 이 일부만
+  보냈다, T6.9). 옮길 때마다 `<smpa>/inbox_manifest.jsonl` 에 한 줄(출처·넣은 시각·sha256·행 수)
 - 볼 PDF = inbox 의 PDF + 옮긴 PDF 중 집회 날짜가 오늘 이후, 날짜마다 기준 작성이 가장 늦은 하나.
   태우가 처음 받은 옛 이름 3개(T0.5)는 sentences.jsonl 공지가 맡는다
 """
@@ -69,7 +70,7 @@ class SmpaInbox:
             path = self.dir / str(row["file"])
             if date.fromisoformat(str(row["event_date"])) >= today and path.exists():
                 kept.append(self._read(path, path, set()))
-        known = {sha256(p) for p in self.dir.glob("*.pdf")}
+        known = {str(r["sha256"]) for r in self._manifest_rows()}
         taken: set[str] = set()  # 이번에 옮길 이름 — 같은 날짜 PDF 둘이 한 번에 와도 겹치지 않게
         for path in sorted(self.inbox.glob("*.pdf")):
             try:
@@ -120,6 +121,10 @@ class SmpaInbox:
         stamp = f"{now.astimezone(KST):%Y%m%dT%H%M%S}"
         self._move(path, self.inbox / "duplicate" / f"{stamp}_{path.name}")
         log.info("smpa pdf duplicate", extra={"file": path.name})
+
+    def archived_dates(self) -> set[str]:
+        """inbox 가 읽은 집회 날짜(ISO) — 그 날짜는 sentences.jsonl 공지가 안 보낸다(겹침 방지)"""
+        return {str(r["event_date"]) for r in self._manifest_rows()}
 
     def _read(self, path: Path, dest: Path | None, taken: set[str]) -> SmpaPdf:
         rows = self.reader.parse_file(path)  # 표·날짜 줄이 다르면 ValueError

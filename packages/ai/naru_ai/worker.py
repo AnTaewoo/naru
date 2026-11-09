@@ -222,9 +222,12 @@ class IngestWorker:
             log.warning("sentences missing", extra={"path": str(self.sentences_path)})
             return None
         rows: dict[str, dict[str, object]] = {}
+        inbox = self.smpa.archived_dates()  # 경찰청 PDF inbox 가 읽은 날짜는 그쪽이 보낸다 (T6.9)
         for line in self.sentences_path.read_text("utf-8").splitlines():
             if line.strip():
                 row = json.loads(line)
+                if row.get("source_type") == "smpa" and row.get("event_date") in inbox:
+                    continue
                 rows[str(row["sentence_id"])] = row
         recorded = [sid for sid in rows if self.recorder.exists(sid)]
         budget = self.live_budget if live else 0
