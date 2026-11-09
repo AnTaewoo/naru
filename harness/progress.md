@@ -279,3 +279,9 @@
 - 정한 것: P7 계획(실시간 통제 지도·PWA 알림)·ADR-014 는 태우 "다음"을 추천안 전부 승인으로 받음 — 기존 P7 현장 실증은 P8, TOPIS 통제지도는 T7.3
 - 막힌 것 / 태우 대기: marathon.jtbc.com 은 robots 뒤 9분 39초에 받아 10분 규칙에 21초 모자람(MANIFEST). VWorld 키
 - 커밋: 97b78fa 3bb71d1 (하네스 a308709) / 이 항목의 커밋
+
+## 2026-11-09 · T7.1 DONE (태우 "다음")
+- 한 것: `GET /closures/events?at=&from=&to=` — 사건 id(sha1 reason·시작·끝 UTC 12자)·status(at 기준 가장 심한)·confidence(최대), 시간 창(시작 ≤ to, 끝(없으면 시작+6시간)+30분 ≥ from, 기본 at ~ 다음 날 24:00 KST), 300건 상한(truncated), ETag(본문 sha1)/304·no-cache. 계약 v0.14(area·centroid 칸, T7.2 까지 null), ADR-014 승인
+- 정한 것: 겹침 유예 30분은 엔진 해제 유예와 같게, 상한은 심한 상태·시작 가까운 순, FE 기록(naru_api v2)은 T7.2 뒤로
+- 막힌 것 / 태우 대기: 배포 때 BE 재시작 바로 뒤 워커 재시작(같은 계약을 읽는다)
+- 커밋: 611a1f2 4260bf7 fc16c19 6de8b81 8833baf / 이 항목의 커밋

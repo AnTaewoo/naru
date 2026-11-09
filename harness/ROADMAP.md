@@ -368,12 +368,12 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 > 계획 `harness/plans/active/P7_plan.md`(정할 것 15개는 추천안 그대로 — 태우 "다음" 2026-11-09 17:05). A(T7.1~T7.6)는 11/16 최종 제출 전, B(T7.7~T7.10)는 그다음. Task 마다 보고에 실제 앱 화면 iPhone 13 스크린샷 1장. 알림 발송은 태우 PC Chrome·폰 실제 구독으로 확인(가짜 엔드포인트 없음)
 
 ### T7.1 BE 사건 API v2 — id·상태·시간 창·ETag
-- status: DOING
+- status: DONE
 - depends: T6.9
 - 산출: `GET /closures/events?at=&from=&to=(&bbox=)` — 사건 `id`(sha1(reason·시작·끝) 12자), `status`(at 기준 가장 심한), `confidence`(최대), 기본 창(진행 중 + 내일 24:00 KST), 300건 상한(`truncated`), ETag/304. 파라미터 없으면 지금처럼. 계약 v0.14(`area`·`centroid` 는 T7.2 까지 null)
 
 ### T7.2 BE 통제 구역 — 사건 area·centroid
-- status: TODO
+- status: DOING
 - depends: T7.1
 - 산출: 접수 때 후보 모양(구간 경로 + 등급 버퍼, 선 15 m, 점 30 m)을 사건 단위 union → 5 m 단순화 → `area`·`centroid`, 표 `closure_events`(Alembic 0005)
 
