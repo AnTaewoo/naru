@@ -22,6 +22,7 @@ edge.kind (유형코드표·플래그·오버레이로 정함, 2026-11-07 데이
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from enum import StrEnum
@@ -37,6 +38,7 @@ from shapely.strtree import STRtree
 
 from naru_be.config import Settings
 
+log = logging.getLogger(__name__)
 LngLat = tuple[float, float]
 _TO_5179 = Transformer.from_crs("EPSG:4326", "EPSG:5179", always_xy=True)
 _5186_TO_5179 = Transformer.from_crs("EPSG:5186", "EPSG:5179", always_xy=True)
@@ -313,8 +315,12 @@ class _Builder:
         rows = wb.worksheets[0].iter_rows(values_only=True)
         col = {str(h): i for i, h in enumerate(next(rows))}
         districts = set(self.settings.districts)
+        skipped = 0
         for row in rows:
-            if row[col["자치구"]] not in districts or row[col["X좌표"]] is None:
+            if row[col["자치구"]] not in districts:
+                continue
+            if row[col["X좌표"]] in (None, "") or row[col["Y좌표"]] in (None, ""):
+                skipped += 1  # OA-23081 06-0000023497 (중랑구) — X·Y 빈 문자열
                 continue
             x, y = _5186_TO_5179.transform(
                 float(str(row[col["X좌표"]])), float(str(row[col["Y좌표"]]))
@@ -337,6 +343,8 @@ class _Builder:
                 continue
             unmatched += 1
         wb.close()
+        if skipped:
+            log.warning(f"skipped {skipped} rows (missing coords)", extra={"source": "OA-23081"})
         for i, ids in attached.items():
             u, v, old = all_edges[i]
             kind = EdgeKind.crosswalk if i in promote else old.kind

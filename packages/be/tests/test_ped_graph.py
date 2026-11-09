@@ -1,5 +1,8 @@
 """T1.1 — PedGraph: 종로구·중구 도보망 + 오버레이 → NetworkX (실데이터).
 
+서비스 범위는 T6.9 부터 서울 전체지만, 이 파일은 종로·중구로 고정해 T1.1 에서 손으로 확인한 값을
+그대로 지킨다. 서울 전체 크기는 test_seoul_coverage.
+
 기대값은 2026-11-07 seoul_spatial_20261107 을 열어 확인한 값. 옆 주석이 확인 방법.
 """
 
@@ -16,7 +19,7 @@ CENTRAL = (126.90, 37.45, 127.10, 37.70)  # 종로·중구 WGS84 범위
 
 @pytest.fixture(scope="module")
 def ped(seoul_spatial_dir: Path) -> PedGraph:
-    return PedGraph.from_seoul_spatial(seoul_spatial_dir, Settings())
+    return PedGraph.from_seoul_spatial(seoul_spatial_dir, Settings(districts=("종로구", "중구")))
 
 
 def test_graph_size_and_connectivity(ped: PedGraph) -> None:

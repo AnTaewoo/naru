@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,6 +26,7 @@ from naru_be.models.domain.road_graph import RoadGraph
 from naru_contracts import RoadClass, SegmentGeom
 
 LngLat = tuple[float, float]
+log = logging.getLogger(__name__)
 _5186_TO_5179 = Transformer.from_crs("EPSG:5186", "EPSG:5179", always_xy=True)
 _5179_TO_4326 = Transformer.from_crs("EPSG:5179", "EPSG:4326", always_xy=True)
 _4326_TO_5179 = Transformer.from_crs("EPSG:4326", "EPSG:5179", always_xy=True)
@@ -93,8 +95,13 @@ class CrosswalkIndex:
             if header != XLSX_COLUMNS:
                 raise ValueError(f"OA-23081 컬럼이 다르다: {header}")
             items: list[Crosswalk] = []
+            skipped = 0
             for row in rows:
-                if row[1] not in districts or row[7] is None or row[8] is None:
+                if row[1] not in districts:
+                    continue
+                # 06-0000023497(중랑구)은 X·Y 가 빈 문자열 — 원문은 그대로 두고 건너뛴다(T6.9)
+                if row[7] in (None, "") or row[8] in (None, ""):
+                    skipped += 1
                     continue
                 x, y = _5186_TO_5179.transform(float(str(row[7])), float(str(row[8])))
                 lng, lat = _5179_TO_4326.transform(x, y)
@@ -114,6 +121,8 @@ class CrosswalkIndex:
                 )
         finally:
             wb.close()
+        if skipped:
+            log.warning(f"skipped {skipped} rows (missing coords)", extra={"source": xlsx.name})
         return cls(items, settings, road_graph)
 
     def __len__(self) -> int:

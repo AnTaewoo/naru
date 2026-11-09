@@ -17,7 +17,12 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_prefix="NARU_", extra="ignore")
 
     data_dir: Path = Path("data")
-    districts: tuple[str, ...] = ("종로구", "중구")  # 데모 범위 (광화문 일대)
+    # 서비스 범위 = 서울 25개 구 전부 (태우 2026-11-09, T6.9). 이름은 OA-23081 자치구 열 그대로
+    districts: tuple[str, ...] = (
+        "강남구", "강동구", "강북구", "강서구", "관악구", "광진구", "구로구", "금천구",
+        "노원구", "도봉구", "동대문구", "동작구", "마포구", "서대문구", "서초구", "성동구",
+        "성북구", "송파구", "양천구", "영등포구", "용산구", "은평구", "종로구", "중구", "중랑구",
+    )  # fmt: skip
 
     # DB (.env DATABASE_URL / TEST_DATABASE_URL — 접두사 없음, docker compose MySQL 8.4 호스트 3307)
     database_url: str = Field(

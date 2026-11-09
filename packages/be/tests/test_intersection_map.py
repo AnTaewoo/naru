@@ -1,6 +1,7 @@
 """T1.3 — IntersectionMap: 교차로명 → 교차로관리번호 → 횡단보도 (실데이터 OA-23081, 종로·중구).
 
-기대값은 2026-11-07 xlsx를 열어 확인한 값.
+기대값은 2026-11-07 xlsx를 열어 확인한 값. 서비스 범위는 T6.9 부터 서울 전체지만 IntersectionMap 은
+운영 코드가 쓰지 않아(T1.3 부품) 종로·중구로 고정해 그 값을 지킨다.
 """
 
 from pathlib import Path
@@ -25,7 +26,8 @@ SEJONG_CROSSWALKS = (
 
 @pytest.fixture(scope="module")
 def imap(seoul_spatial_dir: Path) -> IntersectionMap:
-    return IntersectionMap.from_xlsx(seoul_spatial_dir / "OA-23081.xlsx", Settings())
+    xlsx = seoul_spatial_dir / "OA-23081.xlsx"
+    return IntersectionMap.from_xlsx(xlsx, Settings(districts=("종로구", "중구")))
 
 
 def test_counts_and_uniqueness(imap: IntersectionMap) -> None:

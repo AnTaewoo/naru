@@ -5,6 +5,8 @@ OA-23081 열(2026-11-07 받은 파일을 열어 확인): 연번·자치구·횡�
 기대값은 recorded 경로의 횡단보도 레그가 지나는 간선을 경로 순서대로 찾아 두 파일에서 확인한 값:
 교보빌딩→대한문(통제 없음)은 [관리번호 없음(종로) → 세종대로사거리 …] 와 청계광장(06-0000002137),
 간선 47131 은 관리번호가 없고 가장 가까운 도로가 소공로(3.4 m).
+서비스 범위는 T6.9 부터 서울 전체지만 이 파일은 종로·중구로 고정해 T5.10 에서 잰 이름 수를
+지킨다(둘 다 광화문 안 경로라 범위와 무관).
 """
 
 from pathlib import Path
@@ -24,7 +26,7 @@ DAEHANMUN = (126.976542945622, 37.5650416322942)  # 카카오 17582477
 
 @pytest.fixture(scope="module")
 def ped(seoul_spatial_dir: Path, nodelink_seoul_dir: Path) -> PedGraph:
-    settings = Settings()
+    settings = Settings(districts=("종로구", "중구"))
     road = RoadGraph.from_gpkg(nodelink_seoul_dir / "link.gpkg")
     graph = PedGraph.from_seoul_spatial(seoul_spatial_dir, settings)
     index = CrosswalkIndex.from_xlsx(seoul_spatial_dir / "OA-23081.xlsx", settings, road)

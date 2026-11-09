@@ -4,6 +4,7 @@
 """
 
 import itertools
+import logging
 from pathlib import Path
 
 import gpxpy
@@ -46,8 +47,12 @@ def index(seoul_spatial_dir: Path, road_graph: RoadGraph) -> CrosswalkIndex:
     return CrosswalkIndex.from_xlsx(seoul_spatial_dir / "OA-23081.xlsx", Settings(), road_graph)
 
 
-def test_index_loads_jongno_junggu(index: CrosswalkIndex) -> None:
-    assert len(index) == 1211  # OA-23081 종로구 590 + 중구 621
+def test_index_loads_all_seoul(index: CrosswalkIndex) -> None:
+    # T6.9 서울 전체 — OA-23081 21,776행(25개 구) 중 좌표가 빈 1행(06-0000023497)을 뺀 21,775
+    assert len(index) == 21775
+    assert sum(1 for c in index.crosswalks if c.district in ("종로구", "중구")) == 1211  # 590 + 621
+    with pytest.raises(KeyError):
+        index.get("06-0000023497")
     c = index.get("06-0000029520")  # 세종대로사거리 이단(화살표있음), 교차로관리번호 535
     assert c.intersection_name == "세종대로사거리" and c.intersection_id == "535"
     assert 126.975 < c.lng < 126.978 and 37.569 < c.lat < 37.571
@@ -120,3 +125,16 @@ def test_road_graph_falls_back_when_road_is_broken(road_graph: RoadGraph) -> Non
     path = road_graph.shortest_path(pts, road="세종대로")
     assert not path.strict and "세종대로" in path.roads and len(path.roads) >= 2
     assert path.length_m > 0 and len(path.coords) >= 2
+
+
+def test_missing_coords_row_is_skipped_with_warning(
+    seoul_spatial_dir: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # OA-23081 연번 21202 — 중랑구 06-0000023497 '서울중랑우체국', X좌표·Y좌표가 빈 문자열.
+    # 원문은 그대로 두고 로더가 건너뛴다(태우 2026-11-09). 중랑구 868행 → 867
+    xlsx = seoul_spatial_dir / "OA-23081.xlsx"
+    with caplog.at_level(logging.WARNING, logger="naru_be.models.domain.crosswalk_index"):
+        jungnang = CrosswalkIndex.from_xlsx(xlsx, Settings(districts=("중랑구",)))
+    assert [r.getMessage() for r in caplog.records] == ["skipped 1 rows (missing coords)"]
+    assert len(jungnang) == 867
+    assert "06-0000023497" not in {c.crosswalk_id for c in jungnang.crosswalks}
