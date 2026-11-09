@@ -14,7 +14,6 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from naru_ai.ingest.topis_api import LinkBook
 from naru_ai.signal.bus_feed import BusApi, RoutePaths, parse_bus_positions
 from naru_ai.signal.bus_poller import RouteStops
 
@@ -78,17 +77,6 @@ def test_routes_near_rally_crosswalks(stops: RouteStops, recorded_dir: Path) -> 
     assert not any(n.startswith(("N", "새벽")) for n in names.values())
 
 
-def test_routes_near_incident_link(stops: RouteStops, recorded_dir: Path) -> None:
-    # 돌발 1109106 "세종대로 (숭례문 ↔ 덕수궁) 집회로 양방향 전면통제" 의 링크 1010006000
-    # (links/20261108T180400_LinkVerInfo_1010006000.json 꼭짓점 4개, 세종대로 숭례문→시청역)
-    link = LinkBook(recorded_dir / "links").get("1010006000")
-    assert link is not None and len(link.coords) == 4
-    ranked = stops.near_line(link.coords)
-    # 링크 100 m 안 정류소가 많은 순 — 172·402·472·1711 … 29개 (OA-1095 2026-09-02)
-    assert ranked[:4] == ["100100037", "100100063", "100100075", "100100185"]
-    assert len(ranked) == 29
-
-
 def test_route_paths_go_to_raw_by_day() -> None:
     paths = RoutePaths(DATA / "raw")  # 키 없음 = 부르지 않는다
     at = datetime(2026, 11, 8, 19, 0, tzinfo=KST)
@@ -117,7 +105,7 @@ def test_daily_cap_counts_recorded_calls(recorded_dir: Path) -> None:
     legacy = api.call("100100118", "incident")  # incident 폴더에 없으면 나누기 전 기록을 재생
     assert legacy.path.name == "20261108T184839_getBusPosByRtid_100100118.json"
     with pytest.raises(ValueError):
-        api.call("100100118", "bus")  # 폴더는 notice·incident 둘뿐
+        api.call("100100118", "bus")  # 폴더는 notice·incident(11/9 까지)·marathon
     rec = api.call("100900003")  # 그 노선의 가장 최근 기록
     assert rec.path.name == "20261108T183832_getBusPosByRtid_100900003.json"
     assert len(parse_bus_positions(rec.raw)) == 5

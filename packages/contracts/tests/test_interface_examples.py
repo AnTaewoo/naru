@@ -145,7 +145,7 @@ def test_route_response_example() -> None:  # §2
     assert r.legs[1].name == "시청역 지하보도" and r.legs[1].coord_range == (1, 2)
     assert (
         r.avoided[0].status is Status.confirmed
-        and r.avoided[0].evidence[0].kind is EvidenceKind.bus_skip
+        and r.avoided[0].evidence[0].kind is EvidenceKind.topis_incident
     )
     assert r.avoided[0].until is not None and r.avoided[0].until.utcoffset() is not None
     assert r.baseline.route.coordinates == [] and r.computed_at.utcoffset() is not None

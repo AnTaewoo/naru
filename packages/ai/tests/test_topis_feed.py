@@ -165,6 +165,8 @@ def test_topis_batch_on_nov7_morning(worker: IngestWorker, record: dict[str, str
     assert c.notice_ref is not None and c.notice_ref.sentence_id == "topis-6300-u202611061734"
     assert c.evidence[0].ref.endswith(f"{RECORD}#topis-6300-u202611061734")  # 버전은 근거에만
     assert worker.topis_batch(nov7).batch_id == batch.batch_id  # 같은 내용 = 같은 배치(BE 멱등)
+    # '왕복 전차로'(lanes.scope full·one_side_full) — 버스 기록 대상(ADR-013 보류, 태우 11/9)
+    assert worker.full_closures == {(c.notice_ref.excerpt, c.window.start)}
 
 
 def test_area_endpoint_uses_the_intersection_of_the_same_name(

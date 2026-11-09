@@ -245,30 +245,72 @@ def test_loop_counts_failures_per_source(
 KST = timezone(timedelta(hours=9))
 
 
-def test_bus_round_saves_positions_for_notice_windows(
+SEJONG_TOPIS = (
+    "11/7(토) 도심 대규모 집회 대비 시내버스 정류소 임시폐쇄 및 무정차 안내"  # TOPIS 6300 제목
+)
+
+
+def test_bus_records_full_closures_only(
     app: Flask, quiet: dict[str, str], worker: IngestWorker
 ) -> None:
-    """T6.2 — 11/7 15:30 공지 통제 r04·r01 창 안 → 근처 노선 6개(기록 재생) → bus_positions."""
+    """ADR-013 보류(태우 2026-11-09) — 버스는 전면 통제·마라톤만 기록하고 BE 로는 안 보낸다.
+    11/7 공지 r01·r04·r06(차로 언급 없음)·TOPIS 돌발은 대상이 아니고, TOPIS 6300('숭례문R~대한문R
+    왕복 전차로' — 파싱 lanes.scope full·one_side_full)만."""
     models: NaruModels = app.extensions["naru"]
     worker.run_once()  # 코스·공지 (이미 있으면 멱등)
+    assert worker.full_closures == set()  # r01·r04·r06 은 차로 범위 없음(기록된 파싱)
     models.bus_intake.repo.truncate()
-    w, _ = _worker(
-        app, quiet
-    )  # NARU_BUS_SOURCE 기본 recorded — 노선마다 BUS_UNTIL 까지 가장 최근 기록
+    w, publisher = _worker(
+        app, quiet, NARU_INCIDENT_RECORD=ACCINFO_1107, NARU_TOPIS_RECORD=TOPIS_1108
+    )
+    publisher.publish(w.incident_batch())
+    batch = w.topis_batch(datetime(2026, 11, 7, 9, 0, tzinfo=KST))
+    assert batch is not None
+    publisher.publish(batch)
+    assert [(r.split("\n")[0], at.hour) for r, at in w.full_closures] == [(SEJONG_TOPIS, 5)]
     at = datetime(2026, 11, 7, 15, 30, tzinfo=KST)
-    # 횡단보도 100 m 안 정류소가 많은 순(raw OA-1095): r04 종로09·종로11·1711, r01 160·260·270.
-    # 공지 출처만 본다 — 코스·돌발 사건은 실제 근거가 있어 쿼터를 쓰지 않는다
-    watched = ["100900003", "100900007", "100100185", "100100033", "100100042", "100100046"]
-    assert w.bus.watched(at) == watched
-    out = w.bus_round(at)
-    # 2026-11-08 18:38·18:44 기록: 종로09 5 · 종로11 4 · 1711 11 · 160 20 · 260 17 · 270 18 대
-    accepted = [(r.batch_id.split("-")[1], r.accepted) for r in out]
-    assert accepted == list(zip(watched, (5, 4, 11, 20, 17, 18), strict=True))
-    assert models.bus_intake.repo.count() == 75
-    again = w.bus_round(at)  # 같은 응답 다시 — (노선, 차량, dataTm) 같으면 저장 안 함
-    assert [r.accepted for r in again] == [0] * 6 and models.bus_intake.repo.count() == 75
-    # 17:00 — r04·r01 끝+30분(16:30)이 지나 창 밖이면 아무 노선도 부르지 않는다
-    assert w.bus.watched(datetime(2026, 11, 7, 17, 0, tzinfo=KST)) == []
+    # 6300 횡단보도 100 m 안 정류소가 많은 노선(raw OA-1095) 402·종로09·종로11
+    targets = w.bus.targets(at)
+    assert [(t.key[0].split("\n")[0], t.marathon, t.routes) for t in targets] == [
+        (SEJONG_TOPIS, False, ("100100063", "100900003", "100900007"))
+    ]
+    # 기록 재생(11/8 18:38 까지): 종로09 5대·종로11 4대. 402 는 기록이 없어 건너뛴다(지어내지 않음)
+    assert [(b.route_id, len(b.positions)) for b in w.bus.batches(at)] == [
+        ("100900003", 5),
+        ("100900007", 4),
+    ]
+    assert w.bus_round(at) == [] and models.bus_intake.repo.count() == 0  # 기록만(기본)
+    # 17:40 — 6300 끝(17:00)+30분이 지나 창 밖
+    assert w.bus.targets(datetime(2026, 11, 7, 17, 40, tzinfo=KST)) == []
+
+
+def test_bus_records_marathon_sections(
+    app: Flask, quiet: dict[str, str], worker: IngestWorker
+) -> None:
+    """3/15 07:45 — 시작 1시간 전 ~ 끝 30분 뒤인 마라톤 구간 11개(시작 가까운 순)의 근처 노선.
+    NARU_BUS_RECORD_ONLY=0 이면 BE bus_positions 에만 쌓이고 통제 상태는 그대로."""
+    models: NaruModels = app.extensions["naru"]
+    worker.run_once()
+    w, _ = _worker(app, quiet)
+    at = datetime(2026, 3, 15, 7, 45, tzinfo=KST)
+    targets = w.bus.targets(at)
+    assert len(targets) == 11 and all(t.marathon for t in targets)
+    assert [t.key[0] for t in targets[:2]] == [
+        "marathon 3구간 시청 삼거리~고산자교~무교동 사거리",  # 07:44 시작
+        "marathon 13구간 가락시장역 사거리~석촌역~잠실역 사거리",  # 07:35
+    ]
+    watched = w.bus.watched(at)
+    assert len(watched) == 20 and {kind for _, kind in watched} == {"marathon"}
+    # 기록 재생: 11/8 기록이 있는 5노선만 — 종로09 5·종로11 4·260 17·270 18·160 20 대
+    expect = [("100900003", 5), ("100900007", 4), ("100100042", 17), ("100100046", 18)]
+    expect.append(("100100033", 20))
+    assert [(b.route_id, len(b.positions)) for b in w.bus.batches(at)] == expect
+    models.bus_intake.repo.truncate()
+    closures = models.repo.count()
+    sending, _ = _worker(app, quiet, NARU_BUS_RECORD_ONLY="0")
+    out = sending.bus_round(at)
+    assert [(r.batch_id.split("-")[1], r.accepted) for r in out] == expect
+    assert models.bus_intake.repo.count() == 64 and models.repo.count() == closures
 
 
 def test_bus_targets_logged_on_change_and_every_10_minutes(
@@ -277,72 +319,14 @@ def test_bus_targets_logged_on_change_and_every_10_minutes(
     """태우 11/9 — 버스 소스가 쉬는 건지 고장인지 로그로: 대상 수가 바뀔 때 + 10분에 한 번."""
     worker.run_once()
     w, _ = _worker(app, quiet)
-    at = datetime(2026, 11, 7, 15, 30, tzinfo=KST)
+    # 07:30~07:45 는 같은 11구간(6구간 08:46 시작은 07:46 부터 창 안). 17:45 는 다 끝남
+    at = datetime(2026, 3, 15, 7, 30, tzinfo=KST)
     with caplog.at_level(logging.INFO, logger="naru_ai.signal.bus_poller"):
-        for minutes in (0, 1, 10, 70):  # 15:30 · 15:31(그대로) · 15:40(10분) · 16:40(창 밖)
+        for minutes in (0, 1, 10, 615):  # 07:30 · 07:31(그대로) · 07:40(10분) · 17:45(창 밖)
             w.bus_round(at + timedelta(minutes=minutes))
     lines = [r.__dict__ for r in caplog.records if r.getMessage() == "bus targets"]
-    # 15:30 r04·r01·r06(여의도 16:00~, 창은 15:00 부터 — 서울 전체로 생김) → 노선 6(위 테스트).
-    # r06 은 횡단보도 1곳에 100 m 안 정류소가 없어 노선 0. 16:40 은 r06 만 창 안
-    counts = [(x["notice_events"], x["notice_routes"], x["incidents"]) for x in lines]
-    assert counts == [(3, 6, 0), (3, 6, 0), (1, 0, 0)]
-
-
-def test_bus_first_priority_tiers(app: Flask, quiet: dict[str, str], worker: IngestWorker) -> None:
-    """태우 11/9 — 1순위는 확신도 0.45~0.8 공지 통제(버스 보정이 0.7 경계를 넘길 수 있는 것), 신고
-    인원 많은 순·시작 가까운 순. 0.8 넘는 공지 통제는 남는 쿼터로만."""
-    worker.run_once()
-    w, _ = _worker(app, quiet)
-    at = datetime(2026, 11, 7, 15, 30, tzinfo=KST)
-    tier_a, rest = w.bus.targets(at)
-    # r04 0.75(행진, 도로 이름 없음 — 규칙서 §3.8) 5만 명. r01(5만 명)·r06(5천 명)은 0.85
-    # (도로 이름 있음)
-    assert [(t.confidence, t.people) for t in tier_a] == [(0.75, 50000)]
-    assert tier_a[0].key[0].startswith("15:00~16:00 시의회~숭례문R")
-    assert [(t.confidence, t.people) for t in rest] == [(0.85, 50000), (0.85, 5000)]
-    # 남는 쿼터 = 900 - 그날 부른 1(11/7 기록 하나) - r04 가 16:30 까지 노선 3개 x 60분 180
-    # - TOPIS 2순위 하루 몫 300 = 419
-    assert w.bus.leftover(at, tier_a) == 419
-
-
-def test_bus_second_priority_follows_rally_incidents(
-    app: Flask, quiet: dict[str, str], worker: IngestWorker
-) -> None:
-    """2순위(태우 2026-11-08) — TOPIS 집회·행사 돌발마다 노선 1개, 공지 노선과 겹치지 않게."""
-    worker.run_once()
-    w, _ = _worker(app, quiet, NARU_INCIDENT_RECORD=ACCINFO_1107)
-    w.incident_batch()  # 돌발 원문 → 2순위 대상
-    targets = {t.key: t.rally for t in w.incident_targets()}
-    # 기록 AccInfo 11/7 15:40 의 집회·행사(A10) 15건을 같은 링크·시각으로 묶은 13개
-    # (1108990~2 하나로) — 행사 3: 차 없는 거리 둘·축제
-    assert len(targets) == 13
-    assert [k for k, rally in sorted(targets.items()) if not rally] == [
-        "1107882",
-        "1107886",
-        "1108981",
-    ]
-    at = datetime(2026, 11, 7, 15, 30, tzinfo=KST)
-    notice = w.bus.watched(at)
-    picks = {key: route for route, key in w.bus.incident_routes(at, notice)}
-    # 링크 선 100 m 안 정류소가 많은 순(OA-1095), 집회·최근 시작 먼저 고른다. 1109106 은 172 를
-    # 먼저 시작한 1108990(15:00)이 가져가 402. 1108989(여의대로, 링크 기록 없음 → 점)는 노선 없음
-    assert picks == {
-        "1108990": "100100037",
-        "1108999": "100100036",
-        "1109106": "100100063",
-        "1109001": "100100029",
-        "1109079": "100100032",
-        "1109004": "100100537",
-        "1109026": "100100048",
-        "1108984": "100100075",
-        "1108983": "121900008",
-        "1107886": "100100416",
-        "1107882": "100100567",
-        "1108981": "100000026",
-    }
-    assert not set(picks.values()) & set(notice)
-    # 2순위 노선은 아직 실제 기록이 없다(T6.2 live 상한) — 지어내지 않고 건너뛰어 공지 6개만
-    assert [b.route_id for b in w.bus.batches(at)] == notice
+    counts = [(x["marathon_events"], x["full_events"], x["routes"]) for x in lines]
+    assert counts == [(11, 0, 20), (11, 0, 20), (0, 0, 0)]
 
 
 def test_bus_positions_need_token(app: Flask) -> None:
