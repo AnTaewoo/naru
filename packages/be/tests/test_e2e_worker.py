@@ -46,6 +46,8 @@ ACCINFO_1107 = "data/recorded/incident/20261107T154053_AccInfo.json"  # 11/7 15:
 # 11/8 19:20 NoticeList — 볼 글 6건, 기록 재생으로 후보 0 (test_topis_feed). 운영 워커가 같은 폴더에
 # 새 기록을 쌓으므로 '가장 최근'이 아니라 이 파일로 고정
 TOPIS_1108 = "data/recorded/topis_notice/20261108T192013.json"
+# TOPIS 통제지도 목록 11/9 08:37(T6.5, 6행) — 운영 워커가 같은 폴더에 새 목록을 쌓으므로 고정
+TOPIS_MAP_1109 = "data/recorded/topis_web/20261109T083719_selectAccAllListASC.json"  # T6.5, 6행
 # 버스 기록 재생은 T6.2 기록(11/7·11/8)까지만 — 운영 워커가 11/9 11:04 부터 bus/notice·incident 에
 # 새 기록을 쌓는다. '가장 최근 기록' 재생이면 기대값이 날마다 바뀐다 (T6.9)
 BUS_UNTIL = "2026-11-08T23:59:59+09:00"
@@ -75,6 +77,7 @@ def quiet(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
     return {
         "NARU_BUS_RECORD_UNTIL": BUS_UNTIL,
         "NARU_SMPA_DIR": str(tmp_path_factory.mktemp("smpa")),
+        "NARU_TOPIS_MAP_RECORD": TOPIS_MAP_1109,
     }
 
 
@@ -223,7 +226,9 @@ def test_loop_counts_failures_per_source(
 ) -> None:
     # 돌발만 live 로, 열린데이터광장 주소는 닫힌 포트 — 실제 연결 거부. 코스·공지는 실제 앱으로 간다
     # TOPIS 공지(T6.4)는 기록 재생 — 후보가 없어 아무것도 안 보내고 실패도 없다. 경찰청 PDF
-    # inbox(T6.6)는 빈 임시 폴더 — 운영 inbox 의 PDF 를 테스트가 옮기면 안 된다
+    # inbox(T6.6)는 빈 임시 폴더 — 운영 inbox 의 PDF 를 테스트가 옮기면 안 된다. TOPIS 통제지도
+    # (T7.3)는 기록 재생(quiet 의 11/9 목록) — 예정 집회 둘이 배치 하나, 10분마다(같은 내용이라
+    # BE 멱등)
     loop, _ = _worker(
         app,
         quiet,
@@ -239,10 +244,10 @@ def test_loop_counts_failures_per_source(
         early = loop.tick(t0 + timedelta(minutes=1))  # 아직 5분이 안 됐다
         second = loop.tick(t0 + timedelta(minutes=5))
         third = loop.tick(t0 + timedelta(minutes=10))
-    assert [r.batch_id.split("-")[0] for r in first] == ["course", "notice"]
+    assert [r.batch_id.split("-")[0] for r in first] == ["course", "notice", "topismap"]
     assert early == []
     assert [r.batch_id.split("-")[0] for r in second] == ["notice"]  # 코스는 1회
-    assert [r.batch_id.split("-")[0] for r in third] == ["notice"]
+    assert [r.batch_id.split("-")[0] for r in third] == ["notice", "topismap"]
     fails = [r for r in caplog.records if r.getMessage() == "source failed"]
     assert [(r.levelname, r.__dict__["source"], r.__dict__["failures"]) for r in fails] == [
         ("WARNING", "incident", 1),
@@ -434,6 +439,41 @@ def test_event_area_of_incident_line(app: Flask, quiet: dict[str, str]) -> None:
     pts = _crosswalk_points(app, ev, at)
     assert len(pts) == ev.crosswalks == 6
     assert all(area.buffer(1e-6).contains(shapely.Point(p)) for p in pts)
+
+
+def test_topis_map_scheduled_then_confirmed(app: Flask, quiet: dict[str, str]) -> None:
+    """T7.3 (ADR-014 B) — TOPIS 통제지도 11/9 08:37 목록의 예정 집회 둘. 1109233
+    (국회의사당앞~효자동삼거리 9.5 km 행진, 통제 도로 19 링크)은 시작 전 10:30 에 예정 0.85·
+    횡단보도 75곳 — 아침에 경찰청 공지로는 0곳이던 행진이다. OA-13315 돌발 1109233(국회대로 한
+    링크)이 오면 같은 횡단보도라 T6.1 연결로 12:00 통제 중. 1109234(강남대로, 통제 도로를 아직 안
+    받아 대표 링크)는 14:00 전이라 예정."""
+    models: NaruModels = app.extensions["naru"]
+    models.repo.truncate()
+    w, publisher = _worker(
+        app, quiet, NARU_TOPIS_MAP_RECORD=TOPIS_MAP_1109, NARU_INCIDENT_RECORD=ACCINFO_1109
+    )
+    batch = w.topis_map_batch()
+    assert batch is not None and [c.candidate_id for c in batch.candidates] == [
+        "topismap-1109233-0",
+        "topismap-1109234-0",
+    ]
+    publisher.publish(batch)
+
+    def events(at: str) -> list[ClosureEvent]:
+        resp = app.test_client().get("/closures/events", query_string={"at": at})
+        return ClosureEventsResponse.model_validate(resp.get_json()).events
+
+    before = events("2026-11-09T10:30:00+09:00")
+    got = sorted((e.status.value, e.confidence, e.crosswalks) for e in before)
+    assert got == [("scheduled", 0.85, 5), ("scheduled", 0.85, 75)]
+    march = next(e for e in before if e.crosswalks == 75)
+    assert march.source is Source.topis
+    assert march.districts == ["마포구", "서대문구", "영등포구", "종로구"]
+    publisher.publish(w.incident_batch())  # 돌발 1109233(11:00~15:30)·1109234(14:00~)
+    after = {e.id: e for e in events("2026-11-09T12:00:00+09:00")}
+    assert after[march.id].status is Status.confirmed  # 지도 예정 행진 전체가 통제 중
+    rally = next(e for e in before if e.crosswalks == 5)
+    assert after[rally.id].status is Status.scheduled
 
 
 def test_bus_positions_need_token(app: Flask) -> None:
