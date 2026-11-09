@@ -41,6 +41,22 @@ describe("eventPoints", () => {
   });
 });
 
+describe("구역 없는 옛 사건 (운영)", () => {
+  it("운영 11/7 15:30 — T7.2 전에 받은 돌발 5 는 구역·중심이 없어 bbox 가운데 점(noArea, 12 부터도 점)", () => {
+    // scripts/record_prod_events.py — 운영 GET 한 번 (사건 8, 구역 없음 5)
+    const { body, atMs } = recordedLive("closure_events_prod_1107_1530");
+    const pts = eventPoints(body.events, atMs, CHIP_KINDS);
+    expect(pts.features.filter((f) => f.properties.noArea)).toHaveLength(5);
+    expect(eventAreas(body.events, atMs, CHIP_KINDS).features).toHaveLength(3);
+    // 돌발 세종대로 시청역→숭례문 — 기록의 bbox [126.9763247, 37.5624601, 126.976858, 37.5639851]
+    expect(eventById(body.events, "905defcd0853").centroid ?? null).toBeNull();
+    const old = pts.features.find((f) => f.properties.id === "905defcd0853");
+    const [lng, lat] = old?.geometry.coordinates ?? [0, 0];
+    expect(lng).toBeCloseTo(126.9765914, 7);
+    expect(lat).toBeCloseTo(37.5632226, 7);
+  });
+});
+
 describe("eventAreas", () => {
   const { body, atMs } = recordedLive("closure_events_live_1107_1530");
 
