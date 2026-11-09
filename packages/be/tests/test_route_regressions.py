@@ -31,7 +31,8 @@ from naru_contracts import (
 )
 
 BE_DIR = Path(__file__).resolve().parents[1]
-JAMSIL = ("37.5133,127.0980", "37.5145,127.1035")  # ① 잠실 — 이전: 16,942 m·14,118 s
+JAMSIL = ("37.5133,127.0980", "37.5145,127.1035")  # 잠실 — T6.9 서울 전체부터 범위 안(정상 경로)
+SEONGNAM = ("37.3947,127.1112", "37.3960,127.1150")  # ① 범위 밖 — 경기 성남(태우 2026-11-09)
 SEJONG = ("37.56368,126.97230", "37.56368,126.98193")  # ② 세종대로 건너기 — 이전: 871 s, 피한 곳 0
 GWANGHWAMUN = ("37.57148,126.97475", "37.57148,126.97982")  # ③ 광화문 — 이전·이후 같아야 한다
 
@@ -66,7 +67,7 @@ def route(client: FlaskClient, od: tuple[str, str], at: str) -> RouteResponse:
 
 
 def test_1_out_of_coverage(client: FlaskClient) -> None:
-    q = {"from": JAMSIL[0], "to": JAMSIL[1], "depart_at": "2026-03-15T10:00:00+09:00"}
+    q = {"from": SEONGNAM[0], "to": SEONGNAM[1], "depart_at": "2026-03-15T10:00:00+09:00"}
     resp = client.get("/route", query_string=q)
     assert resp.status_code == 422
     err = ErrorBody.model_validate(resp.get_json()).error
@@ -116,3 +117,21 @@ def test_3_gwanghwamun_underpass_unchanged(client: FlaskClient) -> None:
         ("06-0000046713", Status.confirmed),
         ("06-0000023200", Status.confirmed),
     }
+
+
+def test_jamsil_is_now_a_normal_route(client: FlaskClient) -> None:
+    # T5.5 ① 의 잠실 요청(3/15 10:00)은 T6.9 서울 전체부터 정상 경로. 태우는 600 m 근처를 예상했지만
+    # 데이터상 1,113 m(직선 504 m) — 잠실역 사거리에서 횡단보도 둘(잠실역 137 m·제2롯데월드(연등)1
+    # 113 m)을 건너 돌아간다. 3/15 10:00 은 마라톤 10구간(잠실대교북단 교차로~) 횡단보도
+    # 06-0000028568 이 '통제 중'이라 잠실(송파구청) 지하보도로 1,228 m
+    body = route(client, JAMSIL, "2026-03-15T10:00:00+09:00")
+    assert round(body.baseline.distance_m) == 1113
+    assert round(body.distance_m) == 1228
+    assert [(a.crosswalk_id, a.status) for a in body.avoided] == [
+        ("06-0000028568", Status.confirmed)
+    ]
+    assert any(g.kind is LegKind.underpass for g in body.legs)
+    plain = route(client, JAMSIL, "2026-03-16T10:00:00+09:00")  # 통제 없는 날
+    assert round(plain.distance_m) == 1113 and plain.avoided == []
+    names = [g.name for g in plain.legs if g.kind is LegKind.crosswalk]
+    assert names == ["잠실역", "제2롯데월드(연등)1"]

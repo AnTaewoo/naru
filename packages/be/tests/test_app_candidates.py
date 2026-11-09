@@ -75,7 +75,9 @@ def test_batch_accepted_then_route_avoids(
     body = CandidateBatchResponse.model_validate(resp.get_json())
     assert body.batch_id == course_batch["batch_id"]
     assert body.accepted == 16 and body.review_required == 0
-    assert body.crosswalks_updated == models.repo.count() == 183  # 16구간 15 m 버퍼 안 (T3.3)
+    # 16구간 15 m 버퍼 안 — T6.9 서울 전체: 구간 0~15 가 5·6·58·69·61·54·10·33·15·86·8·9·23·23·9·1
+    # (T6.7 측정, 종로·중구였을 땐 앞 5구간만 183)
+    assert body.crosswalks_updated == models.repo.count() == 470
     # 적재는 지금(2026-11, 창 지남) 기준이라 저장 status 는 released 지만, 3/15 07:45 로 물으면
     # 창으로 다시 판정해 confirmed → 라우터가 피한다 (status_of_state: 실측 해제만 고정)
     route = client.get(
@@ -89,7 +91,7 @@ def test_batch_accepted_then_route_avoids(
     # 같은 batch_id 재전송 → 같은 응답, 행 수 그대로 (INTERFACE §1.1 멱등)
     again = client.post("/internal/candidates", json=course_batch, headers=HEADERS)
     assert again.status_code == 202 and again.get_json() == resp.get_json()
-    assert models.repo.count() == 183
+    assert models.repo.count() == 470
     assert models.repo.batch_result(str(course_batch["batch_id"])) is not None
 
 

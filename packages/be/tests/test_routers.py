@@ -111,15 +111,15 @@ def test_scheduled_penalty_only_inside_notice_window(
 
 def test_outside_graph_is_out_of_coverage(
     world: tuple[TimeDependentRouter, list[ClosureState]],
-) -> None:  # ADR-011 그래프 밖 — 태우 2026-11-08 실서버 요청(잠실), 그래프는 종로·중구
+) -> None:  # ADR-011 그래프 밖 — T6.9 부터 그래프가 서울 전체라 서울 밖(경기 성남, 태우 11/9)
     router, states = world
-    jamsil_from, jamsil_to = (127.0980, 37.5133), (127.1035, 37.5145)
+    out_from, out_to = (127.1112, 37.3947), (127.1150, 37.3960)
     at = datetime(2026, 3, 15, 10, 0, tzinfo=KST)
     with pytest.raises(OutOfCoverageError) as e:
-        router.route(jamsil_from, jamsil_to, at, states)
+        router.route(out_from, out_to, at, states)
     assert e.value.field == "from" and e.value.code == "out_of_coverage"
     with pytest.raises(OutOfCoverageError) as e:
-        router.route(KYOBO, jamsil_to, at, states)
+        router.route(KYOBO, out_to, at, states)
     assert e.value.field == "to"
     assert router.settings.max_snap_m == 150
 
