@@ -1,12 +1,13 @@
 """BE → FE: GET /closures (INTERFACE §3) — GeoJSON FeatureCollection.
 
-GET /closures/events (§3.1, ADR-010) — 통제 사건 목록.
+GET /closures/events (§3.1, ADR-010·ADR-014) — 통제 사건 목록. v0.14: at 을 주면 지금 지도용
+(시간 창·사건 상태·id).
 """
 
 from datetime import datetime
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from naru_contracts._base import Contract
 from naru_contracts.closure import CandidateSummary, LngLat, NoticeRef, Window, _require_offset
@@ -28,6 +29,11 @@ class PointGeometry(Contract):
 class PolygonGeometry(Contract):
     type: Literal["Polygon"] = "Polygon"
     coordinates: list[list[LngLat]]
+
+
+class MultiPolygonGeometry(Contract):
+    type: Literal["MultiPolygon"] = "MultiPolygon"
+    coordinates: list[list[list[LngLat]]]
 
 
 class FeatureProperties(Contract):
@@ -54,11 +60,29 @@ class FeatureCollection(Contract):
 
 
 class ClosureEventsQuery(Contract):
+    model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
+
     bbox: str | None = None  # "minLng,minLat,maxLng,maxLat", 없으면 전체 (§3.1)
+    # v0.14 (ADR-014 A) — at 을 주면 지금 지도: [from, to] 와 겹치는 사건만(from 기본 at, to 기본
+    # at 다음 날 24:00 KST), 사건 status 는 at 기준. 셋 다 없으면 전부(하위 호환,
+    # status 는 서버 지금)
+    at: datetime | None = None
+    from_: datetime | None = Field(default=None, alias="from")
+    to: datetime | None = None
+
+    _tz = field_validator("at", "from_", "to")(_require_offset)
+
+    @model_validator(mode="after")
+    def _window(self) -> "ClosureEventsQuery":
+        if self.at is None and (self.from_ is not None or self.to is not None):
+            raise ValueError("from·to 는 at 과 같이")
+        if self.from_ is not None and self.to is not None and self.from_ > self.to:
+            raise ValueError("from 이 to 보다 늦다")
+        return self
 
 
 class ClosureEvent(Contract):
-    """같은 (reason, window) 의 횡단보도 상태 묶음 (§3.1). 상태는 시각마다 달라서 없다."""
+    """같은 (reason, window) 의 횡단보도 상태 묶음 (§3.1). status 는 응답 at 기준 (v0.14)."""
 
     reason: str
     window: Window
@@ -72,6 +96,14 @@ class ClosureEvent(Contract):
     notice: NoticeRef | None = None
     # v0.13 보충(T6.9) — 사건 횡단보도들이 있는 자치구(OA-23081 이름, 가나다순). FE 구 필터 칩
     districts: list[str] = Field(default_factory=list)
+    # v0.14 (ADR-014 A) — 지도 단위. id = sha1("reason|시작 UTC|끝 UTC") 앞 12자(재접수에도 같다),
+    # status = 응답 at 기준 그 사건 횡단보도 중 가장 심한 상태, confidence = 가장 큰 값.
+    # area·centroid = 통제 구역(T7.2) — 아직 없으면 null
+    id: str = Field(pattern=r"^[0-9a-f]{12}$")
+    status: Status
+    confidence: float = Field(ge=0, le=1)
+    area: PolygonGeometry | MultiPolygonGeometry | None = None
+    centroid: LngLat | None = None
 
     @model_validator(mode="after")
     def _bbox_min_max(self) -> "ClosureEvent":
@@ -97,6 +129,11 @@ class ClosureEventsResponse(Contract):
     # v0.10 (ADR-011 C) — 보행망 노드의 minLng, minLat, maxLng, maxLat. 내 위치가 밖이면 FE 가 안내
     coverage: tuple[float, float, float, float]
     data_as_of: DataAsOf  # v0.12
+    # v0.14 (ADR-014 A) — 사건 status 의 기준 시각(질의 at, 없으면 서버 지금), 상한(300)에 잘렸는지
+    at: datetime
+    truncated: bool = False
+
+    _tz = field_validator("at")(_require_offset)
 
     @model_validator(mode="after")
     def _coverage_min_max(self) -> "ClosureEventsResponse":

@@ -10,9 +10,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -340,32 +341,49 @@ def test_closure_events_example() -> None:  # §3.1 v0.8, ADR-010
     assert r.data_as_of.smpa == datetime(2026, 11, 6, 18, 0, tzinfo=kst)
     assert r.data_as_of.course == datetime(2026, 3, 12, 16, 7, tzinfo=kst)
     assert r.data_as_of.topis_incident is None and r.data_as_of.topis_notice is None
+    # v0.14 (ADR-014 A) — 사건 id = sha1("reason|시작 UTC|끝 UTC") 앞 12자, status 는 응답 at 기준
+    for ev in (rally, seg1):
+        assert ev.window.start is not None and ev.window.end is not None
+        utc = [
+            t.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+            for t in (ev.window.start, ev.window.end)
+        ]
+        key = f"{ev.reason}|{utc[0]}|{utc[1]}".encode()
+        assert ev.id == hashlib.sha1(key).hexdigest()[:12]
+    assert r.at == datetime(2026, 11, 7, 15, 30, tzinfo=kst) and r.truncated is False
+    assert [(e.status, e.confidence) for e in r.events] == [
+        (Status.scheduled, 0.75),  # 15:30 은 r04 창 안, 공지만이라 예정
+        (Status.released, 0.9),  # 3/15 마라톤은 끝
+    ]
+    assert rally.area is None and rally.centroid is None  # 통제 구역은 T7.2
     assert ClosureEventsResponse.model_validate(r.model_dump(mode="json")) == r
 
 
 def test_closure_events_rules() -> None:  # §3.1 — 순서·bbox·개수, 질의 bbox 는 선택
     data = _json(7)
     cov = data["coverage"]
-    asof = data["data_as_of"]
+    asof = {**data["data_as_of"]}
+    at = data["at"]
     swapped = {
         "events": [data["events"][1], data["events"][0]],
         "coverage": cov,
         "data_as_of": asof,
+        "at": at,
     }
     with pytest.raises(ValidationError, match="늦은 것 먼저"):
         ClosureEventsResponse.model_validate(swapped)
     no_start = {**data["events"][1], "window": {"end": data["events"][1]["window"]["end"]}}
     ClosureEventsResponse.model_validate(
-        {"events": [data["events"][0], no_start], "coverage": cov, "data_as_of": asof}
+        {"events": [data["events"][0], no_start], "coverage": cov, "data_as_of": asof, "at": at}
     )  # start 없으면 끝
     with pytest.raises(ValidationError, match="늦은 것 먼저"):
         ClosureEventsResponse.model_validate(
-            {"events": [no_start, data["events"][0]], "coverage": cov, "data_as_of": asof}
+            {"events": [no_start, data["events"][0]], "coverage": cov, "data_as_of": asof, "at": at}
         )
     bad_bbox = {**data["events"][1], "bbox": [126.9772, 37.5608, 126.9757, 37.5701]}
     with pytest.raises(ValidationError, match="bbox"):
         ClosureEventsResponse.model_validate(
-            {"events": [bad_bbox], "coverage": cov, "data_as_of": asof}
+            {"events": [bad_bbox], "coverage": cov, "data_as_of": asof, "at": at}
         )
     with pytest.raises(ValidationError):
         ClosureEventsResponse.model_validate(
@@ -375,14 +393,22 @@ def test_closure_events_rules() -> None:  # §3.1 — 순서·bbox·개수, 질�
                 "data_as_of": asof,
             }
         )
-    with pytest.raises(ValidationError):
-        ClosureEventsResponse.model_validate(
-            {"events": [{**data["events"][1], "status": "confirmed"}]}
-        )
+    for bad in ({"id": "ADAEA2F4CC02"}, {"id": "adaea2f4cc"}, {"confidence": 1.2}, {"status": "x"}):
+        with pytest.raises(ValidationError):  # v0.14 — id 는 hex 12자, 확신도 0~1, 상태는 enum
+            ClosureEventsResponse.model_validate(
+                {
+                    "events": [{**data["events"][1], **bad}],
+                    "coverage": cov,
+                    "data_as_of": asof,
+                    "at": at,
+                }
+            )
+    with pytest.raises(ValidationError):  # 응답 at 필수 (v0.14)
+        ClosureEventsResponse.model_validate({"events": [], "coverage": cov, "data_as_of": asof})
     with pytest.raises(ValidationError):  # coverage 필수 (v0.10)
-        ClosureEventsResponse.model_validate({"events": [], "data_as_of": asof})
+        ClosureEventsResponse.model_validate({"events": [], "data_as_of": asof, "at": at})
     with pytest.raises(ValidationError):  # data_as_of 필수 (v0.12)
-        ClosureEventsResponse.model_validate({"events": [], "coverage": cov})
+        ClosureEventsResponse.model_validate({"events": [], "coverage": cov, "at": at})
     with pytest.raises(ValidationError, match="오프셋"):  # 시각은 오프셋 필수
         ClosureEventsResponse.model_validate(
             {"events": [], "coverage": cov, "data_as_of": {**asof, "smpa": "2026-11-06T18:00:00"}}
@@ -390,7 +416,7 @@ def test_closure_events_rules() -> None:  # §3.1 — 순서·bbox·개수, 질�
     # v0.12 전에 저장된 상태라 type·source·summary·notice 를 모르면 null 그대로
     legacy = {k: v for k, v in data["events"][1].items() if k not in ("type", "source")}
     old = ClosureEventsResponse.model_validate(
-        {"events": [legacy], "coverage": cov, "data_as_of": asof}
+        {"events": [legacy], "coverage": cov, "data_as_of": asof, "at": at}
     )
     assert old.events[0].type is None and old.events[0].source is None
     with pytest.raises(ValidationError, match="coverage"):
@@ -399,6 +425,18 @@ def test_closure_events_rules() -> None:  # §3.1 — 순서·bbox·개수, 질�
         )
     assert ClosureEventsQuery().bbox is None
     assert ClosureEventsQuery.model_validate({"bbox": "126.965,37.555,126.990,37.580"}).bbox
+    # v0.14 — at·from·to: 오프셋 필수, from ≤ to, from·to 는 at 과 같이만
+    q = ClosureEventsQuery.model_validate({"at": at, "from": "2026-11-07T00:00:00+09:00"})
+    assert (
+        q.from_ is not None and q.from_.isoformat() == "2026-11-07T00:00:00+09:00" and q.to is None
+    )
+    for bad_q in (
+        {"at": "2026-11-07T15:30:00"},
+        {"from": "2026-11-07T00:00:00+09:00"},
+        {"at": at, "from": "2026-11-08T00:00:00+09:00", "to": "2026-11-07T00:00:00+09:00"},
+    ):
+        with pytest.raises(ValidationError):
+            ClosureEventsQuery.model_validate(bad_q)
 
 
 def test_geocode_examples() -> None:  # §7 v0.11, ADR-011 B

@@ -1,4 +1,4 @@
-# INTERFACE.md — 파트 간 계약 v0.13
+# INTERFACE.md — 파트 간 계약 v0.14
 
 파트 경계의 단일 기준. 스키마를 바꾸면 **이 파일 먼저** 고치고, 하위호환이 깨지면 버전을 올린다. 변경은 ADR + 태우 승인.
 코드 구현은 `packages/contracts`(`naru_contracts`, pydantic v2) 하나뿐이다. 테스트가 이 문서의 예시 JSON 블록을 그대로 파싱하므로, 예시를 고치면 코드도 고쳐야 한다. FE 타입은 `make schema`로 생성한다.
@@ -159,9 +159,9 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 }
 ```
 
-### §3.1 BE → FE: `GET /closures/events` (v0.8 ADR-010, v0.12 ADR-012)
+### §3.1 BE → FE: `GET /closures/events` (v0.8 ADR-010, v0.12 ADR-012, v0.14 ADR-014)
 
-**요청** `bbox=minLng,minLat,maxLng,maxLat` (선택 — 없으면 전체)
+**요청** `bbox=minLng,minLat,maxLng,maxLat` (선택 — 없으면 전체). v0.14: `at`(ISO 8601 + 오프셋)을 주면 **지금 지도** — `[from, to]` 와 겹치는 사건만(`from` 기본 `at`, `to` 기본 `at` 의 다음 날 24:00 KST), 사건 `status` 는 `at` 기준. 겹침 = 시작 ≤ `to` 이고 (끝 또는 시작+6시간) + 30분 ≥ `from`. `from`·`to` 는 `at` 과 같이만. 셋 다 없으면 전부(하위 호환, `status` 는 서버 지금).
 
 **응답** DB 에 있는 통제를 사건으로 묶은 목록. 사건 = 같은 `(reason, window.start, window.end)` 의 횡단보도 상태들
 ```json
@@ -170,6 +170,7 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
     {"reason": "15:00~16:00 시의회~숭례문R → 광화문·고용노동청 <태평로 등> 50,000명 중부, 종로, 남대문",
      "window": {"start": "2026-11-07T15:00:00+09:00", "end": "2026-11-07T16:00:00+09:00"},
      "crosswalks": 31, "bbox": [126.9757, 37.5605, 126.9877, 37.5759], "approx": false,
+     "id": "2e930ec6deeb", "status": "scheduled", "confidence": 0.75, "area": null, "centroid": null,
      "type": "march", "source": "smpa",
      "summary": {"segments": [{"from_": "시의회", "to": "숭례문오거리", "via": []},
                               {"from_": "숭례문오거리", "to": "광화문", "via": []},
@@ -181,8 +182,10 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
     {"reason": "marathon 1구간 세종대로 사거리~숭례문 오거리",
      "window": {"start": "2026-03-15T07:20:00+09:00", "end": "2026-03-15T08:08:00+09:00"},
      "crosswalks": 6, "bbox": [126.9757, 37.5608, 126.9772, 37.5701], "approx": false,
+     "id": "adaea2f4cc02", "status": "released", "confidence": 0.9, "area": null, "centroid": null,
      "type": "marathon", "source": "course", "summary": null, "notice": null}
   ],
+  "at": "2026-11-07T15:30:00+09:00", "truncated": false,
   "coverage": [126.948108, 37.54265, 127.026684, 37.631483],
   "data_as_of": {"topis_incident": null, "topis_notice": null,
                  "smpa": "2026-11-06T18:00:00+09:00", "course": "2026-03-12T16:07:00+09:00"}
@@ -190,7 +193,11 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 ```
 - 순서: `window.start` 가 늦은 것 먼저, start 가 없으면 끝.
 - `crosswalks` = 서로 다른 횡단보도 수(1 이상). 같은 공지 문장이 구간 여러 개로 나뉘어도 한 사건이다. `bbox` = 그 횡단보도들의 [minLng, minLat, maxLng, maxLat]. `approx` = 하나라도 근사면 true.
-- 상태(status)는 없다 — 시각마다 다르다. 그 시각의 상태는 §3 `/closures?at=`.
+- `id` (v0.14) **필수** — `sha1("<reason>|<시작 UTC YYYY-MM-DDTHH:MM:SSZ>|<끝 UTC>")`(UTF-8, 없는 시각은 빈 문자열) hex 앞 12자. 같은 사건은 다시 받아도 같고, 공지 글이 고쳐져 reason·창이 바뀌면 새 id. FE 공유 링크 `?event=<id>`·알림(B)이 쓴다.
+- `status` (v0.14) **필수** — 응답 `at` 기준 그 사건 횡단보도 상태 중 가장 심한 것(`confirmed` > `scheduled` > `zone_scheduled` > `released`, 규칙은 §3 과 같다). `confidence` **필수** — 그 사건 횡단보도 확신도 중 가장 큰 값. FE 의 "1시간 안 시작"·"확신도 0.7 미만"은 `window`·`confidence` 로 FE 가 가른다.
+- `area`·`centroid` (v0.14) — 통제 구역(GeoJSON Polygon·MultiPolygon, EPSG:4326)과 그 중심 `[lng, lat]`. T7.2 전에는 null.
+- 응답 `at` (v0.14) **필수** — 사건 `status` 의 기준 시각. `truncated` — `at` 을 주면 한 번에 300건까지(심한 상태·시작 가까운 순으로 고른 뒤 위 순서), 넘으면 true.
+- `ETag`(v0.14) — 응답 본문 sha1. `If-None-Match` 가 같으면 `304`(본문 없음), `Cache-Control: no-cache`. FE 60초 갱신이 쓴다.
 - FE "통제 불러오기": 누르면 t = `window.start`, 지도 = `bbox`. start 가 없는 사건은 누를 수 없다.
 - `coverage` (v0.10, ADR-011 C) **필수** — 보행망(그래프) 노드의 [minLng, minLat, maxLng, maxLat]. FE 는 내 위치가 이 밖이면 길찾기 범위 밖이라고 안내한다(사각형이라 안쪽이어도 보행망에서 150 m 넘으면 `/route` 가 `out_of_coverage`).
 - `type`·`source` (v0.12, ADR-012) — 사건을 만든 후보의 종류·출처(§4 enum). v0.12 전에 저장된 상태라 모르면 null. `summary` — 후보의 summary(§1) 그대로, 없으면 null(코스 등). `notice` — 후보의 `notice_ref`(§1) 그대로, 공지가 아니면 null. FE 는 summary 로 제목·둘째 줄을 만들고(없으면 `reason`), `notice.excerpt` 는 상세의 "공지 원문 보기"에서만 보인다.
@@ -266,3 +273,4 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 | 2026-11-08 | v0.13 | §1.2 `POST /internal/bus-positions` 버스 위치 전송 추가(getBusPosByRtid 필드 그대로, 같은 노선·차량·시각은 한 번) — 버스는 후보를 만들지 않는다 (ADR-013 D) | 태우 승인 (ADR-013) |
 | 2026-11-09 | v0.13 (보충) | §3.1 사건 `districts`(자치구, 기본 빈 목록) 추가 — 서비스 범위 서울 전체(T6.9)의 구 필터 칩 | 태우 (T6.9) |
 | 2026-11-09 | v0.13 (보충) | ADR-013 보류 — §1 `bus_skip`·`bus_return` 은 상태를 바꾸지 않는다('통제 중' 근거 = `timetable`·`topis_incident`), §1.2 버스는 전면 통제·마라톤만 기록(`NARU_BUS_RECORD_ONLY`), §2 예시 근거 `topis_incident`. 스키마 그대로 | 태우 (2026-11-09) |
+| 2026-11-09 | v0.14 | §3.1 `GET /closures/events` 에 `at`·`from`·`to`(지금 지도 — 시간 창), 사건 `id`·`status`·`confidence` 필수·`area`·`centroid`(T7.2 까지 null), 응답 `at`·`truncated`, ETag·304 (ADR-014 A, T7.1) | 태우 승인 (ADR-014) |

@@ -1,5 +1,5 @@
 # ADR-014 실시간 통제 지도(사건 단위·통제 구역)와 PWA 알림 — 계약·DB·엔드포인트
-- 상태: **초안** (2026-11-09, 태우 요청 — 승인 대기). 계획 `harness/plans/active/P7_plan.md`
+- 상태: **승인** (2026-11-09 17:05, 태우 "다음" — 계획의 정할 것 15개는 추천안 그대로, 열린 질문도 추천안). 계획 `harness/plans/active/P7_plan.md`
 - 개정 대상: INTERFACE v0.14(§1·§2·§3.1, 새 §7), ADR-006 스택(pywebpush), ARCHITECTURE(BE Model·FE·흐름), CONVENTIONS §5(지도 레이어·PWA), DB Alembic 0005·0006
 - 구현 Task: P7 T7.1~T7.10 (A 실시간 지도 T7.1~T7.6, B 알림 T7.7~T7.10)
 
