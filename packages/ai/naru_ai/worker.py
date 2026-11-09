@@ -22,6 +22,7 @@ import argparse
 import hashlib
 import json
 import logging
+import signal
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -453,8 +454,19 @@ def main(argv: list[str] | None = None) -> int:
         for r in responses:
             print(f"{r.batch_id}: accepted {r.accepted}, crosswalks {r.crosswalks_updated}")
         return 0 if responses else 1
+    exit_on_sigterm()
     worker.run_forever()
     return 0
+
+
+def exit_on_sigterm() -> None:
+    """systemd 가 멈출 때(SIGTERM) 정상 종료 0 — 아니면 uv 가 1 을 돌려 실패로 찍힌다(11/9)."""
+
+    def stop(signum: int, _frame: object) -> None:
+        log.info("worker stopping", extra={"signal": signum})
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, stop)
 
 
 if __name__ == "__main__":
