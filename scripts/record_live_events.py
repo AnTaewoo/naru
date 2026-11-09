@@ -9,7 +9,8 @@
 TOPIS 공지 6300(11/7 09:00 에 볼 글)·TOPIS 통제지도 11/9 08:37 목록(T7.3 예정 집회)·돌발 11/9 14:55.
 그 뒤 GET /closures/events?at=… 를 시각마다 그대로 남긴다(record_naru_api 형식, ETag 도).
 11/7 15:30 = 집회 날, 11/9 13:30 = 국회대로 행진 통제 중·강남대로 30분 뒤, 3/15 07:45 = 마라톤,
-11/8 20:00 = 다음 날(11/9) 통제가 '내일'(T7.5).
+11/8 20:00 = 다음 날(11/9) 통제가 '내일'(T7.5). 시트 목록(T7.12)은 at 앞뒤 365일
+넓은 창 — 11/7 15:30, 11/8 12:00(이 시각 걸린 통제 없음).
 T7.4 에서 PDF·통제지도를 더해 다시 기록 — FE 지금 지도에 확신도 0.7 미만 사건이 있어야 한다.
 """
 
@@ -44,6 +45,19 @@ AT = {
     # T7.5 '내일' 묶음 — 11/8 저녁에 본 11/9 통제(경찰청 PDF·TOPIS 통제지도·돌발 예정)
     "closure_events_live_1108_2000": "2026-11-08T20:00:00+09:00",
 }
+# T7.12 시트 목록 — t 앞뒤 365일 넓은 창(FE 와 같은 from·to).
+# 11/8 12:00 = 이 시각 걸린 통제가 없는 날
+CATALOG = {
+    "closure_events_catalog_1107_1530": "2026-11-07T15:30:00+09:00",
+    "closure_events_catalog_1108_1200": "2026-11-08T12:00:00+09:00",
+}
+
+
+def wide(at: str) -> dict[str, str]:
+    """시트 목록 질의 — at 과 앞뒤 365일 (FE naruApiClient catalogParams 와 같다)"""
+    t = datetime.fromisoformat(at)
+    day = timedelta(days=365)
+    return {"at": at, "from": (t - day).isoformat(), "to": (t + day).isoformat()}
 
 
 def main() -> None:
@@ -80,12 +94,14 @@ def main() -> None:
         pub.publish(worker.incident_batch())
     client = app.test_client()
     out = RECORDED / "naru_api"
-    for name, at in AT.items():
-        resp = client.get("/closures/events", query_string={"at": at})
+    queries = {name: {"at": at} for name, at in AT.items()}
+    queries |= {name: wide(at) for name, at in CATALOG.items()}
+    for name, query in queries.items():
+        resp = client.get("/closures/events", query_string=query)
         doc = {
             "method": "GET",
             "path": "/closures/events",
-            "query": {"at": at},
+            "query": query,
             "status": resp.status_code,
             "etag": resp.headers.get("ETag"),
             "body": resp.get_json(),
