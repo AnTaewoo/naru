@@ -29,6 +29,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import httpx
+
 from naru_ai.config import Settings
 from naru_ai.ingest.course import CourseIngestor
 from naru_ai.ingest.incident import EVENT_TYPE, RALLY, Incident, IncidentIngestor, parse_accinfo
@@ -44,7 +46,7 @@ from naru_ai.notice.resolver import KakaoRecords, Resolver
 from naru_ai.notice.smpa_inbox import SmpaInbox
 from naru_ai.notice.source import NoticeSentence
 from naru_ai.notice.topis_feed import TopisNotices, post_sentences
-from naru_ai.publish import CandidatePublisher
+from naru_ai.publish import CandidatePublisher, PublishError
 from naru_ai.signal.bus_feed import BusApi, RoutePaths
 from naru_ai.signal.bus_poller import BusPoller, IncidentTarget, RouteStops
 from naru_contracts import (
@@ -65,6 +67,7 @@ def _latest(parent: Path, pattern: str) -> Path:
 
 
 FAIL_ALERT = 3  # 한 소스가 연속으로 이만큼 실패하면 ERROR (T6.1)
+COVERAGE_TTL_S = 600.0  # BE 범위를 다시 보는 간격 (T6.9)
 Response = CandidateBatchResponse | BusPositionBatchResponse
 
 
@@ -133,6 +136,8 @@ class IngestWorker:
         self.parser = NoticeParser(settings, self.recorder, client=client)
         self.builder = CandidateBuilder(Resolver(gazetteer, KakaoRecords(recorded)))
         self.client = client
+        self._coverage: str | None = None  # BE 범위 — batch_id 에 섞는다(_scoped)
+        self._coverage_at = 0.0
         self.parse_failed: set[str] = set()  # 이 프로세스에서 다시 안 부를 문장(버전) — TOPIS·smpa
         self.live_budget = client.max_calls if client is not None else 0
         live_seoul = "live" in (settings.incident_source, settings.topis_source)
@@ -376,7 +381,7 @@ class IngestWorker:
 
     # --- 실행 ---------------------------------------------------------------------
     def _publish(self, batch: CandidateBatch) -> CandidateBatchResponse:
-        response = self.publisher.publish(batch)
+        response = self.publisher.publish(self._scoped(batch))
         log.info(
             "batch published",
             extra={
@@ -390,6 +395,20 @@ class IngestWorker:
 
     def _send(self, batch: CandidateBatch | None) -> list[Response]:
         return [] if batch is None else [self._publish(batch)]
+
+    def _scoped(self, batch: CandidateBatch) -> CandidateBatch:
+        """batch_id 에 BE 범위(coverage)를 섞는다 — 범위가 바뀌면(T6.9 서울 전체) 같은 후보도
+        새 배치라 BE 가 횡단보도에 다시 붙인다. 범위가 같으면 그대로 멱등. 범위는 10분마다."""
+        now = time.monotonic()
+        if self._coverage is None or now - self._coverage_at > COVERAGE_TTL_S:
+            try:
+                box = self.publisher.events().coverage
+            except httpx.HTTPError as e:  # BE 가 없으면 보내지도 못한다 — 같은 실패로
+                raise PublishError(f"BE 범위를 못 받음: {e!r}") from e
+            self._coverage, self._coverage_at = ",".join(f"{v:.5f}" for v in box), now
+        prefix = batch.batch_id.split("-")[0]
+        scoped = _batch_id(prefix, [batch.batch_id, self._coverage])
+        return batch.model_copy(update={"batch_id": scoped})
 
     def bus_round(self, now: datetime) -> list[Response]:
         """창 안 공지 통제의 근처 노선 위치 → BE (T6.2). 볼 노선이 없으면 부르지 않는다."""

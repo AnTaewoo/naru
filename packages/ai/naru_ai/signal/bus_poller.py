@@ -45,7 +45,14 @@ SKIP_ROUTES = ("N", "새벽")  # 심야·새벽 노선
 LEAD = timedelta(hours=1)  # 통제 시작 1시간 전부터 ("평소" 통과 시간, ADR-013 A)
 TAIL = timedelta(minutes=30)
 OPEN_END = timedelta(hours=6)  # 끝 없는 통제는 시작+6시간 (INTERFACE §1)
+# 사건 bbox 로 /closures 를 물을 때 둘레 — 횡단보도 하나뿐인 사건은 bbox 가 점이라 소수 6자리로
+# 자르면 그 점이 빠졌다(11/7 r06, T6.9). 약 20 m
+BBOX_PAD_DEG = 0.0002
 TARGETS_LOG_EVERY = timedelta(minutes=10)  # 대상 수가 그대로여도 이만큼마다 한 줄 (태우 11/9)
+# 1순위 공지 통제(태우 2026-11-09): 확신도 0.45~0.8 — 버스 보정(-0.30~+0.25)이 길찾기 0.7
+# 경계를 넘길 수 있는 것. 그 안에서 신고 인원 많은 순·시작 가까운 순. 0.8 넘으면(0.85 이상)
+# 남는 쿼터로만, 0.45 미만은 보정해도 0.7 에 못 닿아 부르지 않는다
+TIER_A = (0.45, 0.8)
 NOTICE_SOURCES = frozenset({Source.smpa, Source.topis, Source.news, Source.seoul_press})
 
 LngLat = tuple[float, float]
@@ -146,6 +153,27 @@ class RouteStops:
         )
 
 
+@dataclass(frozen=True)
+class NoticeTarget:
+    """창 안 공지 통제 하나 — 고른 노선과 우선순위 재료."""
+
+    key: tuple[str, str]
+    routes: tuple[str, ...]
+    confidence: float  # 그 사건 횡단보도들의 확신도 중 가장 큰 값 (/closures)
+    people: int  # 신고 인원 (summary.reported_people, 없으면 0)
+    start: datetime
+    end: datetime
+
+    @property
+    def tier_a(self) -> bool:
+        return TIER_A[0] <= self.confidence <= TIER_A[1]
+
+    def demand(self, now: datetime) -> int:
+        """지금부터 창 끝까지 부를 수(노선마다 1분에 한 번)."""
+        left = (self.end + TAIL) - max(now, self.start - LEAD)
+        return len(self.routes) * max(0, math.ceil(left.total_seconds() / 60))
+
+
 class BusPoller:
     def __init__(
         self,
@@ -173,7 +201,7 @@ class BusPoller:
         self.incident_cap = incident_cap
         self.incident_every_s = incident_every_s
         self.incident_each = incident_each
-        self._picked: dict[tuple[str, str], list[str]] = {}
+        self._picked: dict[tuple[str, str], tuple[list[str], float]] = {}
         self._incident_pick: dict[str, str | None] = {}
         self._incident_calls: dict[tuple[str, str], int] = defaultdict(int)  # (날짜, 돌발)
         self._last_incident: dict[str, datetime] = {}
@@ -181,9 +209,11 @@ class BusPoller:
         self._logged: dict[str, int] | None = None
         self._counts_at: datetime | None = None
 
-    def watched(self, now: datetime) -> list[str]:
-        """1순위 — 창 안 공지 통제마다 근처 노선, 겹치면 한 번."""
-        routes: list[str] = []
+    def targets(self, now: datetime) -> tuple[list[NoticeTarget], list[NoticeTarget]]:
+        """1순위 — 창 안 공지 통제: (확신도 0.45~0.8, 0.8 초과). 각각 신고 인원 많은 순,
+        시작 가까운 순."""
+        tier_a: list[NoticeTarget] = []
+        rest: list[NoticeTarget] = []
         self._counts["notice_events"] = 0
         for ev in self.events().events:
             start = ev.window.start
@@ -195,17 +225,49 @@ class BusPoller:
             self._counts["notice_events"] += 1
             key = (ev.reason, start.isoformat())
             if key not in self._picked:
-                bbox = ",".join(f"{v:.6f}" for v in ev.bbox)
+                w, s, e, n = ev.bbox
+                pad = BBOX_PAD_DEG
+                bbox = f"{w - pad:.6f},{s - pad:.6f},{e + pad:.6f},{n + pad:.6f}"
                 fc = self.closures(bbox, start)
+                mine = [f for f in fc.features if f.properties.reason == ev.reason]
                 points = [
                     (float(f.geometry.coordinates[0]), float(f.geometry.coordinates[1]))
-                    for f in fc.features
-                    if f.properties.reason == ev.reason and f.geometry.type == "Point"
+                    for f in mine
+                    if f.geometry.type == "Point"
                 ]
-                self._picked[key] = self.stops.near(points, self.per_event)
-                log.info("bus routes", extra={"event": ev.reason[:40], "routes": self._picked[key]})
-            routes.extend(r for r in self._picked[key] if r not in routes)
+                conf = max((f.properties.confidence for f in mine), default=0.0)
+                self._picked[key] = (self.stops.near(points, self.per_event), conf)
+                log.info(
+                    "bus routes",
+                    extra={"event": ev.reason[:40], "routes": self._picked[key][0], "conf": conf},
+                )
+            routes, conf = self._picked[key]
+            people = (ev.summary.reported_people if ev.summary else None) or 0
+            t = NoticeTarget(key, tuple(routes), conf, people, start, end)
+            if t.tier_a:
+                tier_a.append(t)
+            elif conf > TIER_A[1]:
+                rest.append(t)
+
+        def order(t: NoticeTarget) -> tuple[int, float, tuple[str, str]]:
+            return (-t.people, abs((t.start - now).total_seconds()), t.key)
+
+        return sorted(tier_a, key=order), sorted(rest, key=order)
+
+    def watched(self, now: datetime) -> list[str]:
+        """1순위 노선 — 0.45~0.8 먼저, 그다음 0.8 초과. 겹치면 한 번."""
+        tier_a, rest = self.targets(now)
+        routes: list[str] = []
+        for t in [*tier_a, *rest]:
+            routes.extend(r for r in t.routes if r not in routes)
         return routes
+
+    def leftover(self, now: datetime, tier_a: Sequence[NoticeTarget]) -> int:
+        """0.8 초과 공지 통제가 쓸 수 있는 수 — 하루 상한에서 오늘 부른 수, 0.45~0.8 통제가 창
+        끝까지 부를 수, TOPIS 돌발(2순위) 하루 몫 중 남은 것을 뺀다."""
+        reserve = sum(t.demand(now) for t in tier_a)
+        reserve += max(0, self.incident_cap - self.api.calls_today(now, "incident"))
+        return self.daily_cap - self.api.calls_today(now) - reserve
 
     def incident_routes(self, now: datetime, taken: Sequence[str]) -> list[tuple[str, str]]:
         """2순위 — 지금 걸린 집회·행사 돌발마다 노선 1개: (노선, 돌발 key)."""
@@ -229,10 +291,17 @@ class BusPoller:
     def batches(self, now: datetime) -> list[BusPositionBatch]:
         day = now.astimezone(KST).strftime("%Y%m%d")
         out: list[BusPositionBatch] = []
-        notice = self.watched(now)
+        tier_a, rest = self.targets(now)
+        first: list[str] = []
+        for t in tier_a:
+            first.extend(r for r in t.routes if r not in first)
+        later: list[str] = []
+        for t in rest:
+            later.extend(r for r in t.routes if r not in first and r not in later)
+        notice = [*first, *later]
         incident = self.incident_routes(now, notice)
         self._log_targets(now, len(notice), len(incident))
-        for route in notice:
+        for route in first:
             if self.api.live and self.api.calls_today(now) >= self.daily_cap:
                 log.warning("bus daily cap", extra={"cap": self.daily_cap})
                 break
@@ -254,6 +323,10 @@ class BusPoller:
             if got:
                 self._incident_calls[(day, key)] += 1
                 out.extend(got)
+        for route in later:  # 0.8 초과 공지 통제 — 남는 쿼터로만
+            if self.api.live and self.leftover(now, tier_a) <= 0:
+                break
+            out.extend(self._poll(route, "notice", now))
         for b in out:
             self._ensure_path(b.route_id, now)
         return out

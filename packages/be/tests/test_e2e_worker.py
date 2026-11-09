@@ -79,11 +79,14 @@ def test_worker_once_publishes_course_and_notices(app: Flask, worker: IngestWork
     by_producer = {r.batch_id.split("-")[0]: r for r in responses}
     assert set(by_producer) == {"course", "notice"}
     assert by_producer["course"].accepted == 16  # 시각표 16구간 (T2.2)
-    assert by_producer["course"].crosswalks_updated == 183  # 15 m 버퍼 안 (T3.4b)
+    # 15 m 버퍼 안 — 서울 전체(T6.9)라 16구간 전부(test_app_candidates), 종로·중구 땐 183
+    assert by_producer["course"].crosswalks_updated == 470
     notice = by_producer["notice"]
     assert notice.accepted == 7 and notice.review_required == 0
-    assert notice.crosswalks_updated == 37  # 광화문 r01 13 + r04 24. 여의도는 데모 범위 밖 → 0
-    assert models.repo.count() == 183 + 37
+    # 광화문 r01 13 + r04 24, 서울 전체로 늘어난 3: 11/7 r06 의사당역 1 · 11/9 r01 여의도 2.
+    # 11/9 r02 는 출발점(국회의사당역 2번출구) 하나라 30 m 안 횡단보도가 없어 0
+    assert notice.crosswalks_updated == 40
+    assert models.repo.count() == 470 + 40
     # 12:30 — 동화면세점 앞 → 종로1R → 동화면세점 앞 (12:00~16:00) 만. 공지만으론 scheduled
     at_1230 = notice_features(app, "2026-11-07T12:30:00+09:00")
     assert len(at_1230) == 13
@@ -98,7 +101,7 @@ def test_worker_once_publishes_course_and_notices(app: Flask, worker: IngestWork
     assert [(r.batch_id, r.accepted) for r in again] == [
         (r.batch_id, r.accepted) for r in responses
     ]
-    assert models.repo.count() == 183 + 37
+    assert models.repo.count() == 470 + 40
 
 
 def test_publisher_rejects_without_token(app: Flask) -> None:
@@ -145,8 +148,9 @@ def test_incidents_link_to_notices_on_same_crosswalks(app: Flask, worker: Ingest
     assert batch.producer == "incident" and len(batch.candidates) == 9
     r = publisher.publish(batch)
     # 15 m 선 버퍼: 세종대로 시청역→숭례문 링크 4곳 두 번(07:00~16:00·15:00~17:00), 숭례문→시청역
-    # 4곳(1109106), 사직로 경복궁역→사직공원 2곳 두 번. 서초·여의도·국회는 그래프 밖이라 0
-    assert (r.accepted, r.review_required, r.crosswalks_updated) == (9, 0, 16)
+    # 4곳(1109106), 사직로 경복궁역→사직공원 2곳 두 번 = 16. 서울 전체(T6.9)로 서초 1108983 9곳·
+    # 여의대로 1108989 1곳이 더해져 26 (서초역 1109004·국회 1109079 는 링크 15 m 안 횡단보도 0)
+    assert (r.accepted, r.review_required, r.crosswalks_updated) == (9, 0, 26)
     own, linked = _linked_at_1530(app)
     assert len(own) == 16 and {p["status"] for p in own} == {Status.confirmed}
     # r04 seg2(숭례문R → 광화문, 14곳)·seg1 끝점(2곳)이 돌발 링크 횡단보도(23254·40204·45236,
@@ -254,9 +258,27 @@ def test_bus_targets_logged_on_change_and_every_10_minutes(
         for minutes in (0, 1, 10, 70):  # 15:30 · 15:31(그대로) · 15:40(10분) · 16:40(창 밖)
             w.bus_round(at + timedelta(minutes=minutes))
     lines = [r.__dict__ for r in caplog.records if r.getMessage() == "bus targets"]
-    # 15:30 r04·r01 창 안 → 노선 6(위 테스트), 16:40 은 둘 다 끝+30분이 지나 0
+    # 15:30 r04·r01·r06(여의도 16:00~, 창은 15:00 부터 — 서울 전체로 생김) → 노선 6(위 테스트).
+    # r06 은 횡단보도 1곳에 100 m 안 정류소가 없어 노선 0. 16:40 은 r06 만 창 안
     counts = [(x["notice_events"], x["notice_routes"], x["incidents"]) for x in lines]
-    assert counts == [(2, 6, 0), (2, 6, 0), (0, 0, 0)]
+    assert counts == [(3, 6, 0), (3, 6, 0), (1, 0, 0)]
+
+
+def test_bus_first_priority_tiers(app: Flask, worker: IngestWorker) -> None:
+    """태우 11/9 — 1순위는 확신도 0.45~0.8 공지 통제(버스 보정이 0.7 경계를 넘길 수 있는 것), 신고
+    인원 많은 순·시작 가까운 순. 0.8 넘는 공지 통제는 남는 쿼터로만."""
+    worker.run_once()
+    w, _ = _worker(app)
+    at = datetime(2026, 11, 7, 15, 30, tzinfo=KST)
+    tier_a, rest = w.bus.targets(at)
+    # r04 0.75(행진, 도로 이름 없음 — 규칙서 §3.8) 5만 명. r01(5만 명)·r06(5천 명)은 0.85
+    # (도로 이름 있음)
+    assert [(t.confidence, t.people) for t in tier_a] == [(0.75, 50000)]
+    assert tier_a[0].key[0].startswith("15:00~16:00 시의회~숭례문R")
+    assert [(t.confidence, t.people) for t in rest] == [(0.85, 50000), (0.85, 5000)]
+    # 남는 쿼터 = 900 - 그날 부른 1(11/7 기록 하나) - r04 가 16:30 까지 노선 3개 x 60분 180
+    # - TOPIS 2순위 하루 몫 300 = 419
+    assert w.bus.leftover(at, tier_a) == 419
 
 
 def test_bus_second_priority_follows_rally_incidents(app: Flask, worker: IngestWorker) -> None:
@@ -349,12 +371,13 @@ def test_smpa_inbox_pdfs_to_closures_then_archived(app: Flask, tmp_path: Path) -
     w, _ = _worker(app, NARU_SMPA_DIR=str(smpa))
     eve = datetime(2026, 11, 6, 20, 0, tzinfo=KST)
     first = w.smpa_round(eve)
-    assert [(r.accepted, r.review_required, r.crosswalks_updated) for r in first] == [(10, 2, 38)]
+    # 광화문 38(r01 13·r04 24·r05 1) + 서울 전체(T6.9)로 4: 11/7 r02 강남역 끝점 1·r06 1·11/9 r01 2
+    assert [(r.accepted, r.review_required, r.crosswalks_updated) for r in first] == [(10, 2, 42)]
     assert sorted(p.name for p in smpa.glob("*.pdf")) == [f"2026110{d}.pdf" for d in (7, 8, 9)]
     assert not list((smpa / "inbox").glob("*.pdf"))
     assert len((smpa / "inbox_manifest.jsonl").read_text("utf-8").splitlines()) == 3
     again = w.smpa_round(eve)
-    assert [r.batch_id for r in again] == [r.batch_id for r in first] and models.repo.count() == 38
+    assert [r.batch_id for r in again] == [r.batch_id for r in first] and models.repo.count() == 42
     # 11/7 15:30 — r01 동화면세점 고리 13·r04 시의회~숭례문R 24(공지 e2e 와 같은 후보 ID·
     # 횡단보도 수) + r05 내자R~사직공원 의 끝점(사직공원) 1. 서초·여의도 행은 그래프 밖이라 0
     at = _features(app, "2026-11-07T15:30:00+09:00")
