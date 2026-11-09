@@ -145,3 +145,52 @@
   margin-left: 4px;
   color: #999;
 }
+
+/* 구 칩 (T6.9) — 지도 화면과 겹치는 사건의 구 먼저 */
+.chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 10px 20px 2px;
+  scrollbar-width: none;
+}
+
+.chip {
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 15px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+}
+
+.chip[aria-pressed="true"] {
+  border-color: #1e1e1e;
+  background: #1e1e1e;
+  color: #fff;
+}
+
+/* 지도에서 고른 묶음 (T7.5) — "여기 통제 N건 · 전체 보기" */
+.picked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px 2px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.back {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2d6bff;
+  cursor: pointer;
+}

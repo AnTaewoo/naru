@@ -12,6 +12,9 @@ import { LiveSheet } from "./LiveSheet";
 
 const fc0745 = recordedClosures("closures_0745");
 const live0745 = recordedLive("closure_events_live_0315_0745");
+const live1107 = recordedLive("closure_events_live_1107_1530");
+const live1108 = recordedLive("closure_events_live_1108_2000");
+const live1109 = recordedLive("closure_events_live_1109_1330");
 // 목록 위 기준 시각은 실시간 돌발이 없던 기록으로 — 있으면 '지금'에 따라 경고가 바뀐다 (T5.9)
 const dataAsOf = recordedEvents().data_as_of;
 
@@ -88,5 +91,61 @@ describe("LiveSheet — 지금 서울 통제", () => {
     fireEvent.click(screen.getByRole("button", { name: "카드 닫기" }));
     expect(screen.queryByRole("article")).toBeNull();
     expect(group("통제 중").getAllByRole("button")).toHaveLength(9);
+  });
+
+  it("11/7 15:30 구 칩 — 종로구·중구 먼저, 영등포구를 고르면 그 사건 둘만, '전체'로 돌아온다", () => {
+    render(
+      <Providers live={live1107}>
+        <LiveSheet />
+      </Providers>,
+    );
+    const chips = within(screen.getByRole("group", { name: "구 필터" }));
+    expect(chips.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "전체",
+      "종로구",
+      "중구",
+      "강남구",
+      "서초구",
+      "영등포구",
+    ]);
+    fireEvent.click(chips.getByRole("button", { name: "영등포구" }));
+    // 돌발 여의대로 08:03(통제 중) · 경찰청 r06 의사당역 16:00(1시간 안)
+    expect(group("통제 중").getAllByRole("button")).toHaveLength(1);
+    expect(group("1시간 안 시작").getAllByRole("button")).toHaveLength(1);
+    fireEvent.click(chips.getByRole("button", { name: "전체" }));
+    expect(group("통제 중").getAllByRole("button")).toHaveLength(8);
+  });
+
+  it("11/8 20:00 — 다음 날 11/9 통제 다섯은 '내일'", () => {
+    render(
+      <Providers live={live1108}>
+        <LiveSheet />
+      </Providers>,
+    );
+    expect(group("내일").getAllByRole("button")).toHaveLength(5);
+    expect(group("내일").getByText("국회의사당앞 → 효자동삼거리 행진")).toBeDefined();
+  });
+
+  it("지도에서 고른 묶음 — '여기 통제 2건'(흐린 0.65 도), 전체 보기로 돌아온다", () => {
+    render(
+      <Providers live={live1107} state={{ picked: ["159e13bfe71a", "3f036e3f24e0"] }}>
+        <LiveSheet />
+      </Providers>,
+    );
+    expect(screen.getByText("여기 통제 2건")).toBeDefined();
+    expect(screen.queryByRole("group", { name: "구 필터" })).toBeNull();
+    expect(screen.getByText("내자동사거리~사직공원 집회")).toBeDefined(); // r05 0.65 — 고른 묶음엔 보인다
+    fireEvent.click(screen.getByRole("button", { name: "전체 보기" }));
+    expect(screen.queryByText("여기 통제 2건")).toBeNull();
+    expect(group("통제 중").getAllByRole("button")).toHaveLength(8);
+  });
+
+  it("고른 사건(?event=·지도)이면 처음부터 그 카드", () => {
+    render(
+      <Providers live={live1109} state={{ selected: "ccaa9980c6ac" }}>
+        <LiveSheet />
+      </Providers>,
+    );
+    expect(screen.getByRole("article", { name: "국회의사당앞 → 효자동삼거리 행진" })).toBeDefined();
   });
 });
