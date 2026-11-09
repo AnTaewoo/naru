@@ -204,7 +204,8 @@ packages/fe/
   src/api/naruApiClient.ts       # fetch("/api/route"), fetch("/api/closures") — 네트워크 만지는 유일한 파일
   src/state/ApiProvider.tsx  TimeProvider.tsx  ClosureProvider.tsx  RouteProvider.tsx
   src/map/MapView.tsx  src/map/colors.ts
-  src/map/layers/closureLayer.ts  routeLayer.ts  zoneLayer.ts   # 순수 함수
+  src/map/eventKinds.ts          # 지금 지도 사건의 종류·칩·목록 순서·줌 단계 (순수, T7.4)
+  src/map/layers/closureLayer.ts  routeLayer.ts  zoneLayer.ts  eventLayer.ts   # 순수 함수
   src/i18n/ko.ts                 # enum → 한국어 라벨
   src/types/contracts.d.ts       # 생성물. 수정 금지
 ```
@@ -231,6 +232,7 @@ packages/fe/
 ### 5.6 지도와 React의 경계
 - `MapView`가 `useRef`로 `maplibregl.Map` 하나를 보유. **레이어는 React로 다시 그리지 않는다.** Context 값이 바뀌면 `useEffect`에서 `map.getSource(id).setData(geojson)`로 명령형 갱신.
 - GeoJSON 변환(`closureLayer.ts` 등)은 **순수 함수** — 입력은 contracts 타입, 출력은 MapLibre source/layer 스펙. FE 단위 테스트의 중심.
+- 지금 지도(T7.4): 줌 12 아래 사건 중심 클러스터(maplibre `cluster`), 12~15 사건 구역(BE `area`), 15 부터 횡단보도 점(`/closures` 는 14 이상·길찾기만). 칩 필터는 소스 데이터에 건다(클러스터 개수가 소스에서 세어진다). 글리프 서버가 없어 숫자는 캔버스(`setMissingStyleImageResolver`). 카메라는 주소 `#map=줌/위도/경도`(maplibre `hash`).
 - React StrictMode의 이중 마운트에서 map이 두 번 생기지 않게 cleanup에서 `map.remove()`.
 
 ### 5.7 FE 테스트 — 실데이터 원칙 그대로
