@@ -2,12 +2,16 @@
 // 받은 응답). 기대값은 기록을 열어 확인한 사건 id·status·시작·확신도 (data/MANIFEST.md 2026-11-09 재기록(T7.4))
 import { describe, expect, it } from "vitest";
 import { eventById, recordedLive } from "../test/recorded";
+import { hhmm } from "../i18n/ko";
 import {
   CHIP_KINDS,
+  byDistrict,
   chipCounts,
   chipStatuses,
+  districtChips,
   eventKind,
   listedEvents,
+  liveGroups,
   zoomBand,
 } from "./eventKinds";
 
@@ -84,5 +88,46 @@ describe("listedEvents — 시트 목록·시간표", () => {
     expect(listedEvents(b.body.events, b.atMs).map((r) => r.event.id)).not.toContain(
       "1deaa20a0218",
     );
+  });
+});
+
+describe("지금 서울 통제 묶음·구 칩 (T7.5)", () => {
+  it("3/15 07:45 — 통제 중 9 → 1시간 안 시작 2 → 오늘 5 (내일 없음)", () => {
+    const { body, atMs } = recordedLive("closure_events_live_0315_0745");
+    const groups = liveGroups(body.events, atMs);
+    expect(groups.map((g) => [g.key, g.items.length])).toEqual([
+      ["now", 9],
+      ["soon", 2],
+      ["today", 5],
+    ]);
+  });
+
+  it("11/8 20:00 — 다음 날 11/9 통제 다섯(하나증권 10:30 · 국회대로 11:00 둘 · 강남대로 14:00 둘)은 '내일'", () => {
+    const { body, atMs } = recordedLive("closure_events_live_1108_2000");
+    const [tomorrow, ...rest] = liveGroups(body.events, atMs);
+    expect(rest).toEqual([]);
+    expect(tomorrow?.key).toBe("tomorrow");
+    expect(tomorrow?.items.map((r) => hhmm(r.event.window.start))).toEqual([
+      "10:30",
+      "11:00",
+      "11:00",
+      "14:00",
+      "14:00",
+    ]);
+    expect(tomorrow?.items[0]?.event.id).toBe("1deaa20a0218");
+  });
+
+  it("11/7 15:30 구 칩 — 광화문 화면과 겹치는 사건의 구(종로구·중구 각 5) 먼저, 나머지 가나다", () => {
+    const { body, atMs } = recordedLive("closure_events_live_1107_1530");
+    const listed = listedEvents(body.events, atMs).map((r) => r.event); // r05 0.65 빼고 12
+    const view: [number, number, number, number] = [126.965, 37.555, 126.99, 37.58]; // DEFAULT_BBOX
+    expect(districtChips(listed, view)).toEqual(["종로구", "중구", "강남구", "서초구", "영등포구"]);
+    expect(districtChips(listed, null)).toEqual(["강남구", "서초구", "영등포구", "종로구", "중구"]);
+    // 영등포구 = 돌발 여의대로 08:03(통제 중) · 경찰청 r06 의사당역 16:00(1시간 안) — 목록 순서 그대로
+    expect(byDistrict(listed, "영등포구").map((e) => e.id)).toEqual([
+      "86f1c51ec2de",
+      "a1199bc3db1d",
+    ]);
+    expect(byDistrict(listed, null)).toHaveLength(12);
   });
 });

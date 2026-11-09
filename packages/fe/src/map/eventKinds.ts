@@ -111,3 +111,83 @@ export function listedEvents(events: readonly ClosureEvent[], atMs: number): Lis
         a.event.reason.localeCompare(b.event.reason),
     );
 }
+
+/** 지금 서울 통제 묶음 (T7.5) — 통제 중 → 1시간 안 시작 → 오늘 → 내일 → 그 뒤. 날짜는 응답 at 의 KST 날짜 */
+export type GroupKey = "now" | "soon" | "today" | "tomorrow" | "later";
+
+export interface EventGroup {
+  key: GroupKey;
+  items: ListedEvent[];
+}
+
+const GROUP_ORDER: readonly GroupKey[] = ["now", "soon", "today", "tomorrow", "later"];
+const KST_MS = 9 * 60 * 60_000;
+const DAY_MS = 24 * 60 * 60_000;
+
+function kstDay(ms: number): string {
+  return new Date(ms + KST_MS).toISOString().slice(0, 10);
+}
+
+function groupOf({ event, kind }: ListedEvent, atMs: number): GroupKey {
+  if (kind === "confirmed") return "now";
+  if (kind === "soon") return "soon";
+  if (!event.window.start) return "later";
+  const day = kstDay(Date.parse(event.window.start));
+  if (day <= kstDay(atMs)) return "today";
+  return day === kstDay(atMs + DAY_MS) ? "tomorrow" : "later";
+}
+
+export function liveGroups(events: readonly ClosureEvent[], atMs: number): EventGroup[] {
+  const by = new Map<GroupKey, ListedEvent[]>();
+  for (const row of listedEvents(events, atMs)) {
+    const key = groupOf(row, atMs);
+    by.set(key, [...(by.get(key) ?? []), row]);
+  }
+  return GROUP_ORDER.flatMap((key) => {
+    const items = by.get(key);
+    return items ? [{ key, items }] : [];
+  });
+}
+
+/** [minLng, minLat, maxLng, maxLat] */
+export type Bounds = [number, number, number, number];
+
+function boundsOf(e: ClosureEvent): Bounds | null {
+  const [w, s, east, n] = e.bbox;
+  const ok = [w, s, east, n].every((x) => typeof x === "number");
+  return ok ? [w as number, s as number, east as number, n as number] : null;
+}
+
+function overlaps(a: Bounds, b: Bounds): boolean {
+  return a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3];
+}
+
+/**
+ * 구 칩 (T6.9 → T7.5 지금 서울 통제) — 목록 사건의 구. 지도 화면(view)과 bbox 가 겹치는 사건의 구 먼저(그런
+ * 사건이 많은 순), 나머지는 가나다. 구 경계는 FE 에 없어서 사건 bbox 로 본다
+ */
+export function districtChips(events: readonly ClosureEvent[], view: Bounds | null): string[] {
+  const inView = new Map<string, number>();
+  const all = new Set<string>();
+  for (const e of events) {
+    const b = boundsOf(e);
+    const seen = view !== null && b !== null && overlaps(b, view);
+    for (const d of e.districts ?? []) {
+      all.add(d);
+      if (seen) inView.set(d, (inView.get(d) ?? 0) + 1);
+    }
+  }
+  const ko = (a: string, b: string) => a.localeCompare(b, "ko");
+  const count = (d: string) => inView.get(d) ?? 0;
+  const first = [...inView.keys()].sort((a, b) => count(b) - count(a) || ko(a, b));
+  return [...first, ...[...all].filter((d) => !inView.has(d)).sort(ko)];
+}
+
+/** 고른 구를 지나는 사건만 (null = 전체) */
+export function byDistrict(
+  events: readonly ClosureEvent[],
+  district: string | null,
+): ClosureEvent[] {
+  if (district === null) return [...events];
+  return events.filter((e) => (e.districts ?? []).includes(district));
+}
