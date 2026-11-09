@@ -4,15 +4,18 @@
     uv run python scripts/record_live_events.py
 
 테스트 DB(naru_test)에 실제 앱을 띄우고 워커 발행 경로로 기록만 싣는다(운영 DB 는 안 건드린다):
-코스(3/15)·공지(sentences.jsonl, LLM 기록 재생)·돌발 11/7 15:40·TOPIS 공지 6300(11/7 09:00 에
-볼 글)·돌발 11/9 14:55. 그 뒤 GET /closures/events?at=… 를 시각마다 그대로 남긴다(record_naru_api
-형식, ETag 도). 11/7 15:30 = 집회 날(사건 11), 11/9 13:30 = 국회대로 통제 중·강남대로 30분 뒤,
-3/15 07:45 = 마라톤.
+경찰청 '오늘의 주요집회' PDF 3개(11/7·11/8·11/9, T6.6 inbox 경로 — LLM 기록 재생, 0.7 미만 둘)·
+코스(3/15)·공지(sentences.jsonl — PDF 로 읽은 날짜의 경찰청 행은 건너뜀, T6.9)·돌발 11/7 15:40·
+TOPIS 공지 6300(11/7 09:00 에 볼 글)·TOPIS 통제지도 11/9 08:37 목록(T7.3 예정 집회)·돌발 11/9 14:55.
+그 뒤 GET /closures/events?at=… 를 시각마다 그대로 남긴다(record_naru_api 형식, ETag 도).
+11/7 15:30 = 집회 날, 11/9 13:30 = 국회대로 행진 통제 중·강남대로 30분 뒤, 3/15 07:45 = 마라톤.
+T7.4 에서 PDF·통제지도를 더해 다시 기록 — FE 지금 지도에 확신도 0.7 미만 사건이 있어야 한다.
 """
 
 from __future__ import annotations
 
 import json
+import shutil
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -30,6 +33,9 @@ ROOT = Path(__file__).resolve().parents[1]
 RECORDED = ROOT / "data" / "recorded"
 INCIDENTS = ["20261107T154053_AccInfo.json", "20261109T145523_AccInfo.json"]
 TOPIS = "20261108T192013.json"  # 11/7 09:00 에 볼 글 중 6300
+TOPIS_MAP = "20261109T083719_selectAccAllListASC.json"  # T6.5 통제지도 목록 6행 (T7.3)
+SMPA_RAW = ROOT / "data" / "raw" / "notices" / "smpa"  # 태우가 받은 PDF (MANIFEST notices/smpa)
+SMPA_PDFS = [f"2611{d}) 오늘의 주요집회.pdf" for d in ("07(토", "08(일", "09(월")]
 AT = {
     "closure_events_live_1107_1530": "2026-11-07T15:30:00+09:00",
     "closure_events_live_1109_1330": "2026-11-09T13:30:00+09:00",
@@ -46,19 +52,28 @@ def main() -> None:
     models.repo.truncate()
     http = httpx.Client(transport=httpx.WSGITransport(app=app), base_url="http://naru.record")
     pub = CandidatePublisher("http://naru.record", "naru-record", client=http, backoff_s=0.0)
-    smpa = tempfile.mkdtemp()  # 운영 inbox 와 떨어진 빈 폴더
+    smpa = Path(tempfile.mkdtemp())  # 운영 inbox 와 떨어진 임시 폴더 — PDF 사본만
+    (smpa / "inbox").mkdir()
+    for name in SMPA_PDFS:
+        shutil.copy2(SMPA_RAW / name, smpa / "inbox" / name)
     for i, record in enumerate(INCIDENTS):
         ai = AISettings(
             NARU_INCIDENT_RECORD=str(RECORDED / "incident" / record),
             NARU_TOPIS_RECORD=str(RECORDED / "topis_notice" / TOPIS),
-            NARU_SMPA_DIR=smpa,
+            NARU_TOPIS_MAP_RECORD=str(RECORDED / "topis_web" / TOPIS_MAP),
+            NARU_SMPA_DIR=str(smpa),
         )
-        worker = IngestWorker(ai, pub)
+        worker = IngestWorker(ai, pub)  # client 없음 → 공지는 LLM 기록 재생만
         if i == 0:
+            # PDF 먼저 — 읽은 날짜의 sentences.jsonl 경찰청 행은 run_once 가 건너뛴다(중복 없음)
+            worker.smpa_round(datetime(2026, 11, 6, 20, 0, tzinfo=KST))
             worker.run_once()
             topis = worker.topis_batch(datetime(2026, 11, 7, 9, 0, tzinfo=KST))
             if topis is not None:
                 pub.publish(topis)
+            mapped = worker.topis_map_batch()  # 돌발 11/9 보다 먼저 — T6.1 연결로 통제 중
+            if mapped is not None:
+                pub.publish(mapped)
         pub.publish(worker.incident_batch())
     client = app.test_client()
     out = RECORDED / "naru_api"
