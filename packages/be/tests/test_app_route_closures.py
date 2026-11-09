@@ -200,3 +200,22 @@ def test_closure_events_bbox_and_errors(client: FlaskClient, course_world: Cours
     resp = client.get("/closures/events", query_string={"bbox": "1,2,3"})
     assert resp.status_code == 400
     assert ErrorBody.model_validate(resp.get_json()).error.field == "bbox"
+
+
+def test_closure_events_have_districts(client: FlaskClient) -> None:
+    # T6.9 통제 불러오기 구 칩 — 사건 횡단보도들의 OA-23081 자치구(가나다순). 코스 구간으로
+    # 확인: 출발지(광화문)는 종로구, 1구간은 세종대로사거리(535 종로구)~숭례문(625 중구),
+    # 10구간은 잠실대교북단(광진구)~잠실역(송파구)
+    body = ClosureEventsResponse.model_validate(client.get("/closures/events").get_json())
+    by = {ev.reason.split(" ")[1]: ev.districts for ev in body.events}
+    assert by["출발지"] == ["종로구"]
+    assert by["1구간"] == ["종로구", "중구"]
+    assert by["10구간"] == ["광진구", "송파구"]
+    assert {d for ev in body.events for d in ev.districts} == {
+        "광진구",
+        "동대문구",
+        "성동구",
+        "송파구",
+        "종로구",
+        "중구",
+    }

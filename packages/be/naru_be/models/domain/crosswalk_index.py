@@ -135,6 +135,11 @@ class CrosswalkIndex:
     def get(self, crosswalk_id: str) -> Crosswalk:
         return self._by_id[crosswalk_id]
 
+    def district_of(self, crosswalk_id: str) -> str | None:
+        """자치구 (T6.9 통제 불러오기 구 칩). 지금 범위 밖 관리번호면 None."""
+        c = self._by_id.get(crosswalk_id)
+        return c.district if c is not None else None
+
     def _within(self, area: shapely.Geometry) -> set[str]:
         return {
             self._items[int(i)].crosswalk_id for i in self._tree.query(area, predicate="intersects")

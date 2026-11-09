@@ -70,6 +70,8 @@ class ClosureEvent(Contract):
     source: Source | None = None
     summary: CandidateSummary | None = None
     notice: NoticeRef | None = None
+    # v0.13 보충(T6.9) — 사건 횡단보도들이 있는 자치구(OA-23081 이름, 가나다순). FE 구 필터 칩
+    districts: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _bbox_min_max(self) -> "ClosureEvent":

@@ -8,7 +8,7 @@ upsert 키 = (candidate_id, crosswalk_id): 같은 후보가 다시 오면 덮어
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -155,10 +155,13 @@ class ClosureRepository:
         with self._sessions.begin() as s:
             return [self._state(row) for row in s.scalars(stmt)]
 
-    def events(self, bbox: Bbox | None = None) -> list[ClosureEvent]:
+    def events(
+        self, bbox: Bbox | None = None, district_of: Callable[[str], str | None] | None = None
+    ) -> list[ClosureEvent]:
         """(reason, window) 사건 묶음 — 서로 다른 횡단보도 수·범위·approx (INTERFACE §3.1, ADR-010).
 
         bbox 면 그 안의 상태만 묶는다. 순서는 시작 늦은 것 먼저, 시작 없는 것은 끝.
+        district_of 를 주면 사건마다 횡단보도들의 자치구(가나다순, T6.9 구 칩).
         """
         e = ClosureStateEntity
         stmt = select(
@@ -181,11 +184,18 @@ class ClosureRepository:
         meta_stmt = select(
             e.reason, e.window_start, e.window_end, e.source, e.type, e.summary, e.notice
         ).where(e.source.is_not(None))
+        cw_stmt = select(e.reason, e.window_start, e.window_end, e.crosswalk_id).distinct()
+        districts: dict[tuple[object, ...], set[str]] = {}
         with self._sessions.begin() as s:
             rows = s.execute(stmt).all()
             metas: dict[tuple[object, ...], tuple[object, ...]] = {}
             for reason, start, end, *meta in s.execute(meta_stmt).all():
                 metas.setdefault((reason, start, end), tuple(meta))
+            if district_of is not None:
+                for reason, start, end, cid in s.execute(cw_stmt).all():
+                    d = district_of(cid)
+                    if d:
+                        districts.setdefault((reason, start, end), set()).add(d)
         return [
             ClosureEvent(
                 reason=reason,
@@ -193,6 +203,7 @@ class ClosureRepository:
                 crosswalks=int(n),
                 bbox=(float(min_lng), float(min_lat), float(max_lng), float(max_lat)),
                 approx=bool(approx),
+                districts=sorted(districts.get((reason, start, end), ())),
                 **_event_meta(metas.get((reason, start, end))),
             )
             for reason, start, end, n, min_lng, min_lat, max_lng, max_lat, approx in rows

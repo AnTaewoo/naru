@@ -1402,6 +1402,13 @@
             }
           ],
           "default": null
+        },
+        "districts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Districts",
+          "type": "array"
         }
       },
       "required": [

@@ -28,4 +28,5 @@ def get_closure_events() -> Response:
     query = ClosureEventsQuery.model_validate(request.args.to_dict())  # 실패 → error_view 400
     bbox = parse_bbox(query.bbox) if query.bbox is not None else None
     m = naru_models()
-    return closure_view.render_events(m.repo.events(bbox), m.ped.bounds(), m.repo.data_as_of())
+    events = m.repo.events(bbox, m.index.district_of)
+    return closure_view.render_events(events, m.ped.bounds(), m.repo.data_as_of())

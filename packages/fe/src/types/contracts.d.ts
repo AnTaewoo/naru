@@ -145,6 +145,7 @@ export type Crosswalks = number;
  */
 export type Bbox2 = [unknown, unknown, unknown, unknown];
 export type Approx4 = boolean;
+export type Districts = string[];
 export type TopisIncident = string | null;
 export type TopisNotice = string | null;
 export type Smpa = string | null;
@@ -440,6 +441,7 @@ export interface ClosureEvent {
   source?: Source | null;
   summary?: CandidateSummary | null;
   notice?: NoticeRef | null;
+  districts?: Districts;
 }
 /**
  * 출처별로 저장된 통제의 가장 늦은 근거 시각 (v0.12, ADR-011 C·ADR-012). 없으면 null.
