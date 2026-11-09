@@ -19,6 +19,8 @@ from pathlib import Path
 
 import httpx
 import pytest
+import shapely
+import shapely.geometry
 from alembic import command
 from alembic.config import Config
 from flask import Flask
@@ -29,7 +31,13 @@ from naru_ai.worker import IngestWorker
 from naru_be.app import create_app
 from naru_be.config import Settings
 from naru_be.controllers._deps import NaruModels
-from naru_contracts import ClosureEventsResponse, FeatureCollection, Source, Status
+from naru_contracts import (
+    ClosureEvent,
+    ClosureEventsResponse,
+    FeatureCollection,
+    Source,
+    Status,
+)
 
 BE_DIR = Path(__file__).resolve().parents[1]
 TOKEN = "naru-e2e-token"
@@ -330,27 +338,30 @@ def test_bus_targets_logged_on_change_and_every_10_minutes(
     assert counts == [(11, 0, 20), (11, 0, 20), (0, 0, 0)]
 
 
+ACCINFO_1109 = "data/recorded/incident/20261109T145523_AccInfo.json"  # 11/9 14:55 — 1109233·1109234
+
+
+def _load_nov7(app: Flask, quiet: dict[str, str], at: str) -> ClosureEventsResponse:
+    """11/7 기록(코스·공지 r01·r04·r06·돌발 15:40·TOPIS 6300)을 새로 싣고 그 시각 사건 (v0.14)."""
+    models: NaruModels = app.extensions["naru"]
+    models.repo.truncate()
+    w, publisher = _worker(
+        app, quiet, NARU_INCIDENT_RECORD=ACCINFO_1107, NARU_TOPIS_RECORD=TOPIS_1108
+    )
+    w.run_once()
+    publisher.publish(w.incident_batch())
+    batch = w.topis_batch(datetime(2026, 11, 7, 9, 0, tzinfo=KST))
+    assert batch is not None
+    publisher.publish(batch)
+    resp = app.test_client().get("/closures/events", query_string={"at": at})
+    return ClosureEventsResponse.model_validate(resp.get_json())
+
+
 def test_live_events_on_nov7(app: Flask, quiet: dict[str, str]) -> None:
     """T7.1 (ADR-014 A) — 11/7 15:30 지금 지도: [15:30, 11/9 00:00] 과 겹치는 사건 11.
     TOPIS 돌발 집회 7(0.9)·TOPIS 공지 6300(0.8, 같은 횡단보도 돌발 근거) 통제 중, 경찰청 공지
     r01(0.85)·r04(0.75)·r06(0.85)는 공지뿐이라 예정. 3/15 코스는 창 밖. 다시 실어도 id 그대로."""
-    models: NaruModels = app.extensions["naru"]
-
-    def load() -> ClosureEventsResponse:
-        models.repo.truncate()
-        w, publisher = _worker(
-            app, quiet, NARU_INCIDENT_RECORD=ACCINFO_1107, NARU_TOPIS_RECORD=TOPIS_1108
-        )
-        w.run_once()
-        publisher.publish(w.incident_batch())
-        batch = w.topis_batch(datetime(2026, 11, 7, 9, 0, tzinfo=KST))
-        assert batch is not None
-        publisher.publish(batch)
-        q = {"at": "2026-11-07T15:30:00+09:00"}
-        resp = app.test_client().get("/closures/events", query_string=q)
-        return ClosureEventsResponse.model_validate(resp.get_json())
-
-    body = load()
+    body = _load_nov7(app, quiet, "2026-11-07T15:30:00+09:00")
     got = Counter((e.source, e.status) for e in body.events)
     assert got == {
         (Source.incident, Status.confirmed): 7,
@@ -359,7 +370,70 @@ def test_live_events_on_nov7(app: Flask, quiet: dict[str, str]) -> None:
     }
     r04 = next(e for e in body.events if e.reason.startswith("15:00~16:00 시의회~숭례문R"))
     assert (r04.id, r04.confidence) == ("2e930ec6deeb", 0.75)  # INTERFACE §3.1 예시와 같은 사건
-    assert sorted(e.id for e in load().events) == sorted(e.id for e in body.events)
+    again = _load_nov7(app, quiet, "2026-11-07T15:30:00+09:00")
+    assert sorted(e.id for e in again.events) == sorted(e.id for e in body.events)
+
+
+def _crosswalk_points(app: Flask, ev: ClosureEvent, at: str) -> list[tuple[float, float]]:
+    """그 사건 횡단보도 점 (/closures, 같은 reason)."""
+    w, s, e, n = ev.bbox
+    bbox = f"{w - 0.0005},{s - 0.0005},{e + 0.0005},{n + 0.0005}"
+    fc = FeatureCollection.model_validate(
+        app.test_client().get("/closures", query_string={"bbox": bbox, "at": at}).get_json()
+    )
+    pts = {
+        (float(f.geometry.coordinates[0]), float(f.geometry.coordinates[1]))
+        for f in fc.features
+        if f.properties.reason == ev.reason and f.geometry.type == "Point"
+    }
+    return sorted(pts)
+
+
+def _shape(ev: ClosureEvent) -> shapely.Geometry:
+    assert ev.area is not None and ev.centroid is not None
+    return shapely.geometry.shape(ev.area.model_dump(mode="json"))
+
+
+def test_event_areas(app: Flask, quiet: dict[str, str]) -> None:
+    """T7.2 (ADR-014 A) — 사건 구역 = 그 사건 후보가 횡단보도를 고른 모양(점 30 m·선 15 m·구간
+    도로 경로 + 등급 버퍼)의 union, 2 m 단순화 + 2 m 여유, EPSG:4326. 사건마다 구역이 있고,
+    횡단보도는 다 그 안, 중심은 구역 안(마라톤 구간처럼 휜 선도). 11/7 TOPIS 6300 은 구간 +
+    숭례문 점 둘이 한 구역."""
+    at = "2026-11-07T15:30:00+09:00"
+    body = _load_nov7(app, quiet, at)
+    assert len(body.events) == 11
+    for ev in body.events:
+        area = _shape(ev)
+        pts = _crosswalk_points(app, ev, at)
+        assert len(pts) == ev.crosswalks, ev.reason
+        assert all(area.buffer(1e-6).contains(shapely.Point(p)) for p in pts), ev.reason
+        assert area.contains(shapely.Point(ev.centroid)), ev.reason
+    t6300 = next(e for e in body.events if e.source is Source.topis)
+    # 구간(숭례문오거리→세종대로사거리) 6곳 + 숭례문 점 둘의 2곳 — 숭례문 2곳이 겹쳐 서로 다른 7곳
+    assert t6300.crosswalks == 7 and t6300.area is not None and t6300.area.type == "Polygon"
+    # 3/15 07:45 — 마라톤 16구간(코스 선 15 m)도 구역·중심
+    seoul = app.test_client().get(
+        "/closures/events", query_string={"at": "2026-03-15T07:45:00+09:00"}
+    )
+    course = ClosureEventsResponse.model_validate(seoul.get_json()).events
+    assert len(course) == 16 and all(e.area is not None and e.centroid is not None for e in course)
+
+
+def test_event_area_of_incident_line(app: Flask, quiet: dict[str, str]) -> None:
+    """11/9 TOPIS 돌발 1109233 '국회대로 국회의사당앞→서강대교남단'(링크 선 15 m) — 횡단보도
+    6곳이 구역 안."""
+    models: NaruModels = app.extensions["naru"]
+    models.repo.truncate()
+    w, publisher = _worker(app, quiet, NARU_INCIDENT_RECORD=ACCINFO_1109)
+    publisher.publish(w.incident_batch())
+    at = "2026-11-09T12:00:00+09:00"
+    resp = app.test_client().get("/closures/events", query_string={"at": at})
+    events = ClosureEventsResponse.model_validate(resp.get_json()).events
+    ev = next(e for e in events if e.reason == "rally 국회대로 국회의사당앞→서강대교남단")
+    area = _shape(ev)
+    pts = _crosswalk_points(app, ev, at)
+    assert len(pts) == ev.crosswalks == 6
+    assert all(area.buffer(1e-6).contains(shapely.Point(p)) for p in pts)
 
 
 def test_bus_positions_need_token(app: Flask) -> None:
