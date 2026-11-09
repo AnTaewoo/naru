@@ -156,6 +156,8 @@
 - 2026-11-08 18:20 (live 1, T6.1 워커 live 경로 확인 — `SeoulOpenApi`, 키 가림 확인): `incident/20261108T182054_AccInfo.json` (sha256 714cd3ecea46…) 10건 — 공사 3 · 행사(10B03) 3 · 기타(11B01) 3 · 교통사고 1, 집회 0 → 후보 0(빈 배치)
 - AccInfo `acc_road_code` 는 009(시각이 HHMM, 예 1109106 "세종대로 (숭례문 ↔ 덕수궁) 집회로 양방향 전면통제" 14:44)와 010(시각이 HHMMSS, 경찰 공지를 옮긴 듯한 "15:00∼17:00 서울시의회∼숭례문(편도全차로) ※행진…")이 섞여 있다. 뜻은 확인 못 함 — 둘 다 집회(10B02)면 같은 규칙으로 후보
 
+- 2026-11-09 18:2x (live 34 — T7.3 TOPIS 통제지도 1109233 통제 도로, 무료 공개 API OA-13310·13311): `topis_web/20261109T084734_selectAccLinkList_1109233.json` 의 19 링크 중 꼭짓점이 없던 17개를 운영 워커와 같은 `SeoulOpenApi.fetch_link`로 — `links/20261109T18*_{LinkInfo,LinkVerInfo}_<link_id>.json` 34장(키는 `<키>`). 1130000600·1130001200·1130001800·1130002800(마포대로) · 1000011900(사직로) · 1010000200·1000000200·1000000800·1000001000(새문안로) · 1000008400(세종대로) · 1120000800(신촌로) · 1180002600(여의대로) · 1180037400·1180036200·1180035200(여의서로) · 1120001000(충정로) · 1000015200(효자로). 노드 이름으로 이으면 국회의사당앞~효자동삼거리 9,489 m 한 줄(test_topis_map)
+
 ### recorded/rtd (서울 실시간 도시데이터)
 - 출처: 열린데이터광장 `citydata` (json), AREA_NM=광화문·덕수궁(AREA_CD POI009). 파일 `data/recorded/rtd/20261107T154125_citydata.json`
 - 필드(실제): `CITYDATA.{AREA_NM, AREA_CD, LIVE_PPLTN_STTS[{AREA_CONGEST_LVL, AREA_CONGEST_MSG, AREA_PPLTN_MIN, AREA_PPLTN_MAX, PPLTN_TIME, FCST_PPLTN[]}], ROAD_TRAFFIC_STTS, PRK_STTS, SUB_STTS, LIVE_SUB_PPLTN, BUS_STN_STTS, LIVE_BUS_PPLTN, ACDNT_CNTRL_STTS, SBIKE_STTS, WEATHER_STTS}`. 2026-11-07 15:10 "약간 붐빔" 48,000~50,000명

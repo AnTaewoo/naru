@@ -16,7 +16,7 @@ A. **사건이 지도의 단위다.**
 - `GET /closures/events?at=&from=&to=&bbox=` — 기본 창은 진행 중 + 내일 24:00(KST), 한 번에 300건(넘으면 `truncated: true`). 사건마다 `id`·`status`(at 기준 그 사건 횡단보도 중 가장 심한 상태)·`confidence`(최대)·`area`·`centroid`. 파라미터가 없으면 지금처럼 전부(하위 호환). ETag = 응답 본문 sha1, `If-None-Match` 가 같으면 304, `Cache-Control: no-cache`.
 - `GET /route?avoid=<id,…>` — 그 사건 횡단보도를 시각·확신도와 상관없이 막는다("이 구역 피해서 길찾기").
 
-B. **TOPIS 통제지도 예정 통제(T7.3).** 목록(`selectAccAllListASC`)·통제 도로(`selectAccLinkList`) AJAX 를 웹 페이지 수집 규칙(ADR-011 E — robots 허용 경로, 같은 곳 10분, NaruBot, 원문 기록)으로 받는다. 링크 꼭짓점은 OA-13311 LinkVerInfo(키로 쓰는 공개 API). 후보 ID 는 돌발과 같은 acc_id 라, 예정 통제가 시작되면 OA-13315 돌발이 같은 후보를 이어 받는다. 전체 통제(accRoadYn)는 버스 기록 대상(ADR-013 보류의 전면 통제). 근거 종류·출처 값은 열린 질문 1.
+B. **TOPIS 통제지도 예정 통제(T7.3).** _구현 보충(2026-11-09): 출처는 `incident` 재사용 대신 `topis`(공지처럼), 후보 ID 는 `topismap-<acc_id>-<k>` — 돌발 후보와 ID 를 같이 쓰면 시작 때 돌발의 링크 하나로 경로가 줄어든다. 대신 T6.1 연결(같은 횡단보도·겹치는 시각)로 돌발 근거가 붙어 '통제 중'이 이어진다(11/9 1109233: 10:30 예정 75곳 → 12:00 통제 중). 시작 뒤에는 돌발 사건(링크 하나)도 따로 보인다 — FE 카드에서 묶을지는 T7.5._ 목록(`selectAccAllListASC`)·통제 도로(`selectAccLinkList`) AJAX 를 웹 페이지 수집 규칙(ADR-011 E — robots 허용 경로, 같은 곳 10분, NaruBot, 원문 기록)으로 받는다. 링크 꼭짓점은 OA-13311 LinkVerInfo(키로 쓰는 공개 API). 후보 ID 는 돌발과 같은 acc_id 라, 예정 통제가 시작되면 OA-13315 돌발이 같은 후보를 이어 받는다. 전체 통제(accRoadYn)는 버스 기록 대상(ADR-013 보류의 전면 통제). 근거 종류·출처 값은 열린 질문 1.
 
 C. **알림.**
 - 표 0006: `push_subscriptions`(endpoint 유일, p256dh, auth, active, created·last_ok) · `watch_areas`(subscription, kind saved·last_seen, lng·lat, radius_m 300·500·1000, expires_at — last_seen 은 약 150 m 격자로 반올림, 3시간 뒤 삭제) · `push_sends`(subscription, event_id, kind created·confirmed, due_at, sent_at, http_status, 유일키 (subscription, event_id, kind)).
