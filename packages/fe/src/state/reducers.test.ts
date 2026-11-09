@@ -37,6 +37,7 @@ import {
   initialTimeState,
   isNowAt,
   kstIso,
+  liveFromLocation,
   minutesFromDayStart,
   pendingTimeState,
   tFromLocation,
@@ -82,6 +83,33 @@ describe("timeReducer", () => {
     expect(tFromLocation("?t=2026-03-15T07:45:00+09:00")).toBe(t0);
     expect(tFromLocation("?t=garbage", () => Date.UTC(2026, 2, 14, 22, 45))).toBe(t0);
     expect(tFromLocation("", () => Date.UTC(2026, 2, 14, 22, 45))).toBe(t0);
+  });
+});
+
+describe("지금 모드 (T7.4)", () => {
+  // 사건 v2 기록 closure_events_live_1107_1530 의 at
+  const at = Date.parse("2026-11-07T15:30:00+09:00");
+  it("?t= 없이 열었거나 '지금으로'면 live — 5분마다 지금으로, 그 사이엔 같은 t(같은 at → 304)", () => {
+    expect(liveFromLocation("")).toBe(true);
+    expect(liveFromLocation("?t=garbage")).toBe(true); // tFromLocation 도 지금으로 간다
+    expect(liveFromLocation("?t=2026-03-15T07:45:00%2B09:00")).toBe(false);
+    const live = timeReducer(pendingTimeState(), { type: "set", t: kstIso(at), live: true });
+    expect(live.live).toBe(true);
+    expect(timeReducer(live, { type: "tick", nowMs: at + 4 * 60_000 + 59_000 })).toBe(live);
+    const next = timeReducer(live, { type: "tick", nowMs: at + 5 * 60_000 });
+    expect(next.t).toBe("2026-11-07T15:35:00+09:00");
+    expect(next.live).toBe(true);
+  });
+  it("슬라이더를 만지거나 시각을 정해 옮기면 멈춘다 — 그 뒤 tick 은 무시", () => {
+    const live = timeReducer(pendingTimeState(), { type: "set", t: kstIso(at), live: true });
+    const stepped = timeReducer(live, { type: "step", deltaMin: 10 });
+    expect(stepped.live).toBe(false);
+    expect(timeReducer(stepped, { type: "tick", nowMs: at + 60 * 60_000 })).toBe(stepped);
+    const slid = timeReducer(live, { type: "setMinutes", minutesFromDayStart: 16 * 60 });
+    expect(slid.live).toBe(false);
+    expect(timeReducer(live, { type: "set", t: "2026-03-15T07:45:00+09:00" }).live).toBe(false);
+    expect(initialTimeState("2026-03-15T07:45:00+09:00").live).toBe(false);
+    expect(pendingTimeState().live).toBe(false);
   });
 });
 

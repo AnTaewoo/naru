@@ -40,7 +40,7 @@ export function TimeSlider() {
                 className={styles.now}
                 aria-label="지금 시각으로"
                 disabled={!time.ready}
-                onClick={() => dispatch({ type: "set", t: kstIso(Date.now()) })}
+                onClick={() => dispatch({ type: "set", t: kstIso(Date.now()), live: true })}
               >
                 지금으로
               </button>
