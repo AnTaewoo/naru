@@ -12,7 +12,7 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci
       - --default-time-zone=+00:00
-    ports: ["3307:3306"]  # 호스트 3307 — 로컬 MariaDB가 3306을 쓴다
+    ports: ["127.0.0.1:3307:3306"]  # 호스트 3307(로컬 MariaDB가 3306) — 127.0.0.1 에만, 밖에서 못 붙게 (T6.8)
     volumes:
       - mysqldata:/var/lib/mysql
       - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
