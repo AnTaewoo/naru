@@ -69,6 +69,9 @@ def _latest(parent: Path, pattern: str) -> Path:
 
 FAIL_ALERT = 3  # 한 소스가 연속으로 이만큼 실패하면 ERROR (T6.1)
 COVERAGE_TTL_S = 600.0  # BE 범위를 다시 보는 간격 (T6.9)
+# BE 가 배치에서 새로 만드는 것의 판 — 바꾸면 같은 후보도 새 배치라 다시 접수된다.
+# t7.2: 사건 통제 구역(area)은 접수 때 만든다 — 배포 전에 받은 배치에도 구역이 생기게
+INTAKE_VERSION = "t7.2"
 Response = CandidateBatchResponse | BusPositionBatchResponse
 
 
@@ -396,8 +399,9 @@ class IngestWorker:
         return [] if batch is None else [self._publish(batch)]
 
     def _scoped(self, batch: CandidateBatch) -> CandidateBatch:
-        """batch_id 에 BE 범위(coverage)를 섞는다 — 범위가 바뀌면(T6.9 서울 전체) 같은 후보도
-        새 배치라 BE 가 횡단보도에 다시 붙인다. 범위가 같으면 그대로 멱등. 범위는 10분마다."""
+        """batch_id 에 BE 범위(coverage)와 접수 판(INTAKE_VERSION)을 섞는다 — 범위가 바뀌면(T6.9
+        서울 전체)·판이 바뀌면(T7.2 구역) 같은 후보도 새 배치라 BE 가 다시 접수한다. 둘 다 같으면
+        그대로 멱등. 범위는 10분마다."""
         now = time.monotonic()
         if self._coverage is None or now - self._coverage_at > COVERAGE_TTL_S:
             try:
@@ -406,7 +410,7 @@ class IngestWorker:
                 raise PublishError(f"BE 범위를 못 받음: {e!r}") from e
             self._coverage, self._coverage_at = ",".join(f"{v:.5f}" for v in box), now
         prefix = batch.batch_id.split("-")[0]
-        scoped = _batch_id(prefix, [batch.batch_id, self._coverage])
+        scoped = _batch_id(prefix, [batch.batch_id, self._coverage, INTAKE_VERSION])
         return batch.model_copy(update={"batch_id": scoped})
 
     def bus_round(self, now: datetime) -> list[Response]:
