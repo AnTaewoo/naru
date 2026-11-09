@@ -1,4 +1,5 @@
 // 렌더 테스트 — Provider 초기 state 에 recorded 응답을 넣고 그린다. 네트워크 없음 (CONVENTIONS §5.7-2)
+// T7.4: 시트 목록·시간표는 지금 지도 사건(사건 v2 기록, scripts/record_live_events.py)
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
@@ -8,32 +9,33 @@ import { ApiProvider } from "../state/ApiProvider";
 import { ClosureProvider, useClosureDispatch, useClosures } from "../state/ClosureProvider";
 import { TimeProvider } from "../state/TimeProvider";
 import { recordedClosures, recordedEvents, recordedLive } from "../test/recorded";
-import { ClosureSheet, closureRows, withEvents } from "./ClosureSheet";
+import { ClosureSheet } from "./ClosureSheet";
 import { timelineBars } from "./ClosureTimeline";
 import { TimeSlider } from "./TimeSlider";
 
 const T = "2026-03-15T07:45:00+09:00";
 const fc0745 = recordedClosures("closures_0745");
 const fc0430 = recordedClosures("closures_0430");
-const fc1107 = recordedClosures("closures_1107_1500"); // 11/7 15:00 광화문 — 공지 집회 두 건
-const T1107 = "2026-11-07T15:00:00+09:00";
-const { events, data_as_of: dataAsOf } = recordedEvents(); // v0.12 — 사건 칸·기준 시각
+const live0745 = recordedLive("closure_events_live_0315_0745");
+const live1107 = recordedLive("closure_events_live_1107_1530");
+// 목록 위 기준 시각은 실시간 돌발이 없던 기록으로 — 있으면 '지금'에 따라 경고가 바뀐다 (T5.9)
+const dataAsOf = recordedEvents().data_as_of;
 
-function Providers({
-  children,
-  at = T,
-  closures = fc0745,
-}: {
-  children: ReactNode;
-  at?: string;
-  closures?: typeof fc0745;
-}) {
+function Providers({ children, live = live0745 }: { children: ReactNode; live?: typeof live0745 }) {
+  const at = live.body.at;
   return (
     <ApiProvider client={createNaruApiClient("/api")}>
       <TimeProvider initialT={at}>
         <ClosureProvider
           fetchEnabled={false}
-          initialState={{ status: "ready", closures, at, events, dataAsOf }}
+          initialState={{
+            status: "ready",
+            closures: fc0745,
+            at,
+            events: live.body.events,
+            eventsAt: at,
+            dataAsOf,
+          }}
         >
           {children}
         </ClosureProvider>
@@ -42,42 +44,9 @@ function Providers({
   );
 }
 
-describe("closureRows / timelineBars (순수)", () => {
-  it("07:45 — 횡단보도 79개가 후보 단위 행으로 묶이고 확인이 먼저 온다", () => {
-    const rows = closureRows(fc0745);
-    expect(rows.reduce((n, r) => n + r.crosswalks, 0)).toBe(79);
-    expect(rows.length).toBeGreaterThan(1);
-    expect(rows[0]?.status).toBe("confirmed");
-    const seg1 = rows.find((r) => r.reason.includes("1구간"));
-    expect(seg1?.status).toBe("confirmed");
-    expect(seg1?.start).toBe("2026-03-15T07:20:00+09:00");
-    expect(seg1?.end).toBe("2026-03-15T08:08:00+09:00");
-    expect(seg1 && "evidence" in seg1).toBe(false); // 출처 줄(시각표·확신)은 쓰지 않는다 (T5.9)
-  });
-  it("횡단보도 수는 화면 영역 말고 사건 전체 — 07:45 2구간 화면 안 23곳 → 58곳 (T5.9)", () => {
-    const rows = withEvents(closureRows(fc0745), events);
-    const count = (part: string) => rows.find((r) => r.reason.includes(part))?.crosswalks;
-    // recorded closures_0745 의 화면 안 개수 23·21·24 → closure_events 의 사건 전체 58·54·60
-    expect([count("2구간"), count("3구간"), count("4구간"), count("1구간")]).toEqual([
-      58, 54, 60, 6,
-    ]);
-    // 11/7 r04: 구간 후보가 겹쳐 피처 38개지만 서로 다른 횡단보도 31곳
-    const rally = withEvents(closureRows(fc1107), events).find((r) => r.reason.startsWith("15:00"));
-    expect(rally?.crosswalks).toBe(31);
-    expect(rally?.event?.summary?.reported_people).toBe(50000);
-  });
-  it("04:30 — 예정 1행(출발지 구간), 횡단보도 5곳", () => {
-    const rows = closureRows(fc0430);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.status).toBe("scheduled");
-    expect(rows[0]?.crosswalks).toBe(5);
-  });
-});
-
-describe("timelineBars (순수, T7.4 — 지금 지도 사건)", () => {
+describe("timelineBars (순수)", () => {
   it("3/15 07:45 — 시트 목록과 같은 사건 16, 1구간 07:20~08:08 막대·통제 중 빨강", () => {
-    const live = recordedLive("closure_events_live_0315_0745");
-    const bars = timelineBars(live.body.events, live.atMs, "2026-03-15T00:00:00+09:00");
+    const bars = timelineBars(live0745.body.events, live0745.atMs, "2026-03-15T00:00:00+09:00");
     expect(bars).toHaveLength(16);
     const seg1 = bars.find((b) => b.key === "adaea2f4cc02"); // 기록: marathon 1구간 07:20–08:08
     expect(seg1?.title).toBe("마라톤 1구간 세종대로 사거리~숭례문 오거리");
@@ -85,42 +54,45 @@ describe("timelineBars (순수, T7.4 — 지금 지도 사건)", () => {
     expect(seg1?.leftPct).toBeCloseTo(((7 * 60 + 20) / (24 * 60)) * 100, 3);
     expect(seg1?.widthPct).toBeCloseTo((48 / (24 * 60)) * 100, 3);
     // 다른 날이면 막대 없음 — 3/15 사건을 3/16 축에
-    expect(timelineBars(live.body.events, live.atMs, "2026-03-16T00:00:00+09:00")).toEqual([]);
+    expect(timelineBars(live0745.body.events, live0745.atMs, "2026-03-16T00:00:00+09:00")).toEqual(
+      [],
+    );
   });
 });
 
 describe("ClosureSheet", () => {
-  it("recorded 07:45 를 그린다 — 부제 개수·행·배지", () => {
+  it("3/15 07:45 — 부제는 서울 사건 수, 행·배지, 통제 불러오기는 없다", () => {
     render(
       <Providers>
         <ClosureSheet />
       </Providers>,
     );
     expect(screen.getByText("3월 15일 통제")).toBeDefined(); // 기준 시각이 오늘이 아니면 날짜 (T5.4)
-    expect(screen.getByText(/횡단보도 45곳 통제 중, 19곳 예정/)).toBeDefined(); // 곳 단위(64곳)
+    expect(screen.getByText(/서울 통제 중 9건, 예정 7건/)).toBeDefined(); // 칩과 같은 수
     expect(screen.getByText("마라톤 1구간 세종대로 사거리~숭례문 오거리")).toBeDefined();
     expect(screen.queryByText(/^marathon /)).toBeNull(); // 코드값은 화면에 안 나온다
-    expect(screen.getAllByText(/뒤 해제/).length).toBeGreaterThan(0); // confirmed 행 배지
-    expect(screen.getAllByText("제한").length).toBeGreaterThan(0); // scheduled 행 배지
-    expect(screen.getByLabelText("기준 시각")).toBeDefined();
-    expect(screen.getByText("07:45")).toBeDefined();
-    // T5.9 — 사건 전체 수, 출처 줄 없음, 목록 위 기준 시각(실시간 돌발 없으면 회색 경고)
+    expect(screen.getByText("23분 뒤 해제")).toBeDefined(); // 1구간 08:08 해제, 07:45 기준
+    expect(screen.getAllByText("제한")).toHaveLength(7); // 예정 행 배지
     expect(screen.getByText("07:23–08:57 · 횡단보도 58곳")).toBeDefined(); // 2구간, 기록 창 그대로
     expect(screen.queryByText(/확신/)).toBeNull();
-    expect(screen.queryByText(/시각표·|시각표 ·/)).toBeNull();
     expect(screen.getByText("경찰청 11/6 공지 · 마라톤 3/12 시각표 기준")).toBeDefined();
     expect(screen.getByText("실시간 돌발(TOPIS)은 아직 받지 않아요")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "통제 불러오기" })).toBeNull(); // T7.4 삭제
+    expect(screen.getByLabelText("기준 시각")).toBeDefined();
+    expect(screen.getByText("07:45")).toBeDefined();
   });
 
-  it("11/7 15:00 — 공지 행은 파서 제목·둘째 줄, 원문은 '공지 원문 보기'에서만 (T5.9)", () => {
+  it("11/7 15:30 — 공지 행은 파서 제목·둘째 줄, 원문은 '공지 원문 보기'에서만, 0.65 는 목록에 없다", () => {
     render(
-      <Providers at={T1107} closures={fc1107}>
+      <Providers live={live1107}>
         <ClosureSheet />
       </Providers>,
     );
+    expect(screen.getByText(/서울 통제 중 8건, 예정 4건/)).toBeDefined();
     expect(screen.getByText("시의회~숭례문오거리 집회 → 광화문·고용노동청 행진")).toBeDefined();
     expect(screen.getByText("5만 명 · 태평로")).toBeDefined();
-    expect(screen.getByText("15:00–16:00 · 횡단보도 31곳")).toBeDefined();
+    expect(screen.getByText("15:00–16:00 · 횡단보도 22곳")).toBeDefined();
+    expect(screen.queryByText(/내자/)).toBeNull(); // r05 내자R~사직공원 0.65 — 지도에만
     const excerpt =
       "15:00~16:00 시의회~숭례문R → 광화문·고용노동청 <태평로 등> 50,000명 중부, 종로, 남대문";
     expect(screen.queryByText(excerpt)).toBeNull(); // 목록엔 원문이 없다

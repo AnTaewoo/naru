@@ -7,7 +7,6 @@ import { useRoute, useRouteDispatch, type RouteView } from "../state/RouteProvid
 import { useTime } from "../state/TimeProvider";
 import type { LegKind, RouteResponse } from "../types/contracts";
 import { BottomSheet, type SheetStage } from "./BottomSheet";
-import { ClosureEvents } from "./ClosureEvents";
 import { EvidencePopover } from "./EvidencePopover";
 import { LegList } from "./LegList";
 import styles from "./RouteCard.module.css";
@@ -89,7 +88,7 @@ export function routeCrossing(route: RouteResponse): string | null {
   return leg ? leg.name || LEG_KO[leg.kind] : null;
 }
 
-type Panel = "legs" | "evidence" | "events" | null;
+type Panel = "legs" | "evidence" | null;
 
 function cardClass(
   base: string | undefined,
@@ -131,7 +130,7 @@ export function RouteCard() {
     if (odKey) setStage("collapsed");
   }, [odKey]);
   const toggle = (p: Exclude<Panel, null>) => {
-    if (panel !== p) setStage("full"); // 경로 상세·통제 근거·통제 목록은 길다
+    if (panel !== p) setStage("full"); // 경로 상세·통제 근거는 길다
     setPanel(panel === p ? null : p);
   };
   const fast = route ? fastestCard(route, at ?? t) : null;
@@ -206,14 +205,6 @@ export function RouteCard() {
               blocked: orig?.blocked ?? false,
               crossing: routeCrossing(route),
             })}
-            {!orig && (
-              <>
-                {" "}
-                <button type="button" className={styles.inline} onClick={() => toggle("events")}>
-                  통제 불러오기
-                </button>
-              </>
-            )}
           </p>
         </>
       ) : (
@@ -244,7 +235,6 @@ export function RouteCard() {
       )}
       {route && panel === "legs" && <LegList route={route} />}
       {route && hasAvoided && panel === "evidence" && <EvidencePopover route={route} />}
-      {panel === "events" && <ClosureEvents focusMap={false} onDone={() => setPanel(null)} />}
     </BottomSheet>
   );
 }
