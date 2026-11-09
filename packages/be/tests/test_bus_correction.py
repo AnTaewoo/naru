@@ -37,6 +37,16 @@ from naru_be.models.domain.crosswalk_index import CrosswalkIndex
 
 DATA = Path(__file__).resolve().parents[3] / "data"
 ROUTES = DATA / "raw" / "bus_routes" / "20261109"
+T63_ROUTES = (
+    "100100001",
+    "100100033",
+    "100100042",
+    "100100046",
+    "100100118",
+    "100100185",
+    "100900003",
+    "100900007",
+)
 KST = timezone(timedelta(hours=9))
 R04 = datetime(2026, 11, 7, 15, 0, tzinfo=KST)  # smpa-20261107-r04 시작
 CAR_A, CAR_B = "106024536", "106024187"  # 100100001 11/8 18:38 기록의 두 차량
@@ -100,8 +110,10 @@ def test_off_route_twice() -> None:
 
 @pytest.fixture(scope="module")
 def routes() -> dict[str, RoutePath]:
-    paths = sorted(ROUTES.glob("path_*.json"))
-    assert len(paths) == 8, "getRoutePath 기록 없음 — MANIFEST raw bus_routes"
+    # 이 폴더엔 운영 워커도 그날 노선 경로를 받는다(ADR-013 I, 11/9 11:04 100100032·100100567) —
+    # 07:56 에 받은 8노선만 (ls 로 확인)
+    paths = [ROUTES / f"path_{r}.json" for r in T63_ROUTES]
+    assert all(p.exists() for p in paths), "getRoutePath 기록 없음 — MANIFEST raw bus_routes"
     return {r.route_id: r for r in (RoutePath.load(p) for p in paths)}
 
 

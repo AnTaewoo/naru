@@ -107,7 +107,8 @@ def _record(
 
 
 class BusApi:
-    """getBusPosByRtid — live(호출 + 원문 기록) 또는 recorded(그 노선의 가장 최근 기록)."""
+    """getBusPosByRtid — live(호출 + 원문 기록) 또는 recorded(그 노선의 가장 최근 기록,
+    until 이 있으면 그 시각까지 — 파일 이름의 KST 시각으로 본다)."""
 
     def __init__(
         self,
@@ -115,8 +116,10 @@ class BusApi:
         key: str | None = None,
         base_url: str = BUS_API,
         client: httpx.Client | None = None,
+        until: datetime | None = None,
     ) -> None:
         self.root = recorded_dir / "bus"
+        self.until = until.astimezone(KST).strftime("%Y%m%dT%H%M%S") if until else None
         self.key = unquote(key) if key else None  # 인코딩 키면 풀어서 httpx 가 다시 인코딩
         self.base_url = base_url
         self._client = client or httpx.Client(timeout=30.0, headers={"User-Agent": USER_AGENT})
@@ -139,7 +142,7 @@ class BusApi:
             raise ValueError(f"kind 는 {KINDS} 중 하나: {kind}")
         name = f"*_getBusPosByRtid_{route_id}.json"
         if self.key is None:
-            files = sorted((self.root / kind).glob(name)) or sorted(self.root.glob(name))
+            files = self._recorded(kind, name)
             if not files:
                 raise FileNotFoundError(f"버스 기록 없음: 노선 {route_id}")
             rec = json.loads(files[-1].read_text("utf-8"))
@@ -156,6 +159,14 @@ class BusApi:
         )
         _record(path, "bus", self.base_url, params, r, raw, called)
         return FeedRecord(path, raw, called)
+
+    def _recorded(self, kind: str, name: str) -> list[Path]:
+        """kind 폴더의 기록, 없으면 나누기 전(bus/ 바로 아래) — until 뒤 기록은 없는 셈"""
+        for files in (sorted((self.root / kind).glob(name)), sorted(self.root.glob(name))):
+            kept = [f for f in files if self.until is None or f.name[:15] <= self.until]
+            if kept:
+                return kept
+        return []
 
 
 class RoutePaths:

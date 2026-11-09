@@ -5,6 +5,7 @@ os.environ 을 직접 읽지 않는다. .env 의 ANTHROPIC_API_KEY / NARU_LLM_MO
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
@@ -61,6 +62,11 @@ class Settings(BaseSettings):
     # T6.2 버스 위치 (ADR-013 D·G). recorded = 노선별 가장 최근 기록 재생, live = 호출 + 기록
     bus_source: Literal["live", "recorded"] = Field(
         default="recorded", validation_alias="NARU_BUS_SOURCE"
+    )
+    # recorded 재생은 이 시각까지의 기록만 — 운영 워커가 쌓는 새 기록에
+    # 테스트가 흔들리지 않게 (T6.9)
+    bus_record_until: datetime | None = Field(
+        default=None, validation_alias="NARU_BUS_RECORD_UNTIL"
     )
     bus_interval_s: int = Field(default=60, validation_alias="NARU_BUS_INTERVAL_S")
     bus_daily_cap: int = Field(default=900, validation_alias="NARU_BUS_DAILY_CAP")  # 개발계정 1,000

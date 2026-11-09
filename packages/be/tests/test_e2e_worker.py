@@ -3,7 +3,7 @@
 AI 와 BE 가 한 프로세스에 함께 올라오는 유일한 테스트 (패키지끼리는 import 안 한다 — 경계는 HTTP).
 입력: 기록된 LLM 응답(recorded/llm 의 sentences 5문장, 재생만) + 카카오 기록 + 코스 GPX·시각표.
 기대값은 2026-11-08 notice_v2 기록으로 확인한 값: 공지 후보 7(광화문 r01 1 + r04 3 + 여의도 3),
-횡단보도 37(여의도 3건은 데모 범위 종로·중구 밖이라 0), /closures 광화문 12:30 → 13, 15:30 → 37.
+횡단보도 40(서울 전체 T6.9 — 여의도 3건이 붙는다), /closures 광화문 12:30 → 13, 15:30 → 37.
 T6.1: 기록 돌발(OA-13315 2026-11-07 15:40, 53건) → 집회 후보 9 → 같은 횡단보도·겹치는 시각의
 공지 후보에 topis_incident 근거, 받은 시각 = data_as_of, --loop 는 실패한 소스만 따로 센다
 (닫힌 포트로 실제 연결 거부).
@@ -37,6 +37,9 @@ ACCINFO_1107 = "data/recorded/incident/20261107T154053_AccInfo.json"  # 11/7 15:
 # 11/8 19:20 NoticeList — 볼 글 6건, 기록 재생으로 후보 0 (test_topis_feed). 운영 워커가 같은 폴더에
 # 새 기록을 쌓으므로 '가장 최근'이 아니라 이 파일로 고정
 TOPIS_1108 = "data/recorded/topis_notice/20261108T192013.json"
+# 버스 기록 재생은 T6.2 기록(11/7·11/8)까지만 — 운영 워커가 11/9 11:04 부터 bus/notice·incident 에
+# 새 기록을 쌓는다. '가장 최근 기록' 재생이면 기대값이 날마다 바뀐다 (T6.9)
+BUS_UNTIL = "2026-11-08T23:59:59+09:00"
 # 서울경찰청 '오늘의 주요집회' 실제 PDF 3개(태우 2026-11-07 받음) — T6.6 은 임시 폴더로 복사
 SMPA_RAW = Path("data/raw/notices/smpa")
 SMPA_PDFS = [f"2611{d}) 오늘의 주요집회.pdf" for d in ("07(토", "08(일", "09(월")]
@@ -57,10 +60,20 @@ def app() -> Iterator[Flask]:
 
 
 @pytest.fixture(scope="module")
-def worker(app: Flask) -> IngestWorker:
+def quiet(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
+    """운영 워커와 떨어진 설정 — 버스는 BUS_UNTIL 까지의 기록, 경찰청 inbox 는 빈 임시 폴더
+    (운영 inbox 가 오늘 PDF 를 옮겨 두면 그날 sentences.jsonl 공지를 건너뛴다, T6.9)"""
+    return {
+        "NARU_BUS_RECORD_UNTIL": BUS_UNTIL,
+        "NARU_SMPA_DIR": str(tmp_path_factory.mktemp("smpa")),
+    }
+
+
+@pytest.fixture(scope="module")
+def worker(app: Flask, quiet: dict[str, str]) -> IngestWorker:
     http = httpx.Client(transport=httpx.WSGITransport(app=app), base_url="http://naru.test")
     publisher = CandidatePublisher("http://naru.test", TOKEN, client=http, backoff_s=0.0)
-    return IngestWorker(AISettings(), publisher)  # client 없음 → 공지는 기록 재생만
+    return IngestWorker(AISettings(**quiet), publisher)  # client 없음 → 공지는 기록 재생만
 
 
 def notice_features(app: Flask, at: str) -> list[dict[str, object]]:
@@ -116,10 +129,12 @@ def test_publisher_rejects_without_token(app: Flask) -> None:
         bad.publish(batch)
 
 
-def _worker(app: Flask, **ai: str) -> tuple[IngestWorker, CandidatePublisher]:
+def _worker(
+    app: Flask, quiet: dict[str, str], **ai: str
+) -> tuple[IngestWorker, CandidatePublisher]:
     http = httpx.Client(transport=httpx.WSGITransport(app=app), base_url="http://naru.test")
     publisher = CandidatePublisher("http://naru.test", TOKEN, client=http, backoff_s=0.0)
-    return IngestWorker(AISettings(**ai), publisher), publisher
+    return IngestWorker(AISettings(**{**quiet, **ai}), publisher), publisher
 
 
 def _features(app: Flask, at: str) -> list[dict[str, object]]:
@@ -141,9 +156,11 @@ def _linked_at_1530(app: Flask) -> tuple[list[dict[str, object]], list[dict[str,
     return own, [p for p in notice if "topis_incident" in _kinds(p)]
 
 
-def test_incidents_link_to_notices_on_same_crosswalks(app: Flask, worker: IngestWorker) -> None:
+def test_incidents_link_to_notices_on_same_crosswalks(
+    app: Flask, quiet: dict[str, str], worker: IngestWorker
+) -> None:
     worker.run_once()  # 코스·공지 (이미 있으면 멱등)
-    w, publisher = _worker(app, NARU_INCIDENT_RECORD=ACCINFO_1107)
+    w, publisher = _worker(app, quiet, NARU_INCIDENT_RECORD=ACCINFO_1107)
     batch = w.incident_batch()
     assert batch.producer == "incident" and len(batch.candidates) == 9
     r = publisher.publish(batch)
@@ -162,10 +179,12 @@ def test_incidents_link_to_notices_on_same_crosswalks(app: Flask, worker: Ingest
     assert {(p["status"], p["confidence"]) for p in linked} == {(Status.scheduled, 0.75)}
 
 
-def test_notice_after_incident_gets_the_same_evidence(app: Flask, worker: IngestWorker) -> None:
+def test_notice_after_incident_gets_the_same_evidence(
+    app: Flask, quiet: dict[str, str], worker: IngestWorker
+) -> None:
     models: NaruModels = app.extensions["naru"]
     models.repo.truncate()
-    w, publisher = _worker(app, NARU_INCIDENT_RECORD=ACCINFO_1107)
+    w, publisher = _worker(app, quiet, NARU_INCIDENT_RECORD=ACCINFO_1107)
     publisher.publish(w.incident_batch())  # 돌발이 먼저
     worker.run_once()  # 공지가 뒤에 와도 같은 근거가 붙는다
     own, linked = _linked_at_1530(app)
@@ -177,8 +196,8 @@ def _incident_as_of(app: Flask) -> datetime | None:
     return ClosureEventsResponse.model_validate(resp.get_json()).data_as_of.topis_incident
 
 
-def test_incident_receipt_is_data_as_of(app: Flask) -> None:
-    w, publisher = _worker(app, NARU_INCIDENT_RECORD=ACCINFO_1107)
+def test_incident_receipt_is_data_as_of(app: Flask, quiet: dict[str, str]) -> None:
+    w, publisher = _worker(app, quiet, NARU_INCIDENT_RECORD=ACCINFO_1107)
     batch = w.incident_batch()
     publisher.publish(batch)
     first = _incident_as_of(app)
@@ -191,13 +210,14 @@ def test_incident_receipt_is_data_as_of(app: Flask) -> None:
 
 
 def test_loop_counts_failures_per_source(
-    app: Flask, caplog: pytest.LogCaptureFixture, tmp_path: Path
+    app: Flask, quiet: dict[str, str], caplog: pytest.LogCaptureFixture, tmp_path: Path
 ) -> None:
     # 돌발만 live 로, 열린데이터광장 주소는 닫힌 포트 — 실제 연결 거부. 코스·공지는 실제 앱으로 간다
     # TOPIS 공지(T6.4)는 기록 재생 — 후보가 없어 아무것도 안 보내고 실패도 없다. 경찰청 PDF
     # inbox(T6.6)는 빈 임시 폴더 — 운영 inbox 의 PDF 를 테스트가 옮기면 안 된다
     loop, _ = _worker(
         app,
+        quiet,
         NARU_INCIDENT_SOURCE="live",
         SEOUL_OPENDATA_KEY="naru-e2e-key",
         NARU_SEOUL_API_URL="http://127.0.0.1:9",
@@ -225,12 +245,16 @@ def test_loop_counts_failures_per_source(
 KST = timezone(timedelta(hours=9))
 
 
-def test_bus_round_saves_positions_for_notice_windows(app: Flask, worker: IngestWorker) -> None:
+def test_bus_round_saves_positions_for_notice_windows(
+    app: Flask, quiet: dict[str, str], worker: IngestWorker
+) -> None:
     """T6.2 — 11/7 15:30 공지 통제 r04·r01 창 안 → 근처 노선 6개(기록 재생) → bus_positions."""
     models: NaruModels = app.extensions["naru"]
     worker.run_once()  # 코스·공지 (이미 있으면 멱등)
     models.bus_intake.repo.truncate()
-    w, _ = _worker(app)  # NARU_BUS_SOURCE 기본 recorded — 노선마다 가장 최근 기록
+    w, _ = _worker(
+        app, quiet
+    )  # NARU_BUS_SOURCE 기본 recorded — 노선마다 BUS_UNTIL 까지 가장 최근 기록
     at = datetime(2026, 11, 7, 15, 30, tzinfo=KST)
     # 횡단보도 100 m 안 정류소가 많은 순(raw OA-1095): r04 종로09·종로11·1711, r01 160·260·270.
     # 공지 출처만 본다 — 코스·돌발 사건은 실제 근거가 있어 쿼터를 쓰지 않는다
@@ -248,11 +272,11 @@ def test_bus_round_saves_positions_for_notice_windows(app: Flask, worker: Ingest
 
 
 def test_bus_targets_logged_on_change_and_every_10_minutes(
-    app: Flask, worker: IngestWorker, caplog: pytest.LogCaptureFixture
+    app: Flask, quiet: dict[str, str], worker: IngestWorker, caplog: pytest.LogCaptureFixture
 ) -> None:
     """태우 11/9 — 버스 소스가 쉬는 건지 고장인지 로그로: 대상 수가 바뀔 때 + 10분에 한 번."""
     worker.run_once()
-    w, _ = _worker(app)
+    w, _ = _worker(app, quiet)
     at = datetime(2026, 11, 7, 15, 30, tzinfo=KST)
     with caplog.at_level(logging.INFO, logger="naru_ai.signal.bus_poller"):
         for minutes in (0, 1, 10, 70):  # 15:30 · 15:31(그대로) · 15:40(10분) · 16:40(창 밖)
@@ -264,11 +288,11 @@ def test_bus_targets_logged_on_change_and_every_10_minutes(
     assert counts == [(3, 6, 0), (3, 6, 0), (1, 0, 0)]
 
 
-def test_bus_first_priority_tiers(app: Flask, worker: IngestWorker) -> None:
+def test_bus_first_priority_tiers(app: Flask, quiet: dict[str, str], worker: IngestWorker) -> None:
     """태우 11/9 — 1순위는 확신도 0.45~0.8 공지 통제(버스 보정이 0.7 경계를 넘길 수 있는 것), 신고
     인원 많은 순·시작 가까운 순. 0.8 넘는 공지 통제는 남는 쿼터로만."""
     worker.run_once()
-    w, _ = _worker(app)
+    w, _ = _worker(app, quiet)
     at = datetime(2026, 11, 7, 15, 30, tzinfo=KST)
     tier_a, rest = w.bus.targets(at)
     # r04 0.75(행진, 도로 이름 없음 — 규칙서 §3.8) 5만 명. r01(5만 명)·r06(5천 명)은 0.85
@@ -281,10 +305,12 @@ def test_bus_first_priority_tiers(app: Flask, worker: IngestWorker) -> None:
     assert w.bus.leftover(at, tier_a) == 419
 
 
-def test_bus_second_priority_follows_rally_incidents(app: Flask, worker: IngestWorker) -> None:
+def test_bus_second_priority_follows_rally_incidents(
+    app: Flask, quiet: dict[str, str], worker: IngestWorker
+) -> None:
     """2순위(태우 2026-11-08) — TOPIS 집회·행사 돌발마다 노선 1개, 공지 노선과 겹치지 않게."""
     worker.run_once()
-    w, _ = _worker(app, NARU_INCIDENT_RECORD=ACCINFO_1107)
+    w, _ = _worker(app, quiet, NARU_INCIDENT_RECORD=ACCINFO_1107)
     w.incident_batch()  # 돌발 원문 → 2순위 대상
     targets = {t.key: t.rally for t in w.incident_targets()}
     # 기록 AccInfo 11/7 15:40 의 집회·행사(A10) 15건을 같은 링크·시각으로 묶은 13개
@@ -330,13 +356,15 @@ def _refs(p: dict[str, object]) -> list[str]:
     return [str(e["ref"]) for e in evidence if isinstance(e, dict)]
 
 
-def test_topis_notice_confirmed_by_incident(app: Flask) -> None:
+def test_topis_notice_confirmed_by_incident(app: Flask, quiet: dict[str, str]) -> None:
     # T6.4: TOPIS 공지 6300(11/7 도심 집회, 창 05:00~17:00, 0.8) — 11/7 09:00 에 볼 글 중 후보가
     # 나오는 유일한 글(test_topis_feed). 같은 날 돌발과 같은 횡단보도·겹치는 시각이라 돌발 근거가
     # 붙고, 0.8 이상이라 창이 시작되면 '통제 중' (README 상태 표)
     models: NaruModels = app.extensions["naru"]
     models.repo.truncate()
-    w, publisher = _worker(app, NARU_INCIDENT_RECORD=ACCINFO_1107, NARU_TOPIS_RECORD=TOPIS_1108)
+    w, publisher = _worker(
+        app, quiet, NARU_INCIDENT_RECORD=ACCINFO_1107, NARU_TOPIS_RECORD=TOPIS_1108
+    )
     publisher.publish(w.incident_batch())
     batch = w.topis_batch(datetime(2026, 11, 7, 9, 0, tzinfo=KST))
     assert batch is not None
@@ -357,7 +385,9 @@ def test_topis_notice_confirmed_by_incident(app: Flask) -> None:
     assert all(_kinds(p) == {"notice", "topis_incident"} for p in noon)
 
 
-def test_smpa_inbox_pdfs_to_closures_then_archived(app: Flask, tmp_path: Path) -> None:
+def test_smpa_inbox_pdfs_to_closures_then_archived(
+    app: Flask, quiet: dict[str, str], tmp_path: Path
+) -> None:
     # T6.6: 태우가 inbox 에 넣은 실제 PDF 3개(11/7 6행·11/8 3행·11/9 4행, 기준 작성 11/6
     # 18:00) — 행은 기록 notice_v2 smpa-<날짜>-r<행>-u202611061800 13건 재생 → 후보 10(0.7 미만
     # 2: 11/7 r05 0.65·11/8 r03 0.45). 보낸 뒤 <날짜>.pdf 로 옮기고, 옮긴 PDF 는 그날까지 다시
@@ -368,7 +398,7 @@ def test_smpa_inbox_pdfs_to_closures_then_archived(app: Flask, tmp_path: Path) -
     (smpa / "inbox").mkdir(parents=True)
     for name in SMPA_PDFS:
         shutil.copy2(SMPA_RAW / name, smpa / "inbox" / name)
-    w, _ = _worker(app, NARU_SMPA_DIR=str(smpa))
+    w, _ = _worker(app, quiet, NARU_SMPA_DIR=str(smpa))
     eve = datetime(2026, 11, 6, 20, 0, tzinfo=KST)
     first = w.smpa_round(eve)
     # 광화문 38(r01 13·r04 24·r05 1) + 서울 전체(T6.9)로 4: 11/7 r02 강남역 끝점 1·r06 1·11/9 r01 2

@@ -167,7 +167,7 @@ class IngestWorker:
         self._incident_rows: list[Incident] = []
         self.bus = BusPoller(
             RouteStops.load(_latest(raw, "bus_routes_*") / "OA-1095.xlsx"),
-            BusApi(recorded, bus_key if live_bus else None),
+            BusApi(recorded, bus_key if live_bus else None, until=settings.bus_record_until),
             publisher.events,
             publisher.closures,
             self.incident_targets,

@@ -20,6 +20,8 @@ from naru_ai.signal.bus_poller import RouteStops
 
 KST = ZoneInfo("Asia/Seoul")
 DATA = Path(__file__).resolve().parents[3] / "data"
+# T6.2 기록(11/7·11/8)까지만 재생 — 운영 워커가 11/9 부터 같은 폴더에 새 기록을 쌓는다 (T6.9)
+T62_END = datetime(2026, 11, 8, 23, 59, 59, tzinfo=KST)
 
 
 def _raw(recorded_dir: Path, name: str) -> str:
@@ -95,8 +97,19 @@ def test_route_paths_go_to_raw_by_day() -> None:
     assert paths.ensure("100100001", at) is None and not expect.exists()
 
 
+def test_recorded_replay_until(recorded_dir: Path) -> None:
+    # 운영 워커가 11/9 11:04 부터 2순위 기록을 쌓는다 — 100100032 의 첫 기록은
+    # bus/incident/20261109T110453_…(ls 로 확인). 기한 없이 재생하면 그 뒤 기록,
+    # 11/8 까지로 자르면 그 노선 기록은 없다 (T6.9)
+    assert BusApi(recorded_dir).call("100100032", "incident").path.name >= (
+        "20261109T110453_getBusPosByRtid_100100032.json"
+    )
+    with pytest.raises(FileNotFoundError):
+        BusApi(recorded_dir, until=T62_END).call("100100032", "incident")
+
+
 def test_daily_cap_counts_recorded_calls(recorded_dir: Path) -> None:
-    api = BusApi(recorded_dir)  # 키 없음 = 기록 재생
+    api = BusApi(recorded_dir, until=T62_END)  # 키 없음 = 기록 재생, T6.2 기록(11/7·11/8)까지
     assert not api.live
     day = datetime(2026, 11, 7, 20, 0, tzinfo=KST)
     assert api.calls_today(day) == 1  # 11/7 기록 1개 — 나누기 전(bus/ 바로 아래)이라 notice 로 센다
