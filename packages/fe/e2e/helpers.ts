@@ -71,3 +71,17 @@ export async function denyGeolocation(browser: Browser, page: Page): Promise<CDP
   }
   return cdp;
 }
+
+/** 하단 시트를 손잡이로 끌어 '전체'로 — 목록이 길면 절반에선 행이 시트 밖이다(사람도 끌어 올린다) */
+export async function fullSheet(page: Page, name: string) {
+  const sheet = page.getByRole("region", { name });
+  const grip = sheet.getByRole("button", { name: "시트 높이" });
+  const g = await grip.boundingBox();
+  const x = (g?.x ?? 0) + (g?.width ?? 0) / 2;
+  const y = (g?.y ?? 0) + (g?.height ?? 0) / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x, y - 400, { steps: 8 });
+  await page.mouse.up();
+  await expect(sheet).toHaveAttribute("data-stage", "full");
+}

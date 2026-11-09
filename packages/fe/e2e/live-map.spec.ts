@@ -3,7 +3,7 @@
 // 기대값은 그 기록(data/recorded/naru_api/closure_events_live_1107_1530.json)을 열어 확인한 값
 import { devices, expect, test } from "@playwright/test";
 import { eventById, recordedLive } from "../src/test/recorded";
-import { consoleErrors, ownErrors } from "./helpers";
+import { consoleErrors, fullSheet, ownErrors } from "./helpers";
 
 const iphone = devices["iPhone 13"];
 test.use({
@@ -131,6 +131,7 @@ test("행을 누르면 사건 카드 — 남은 시간·출처·확신도·근�
   const errors = consoleErrors(page);
   await page.goto(HOME);
   const sheet = page.getByRole("region", { name: SHEET });
+  await fullSheet(page, SHEET); // 절반에선 목록이 시트 밖(T7.11 달력으로 슬라이더가 높아졌다)
   await sheet.getByRole("button", { name: new RegExp(`^${RALLY}`) }).click();
   const card = page.getByRole("article", { name: RALLY });
   await expect(card).toContainText("15:00–16:00");
@@ -156,6 +157,9 @@ test("지도 구역을 누르면 — 겹친 곳은 '여기 통제 N건' 묶음, 
     "crosswalk",
   );
   const sheet = page.getByRole("region", { name: SHEET });
+  // 사건이 와서 구역이 그려진 뒤에 누른다
+  await expect(page.getByRole("button", { name: "통제 중 8" })).toBeVisible();
+  await page.waitForTimeout(800);
   await sheet.getByRole("button", { name: "시트 높이" }).click(); // 접어 지도 가운데를 비운다
   await expect(sheet).toHaveAttribute("data-stage", "collapsed");
   // r04 centroid 는 BE 가 구역 안 대표점으로 준 값(T7.2) — 지도 가운데가 그 점
@@ -184,4 +188,37 @@ test("?event=<id> 로 열면 그 사건 카드, 지도가 그 사건으로 — 1
     .toBeLessThan(12);
   await page.waitForTimeout(1500);
   await page.screenshot({ path: "test-results/live-map-event.png" });
+});
+
+test("달력으로 날짜를 바꾸면 그날 같은 시각 — 11/7 07:45 → 3/15 07:45 마라톤 (T7.11)", async ({
+  page,
+}) => {
+  await page.goto("/?t=2026-11-07T07:45:00%2B09:00");
+  await page.getByLabel("날짜").fill("2026-03-15");
+  // 사건 v2 기록 closure_events_live_0315_0745 — 통제 중 9 · 예정 7
+  await expect(page.getByRole("button", { name: "통제 중 9" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "3월 15일 07:45 서울 통제" })).toContainText(
+    "마라톤 1구간 세종대로 사거리~숭례문 오거리",
+  );
+});
+
+test("예시로 보기 — 국회대로 행진을 누르면 11/9 12:00, 지도가 그 행진 구역으로 (T7.11)", async ({
+  page,
+}) => {
+  await page.goto(HOME);
+  const sheet = page.getByRole("region", { name: SHEET });
+  const examples = sheet.getByRole("region", { name: "예시로 보기" });
+  await examples.getByRole("button", { name: /국회대로 행진/ }).click();
+  await expect(page.getByLabel("날짜")).toHaveValue("2026-11-09");
+  const now = page.getByRole("region", { name: "11월 9일 12:00 서울 통제" });
+  // TOPIS 통제지도 1109233 — 12:00 엔 돌발 연결로 통제 중 (T7.3)
+  await expect(now.getByRole("region", { name: "통제 중" })).toContainText(
+    "국회의사당앞 → 효자동삼거리 행진",
+  );
+  // 9.5 km 행진 bbox(examples.ts)에 절반 시트 위로 맞춤 — 줌 12 안팎
+  await expect
+    .poll(() => Number(new URL(page.url()).hash.split("/")[0]?.slice(5)))
+    .toBeLessThan(13);
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: "test-results/live-map-example.png" });
 });
