@@ -113,6 +113,9 @@
     "DataAsOf": {
       "$ref": "#/$defs/DataAsOf"
     },
+    "MultiPolygonGeometry": {
+      "$ref": "#/$defs/MultiPolygonGeometry"
+    },
     "ClosureEventsResponse": {
       "$ref": "#/$defs/ClosureEventsResponse"
     },
@@ -1313,6 +1316,45 @@
           ],
           "default": null,
           "title": "Bbox"
+        },
+        "at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At"
+        },
+        "from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "From"
+        },
+        "to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "To"
         }
       },
       "title": "ClosureEventsQuery",
@@ -1320,7 +1362,7 @@
     },
     "ClosureEvent": {
       "additionalProperties": false,
-      "description": "같은 (reason, window) 의 횡단보도 상태 묶음 (§3.1). 상태는 시각마다 달라서 없다.",
+      "description": "같은 (reason, window) 의 횡단보도 상태 묶음 (§3.1). status 는 응답 at 기준 (v0.14).",
       "properties": {
         "reason": {
           "title": "Reason",
@@ -1409,13 +1451,67 @@
           },
           "title": "Districts",
           "type": "array"
+        },
+        "id": {
+          "pattern": "^[0-9a-f]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "area": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PolygonGeometry"
+            },
+            {
+              "$ref": "#/$defs/MultiPolygonGeometry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Area"
+        },
+        "centroid": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Centroid"
         }
       },
       "required": [
         "reason",
         "window",
         "crosswalks",
-        "bbox"
+        "bbox",
+        "id",
+        "status",
+        "confidence"
       ],
       "title": "ClosureEvent",
       "type": "object"
@@ -1482,6 +1578,45 @@
       "title": "DataAsOf",
       "type": "object"
     },
+    "MultiPolygonGeometry": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "MultiPolygon",
+          "default": "MultiPolygon",
+          "title": "Type",
+          "type": "string"
+        },
+        "coordinates": {
+          "items": {
+            "items": {
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "title": "Coordinates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "coordinates"
+      ],
+      "title": "MultiPolygonGeometry",
+      "type": "object"
+    },
     "ClosureEventsResponse": {
       "additionalProperties": false,
       "properties": {
@@ -1514,12 +1649,23 @@
         },
         "data_as_of": {
           "$ref": "#/$defs/DataAsOf"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
         }
       },
       "required": [
         "events",
         "coverage",
-        "data_as_of"
+        "data_as_of",
+        "at"
       ],
       "title": "ClosureEventsResponse",
       "type": "object"

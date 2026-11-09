@@ -137,6 +137,9 @@ export type Approx3 = boolean;
 export type Type4 = "FeatureCollection";
 export type Features = Feature[];
 export type Bbox1 = string | null;
+export type At2 = string | null;
+export type From2 = string | null;
+export type To2 = string | null;
 export type Reason3 = string;
 export type Crosswalks = number;
 /**
@@ -146,6 +149,12 @@ export type Crosswalks = number;
 export type Bbox2 = [unknown, unknown, unknown, unknown];
 export type Approx4 = boolean;
 export type Districts = string[];
+export type Id = string;
+export type Confidence3 = number;
+export type Area = PolygonGeometry | MultiPolygonGeometry | null;
+export type Type5 = "MultiPolygon";
+export type Coordinates5 = [unknown, unknown][][][];
+export type Centroid = [unknown, unknown] | null;
 export type TopisIncident = string | null;
 export type TopisNotice = string | null;
 export type Smpa = string | null;
@@ -156,9 +165,11 @@ export type Events = ClosureEvent[];
  * @maxItems 4
  */
 export type Coverage = [unknown, unknown, unknown, unknown];
+export type At3 = string;
+export type Truncated = boolean;
 export type Q = string;
 export type Near = string | null;
-export type Id = string;
+export type Id1 = string;
 export type Name1 = string;
 export type Address = string;
 /**
@@ -231,6 +242,7 @@ export interface NaruContracts {
   ClosureEventsQuery?: ClosureEventsQuery;
   ClosureEvent?: ClosureEvent;
   DataAsOf?: DataAsOf;
+  MultiPolygonGeometry?: MultiPolygonGeometry;
   ClosureEventsResponse?: ClosureEventsResponse;
   GeocodeSearchQuery?: GeocodeSearchQuery;
   Place?: Place;
@@ -427,9 +439,12 @@ export interface FeatureCollection {
 }
 export interface ClosureEventsQuery {
   bbox?: Bbox1;
+  at?: At2;
+  from?: From2;
+  to?: To2;
 }
 /**
- * 같은 (reason, window) 의 횡단보도 상태 묶음 (§3.1). 상태는 시각마다 달라서 없다.
+ * 같은 (reason, window) 의 횡단보도 상태 묶음 (§3.1). status 는 응답 at 기준 (v0.14).
  */
 export interface ClosureEvent {
   reason: Reason3;
@@ -442,6 +457,15 @@ export interface ClosureEvent {
   summary?: CandidateSummary | null;
   notice?: NoticeRef | null;
   districts?: Districts;
+  id: Id;
+  status: Status;
+  confidence: Confidence3;
+  area?: Area;
+  centroid?: Centroid;
+}
+export interface MultiPolygonGeometry {
+  type?: Type5;
+  coordinates: Coordinates5;
 }
 /**
  * 출처별로 저장된 통제의 가장 늦은 근거 시각 (v0.12, ADR-011 C·ADR-012). 없으면 null.
@@ -456,13 +480,15 @@ export interface ClosureEventsResponse {
   events: Events;
   coverage: Coverage;
   data_as_of: DataAsOf;
+  at: At3;
+  truncated?: Truncated;
 }
 export interface GeocodeSearchQuery {
   q: Q;
   near?: Near;
 }
 export interface Place {
-  id: Id;
+  id: Id1;
   name: Name1;
   address: Address;
   coord: Coord;
