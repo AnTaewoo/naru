@@ -69,6 +69,14 @@ export function bboxOf(map: MapLibreMap): string {
   return `${f(b.getWest())},${f(b.getSouth())},${f(b.getEast())},${f(b.getNorth())}`;
 }
 
+/** 횡단보도 점(/closures)을 받는 줌 — 점은 15 부터 그리지만 한 단계 먼저 받아 둔다 (T7.4) */
+export const POINTS_FETCH_ZOOM = 14;
+
+/** 지금 화면 — bbox 와 횡단보도 점이 필요한지(줌 14 이상이거나 길찾기) */
+function viewOf(map: MapLibreMap, routeActive: boolean): { bbox: string; points: boolean } {
+  return { bbox: bboxOf(map), points: routeActive || map.getZoom() >= POINTS_FETCH_ZOOM };
+}
+
 export function centerOf(bbox: string): [number, number] {
   const [w, s, e, n] = bbox.split(",").map(Number);
   if (
@@ -198,6 +206,7 @@ export function MapView({ visible }: MapViewProps) {
   const original = view === "original" && (route?.avoided.length ?? 0) > 0;
   const originalRef = useRef(original);
   const routeDispatch = useRouteDispatch();
+  const activeRef = useRef(active);
   const fromPin = useRef<Marker | null>(null);
   const toPin = useRef<Marker | null>(null);
   const fitted = useRef<string | null>(null);
@@ -274,8 +283,9 @@ export function MapView({ visible }: MapViewProps) {
       applyRoute(map, routeRef.current);
       applyView(map, routeRef.current, originalRef.current, closuresRef.current);
       fitRoute(map, routeRef.current, fitted);
+      dispatch({ type: "setView", ...viewOf(map, activeRef.current) });
     });
-    map.on("moveend", () => dispatch({ type: "setBbox", bbox: bboxOf(map) }));
+    map.on("moveend", () => dispatch({ type: "setView", ...viewOf(map, activeRef.current) }));
     // 길찾기가 켜져 있을 때만 reducer 가 받는다 — 출발, 다음 도착
     map.on("click", (e) => routeDispatch({ type: "pick", point: [e.lngLat.lng, e.lngLat.lat] }));
     mapRef.current = map;
@@ -380,6 +390,13 @@ export function MapView({ visible }: MapViewProps) {
     if (loaded.current) run();
     else map.once("load", run);
   }, [focus]);
+
+  // 길찾기를 켜고 끄면 횡단보도 점이 필요한지도 바뀐다 (원래 길 원·통제 근거가 점을 쓴다)
+  useEffect(() => {
+    activeRef.current = active;
+    const map = mapRef.current;
+    if (map && loaded.current) dispatch({ type: "setView", ...viewOf(map, active) });
+  }, [active, dispatch]);
 
   // 출발·도착 핀, 고르는 중엔 십자 커서
   useEffect(() => {

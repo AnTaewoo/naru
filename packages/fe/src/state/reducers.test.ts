@@ -115,7 +115,7 @@ describe("지금 모드 (T7.4)", () => {
 
 describe("closureReducer", () => {
   const fc = recordedClosures("closures_0745");
-  it("request → receive → setBbox", () => {
+  it("request → receive → setView", () => {
     let s = initialClosureState();
     expect(s.status).toBe("idle");
     expect(s.bbox).toBe(DEFAULT_BBOX);
@@ -131,10 +131,16 @@ describe("closureReducer", () => {
     expect(s.status).toBe("ready");
     expect(s.closures.features).toHaveLength(79);
     expect(s.at).toBe("2026-03-15T07:45:00+09:00");
-    const same = closureReducer(s, { type: "setBbox", bbox: s.bbox });
-    expect(same).toBe(s); // 같은 bbox 면 참조 유지 → 재요청 없음
-    const moved = closureReducer(s, { type: "setBbox", bbox: "126.9,37.5,127.0,37.6" });
+    const same = closureReducer(s, { type: "setView", bbox: s.bbox, points: s.points });
+    expect(same).toBe(s); // 같은 화면이면 참조 유지 → 재요청 없음
+    expect(s.points).toBe(false); // 처음은 서울 전체 — 횡단보도 점은 줌 14 이상·길찾기에서만 (T7.4)
+    const moved = closureReducer(s, {
+      type: "setView",
+      bbox: "126.9,37.5,127.0,37.6",
+      points: true,
+    });
     expect(moved.bbox).toBe("126.9,37.5,127.0,37.6");
+    expect(moved.points).toBe(true);
     expect(moved.closures).toBe(fc); // 이전 결과는 유지(깜빡임 없음)
     const failed = closureReducer(moved, { type: "fail", error: "x" });
     expect(failed.status).toBe("error");

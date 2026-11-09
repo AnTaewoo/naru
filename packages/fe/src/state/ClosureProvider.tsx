@@ -15,8 +15,8 @@ import type { ClosureEvent, DataAsOf, FeatureCollection } from "../types/contrac
 import { useNaruApi } from "./ApiProvider";
 import { useTime } from "./TimeProvider";
 
-// Provider 3/4 — 지금 지도 사건(/api/closures/events?at=t, 60초 ETag)과 화면의 횡단보도(/api/closures).
-// t·화면이 바뀌면 다시 받는다 (이전 요청은 Abort). CONVENTIONS §5.5, T7.4
+// Provider 3/4 — 지금 지도 사건(/api/closures/events?at=t, 60초 ETag)과 화면의 횡단보도(/api/closures,
+// 줌 14 이상·길찾기 때만). t·화면이 바뀌면 다시 받는다 (이전 요청은 Abort). CONVENTIONS §5.5, T7.4
 export type ClosureStatus = "idle" | "loading" | "ready" | "error";
 
 export interface ClosureState {
@@ -26,6 +26,8 @@ export interface ClosureState {
   /** 결과가 기준한 시각·bbox */
   at: string | null;
   bbox: string;
+  /** 횡단보도 점이 필요한가 — 줌 14 이상이거나 길찾기 (T7.4). 아니면 /closures 를 받지 않는다 */
+  points: boolean;
   error: string | null;
   /** 지금 지도 사건 (GET /closures/events?at=t, ADR-014 A). null = 아직 못 받음 */
   events: ClosureEvent[] | null;
@@ -70,7 +72,7 @@ export type ClosureAction =
   | { type: "request"; at: string; bbox: string }
   | { type: "receive"; at: string; bbox: string; closures: FeatureCollection }
   | { type: "fail"; error: string }
-  | { type: "setBbox"; bbox: string }
+  | { type: "setView"; bbox: string; points: boolean }
   | {
       type: "receiveEvents";
       events: ClosureEvent[];
@@ -84,7 +86,7 @@ export type ClosureAction =
   | { type: "focus"; bbox: Bbox4 };
 
 export const EMPTY_CLOSURES: FeatureCollection = { type: "FeatureCollection", features: [] };
-/** 처음 화면 광화문 일대 — 서비스 범위(BE Settings.districts 서울 25개 구, T6.9) 안. 지도가 움직이면 setBbox */
+/** 화면 bbox 자리값(광화문 일대, 장소 검색의 near) — 지도가 뜨면 setView 로 실제 화면 */
 export const DEFAULT_BBOX = "126.965,37.555,126.990,37.580";
 
 export function initialClosureState(partial: Partial<ClosureState> = {}): ClosureState {
@@ -93,6 +95,7 @@ export function initialClosureState(partial: Partial<ClosureState> = {}): Closur
     closures: EMPTY_CLOSURES,
     at: null,
     bbox: DEFAULT_BBOX,
+    points: false,
     error: null,
     events: null,
     eventsAt: null,
@@ -121,8 +124,10 @@ export function closureReducer(state: ClosureState, action: ClosureAction): Clos
       };
     case "fail":
       return { ...state, status: "error", error: action.error };
-    case "setBbox":
-      return state.bbox === action.bbox ? state : { ...state, bbox: action.bbox };
+    case "setView":
+      return state.bbox === action.bbox && state.points === action.points
+        ? state
+        : { ...state, bbox: action.bbox, points: action.points };
     case "receiveEvents":
       return {
         ...state,
@@ -162,10 +167,11 @@ export function ClosureProvider({
   const [state, dispatch] = useReducer(closureReducer, initialState, initialClosureState);
   const api = useNaruApi();
   const { t, ready } = useTime();
-  const bbox = state.bbox;
+  const { bbox, points } = state;
 
   useEffect(() => {
-    if (!fetchEnabled || !ready) return; // 시각이 정해지기 전엔 받지 않는다
+    // 시각이 정해지기 전, 횡단보도 점이 필요 없는 화면(서울 전체·구역 줌)에선 받지 않는다 (T7.4)
+    if (!fetchEnabled || !ready || !points) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
       dispatch({ type: "request", at: t, bbox });
@@ -182,7 +188,7 @@ export function ClosureProvider({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [api, t, ready, bbox, fetchEnabled, debounceMs]);
+  }, [api, t, ready, bbox, points, fetchEnabled, debounceMs]);
 
   // 지금 지도 사건 (T7.4) — t 가 바뀌면 바로, 그 뒤 pollMs 마다 If-None-Match. 304 면 dispatch 하지
   // 않는다(다시 그리지 않음). 숨은 탭은 건너뛰고 다시 보이면 바로 한 번
