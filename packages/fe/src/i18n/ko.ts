@@ -11,6 +11,7 @@ import type {
   SummarySegment,
 } from "../types/contracts";
 import { eventKind, type ChipKind, type GroupKey } from "../map/eventKinds";
+import type { ExampleKey } from "../map/examples";
 
 export const STATUS_KO: Record<Status, string> = {
   scheduled: "예정",
@@ -132,6 +133,13 @@ export function remainKo(e: Pick<ClosureEvent, "status" | "window">, atMs: numbe
   const ms = Date.parse(start) - atMs;
   return ms > 0 ? `${durationKo(ms)} 뒤 시작` : `${hhmm(start)} 시작 · 확인 전`;
 }
+
+/** 예시로 보기 (T7.11, 태우 11/10) — 데모 날짜·시각 */
+export const EXAMPLE_KO: Record<ExampleKey, { title: string; sub: string }> = {
+  marathon: { title: "2026 서울마라톤", sub: "3월 15일 07:45 광화문" },
+  rally: { title: "광화문 집회·행진", sub: "11월 7일 15:00 세종대로" },
+  march: { title: "국회대로 행진", sub: "11월 9일 12:00" },
+};
 
 /** 지금 서울 통제 묶음 머리 (T7.5) */
 export const GROUP_KO: Record<GroupKey, string> = {
