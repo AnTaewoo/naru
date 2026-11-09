@@ -15,7 +15,6 @@ test.use({
 
 const q = recorded("route_0745").query ?? {};
 const od = `from=${q["from"] ?? ""}&to=${q["to"] ?? ""}`;
-const SEG1 = /마라톤 1구간 세종대로 사거리~숭례문 오거리/;
 
 test("경로를 찾으면 시트가 접히고(96px) 출발·도착 핀이 시트 위 화면 안에 보인다, 푸터 없음", async ({
   page,
@@ -72,38 +71,4 @@ test("손잡이 — 탭은 접힘↔절반, 위로 끌면 전체, 아래로 끌�
   await settled(552); // 손잡이가 패널 아래에 있어 다시 잡을 수 있다
   await drag(450); // 전체 → 38 → 접힘(96)
   await expect(sheet).toHaveAttribute("data-stage", "collapsed");
-});
-
-test("통제를 불러오면 시트가 접히고 지도가 그 통제 범위로 — 서울 전체로 줌아웃하지 않는다", async ({
-  page,
-}) => {
-  const closuresUrls: string[] = [];
-  page.on("request", (r) => {
-    if (r.url().includes("/api/closures?")) closuresUrls.push(r.url());
-  });
-  const eventsRes = page.waitForResponse((r) => r.url().includes("/api/closures/events"));
-  await page.goto("/");
-  const events = (await (await eventsRes).json()) as {
-    events: { reason: string; bbox: number[] }[];
-  };
-  const seg1 = events.events.find((e) => e.reason.includes("1구간"));
-  expect(seg1).toBeDefined();
-  const empty = page.getByText("이 시각에 걸린 통제가 없어요.");
-  await empty.getByRole("button", { name: "통제 불러오기" }).click();
-  await page
-    .getByRole("region", { name: "통제 불러오기" })
-    .getByRole("button", { name: SEG1 })
-    .click();
-  const sheet = page.getByRole("region", { name: "3월 15일 통제" });
-  await expect(sheet).toHaveAttribute("data-stage", "collapsed");
-  await page.waitForTimeout(2500); // 화면 맞춤 → moveend → 그 범위로 /api/closures
-  const last = new URL(closuresUrls.at(-1) ?? "http://x/").searchParams.get("bbox") ?? "";
-  const [w, s, e, n] = last.split(",").map(Number);
-  const [ew, es, ee, en] = seg1?.bbox ?? [];
-  // 지도가 그 통제 횡단보도 전체를 담고(bbox 포함), 서울 전체가 아니다(가로 0.1° ≈ 9 km 미만)
-  expect(w).toBeLessThanOrEqual(ew ?? 0);
-  expect(s).toBeLessThanOrEqual(es ?? 0);
-  expect(e).toBeGreaterThanOrEqual(ee ?? 0);
-  expect(n).toBeGreaterThanOrEqual(en ?? 0);
-  expect((e ?? 0) - (w ?? 0)).toBeLessThan(0.1);
 });

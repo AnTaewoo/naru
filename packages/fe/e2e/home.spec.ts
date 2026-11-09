@@ -36,7 +36,7 @@ test("통제 중 시각(?t=…+09:00) — 지도 캔버스·워커·통제 시�
   expect(workerRes.headers()["content-type"] ?? "").toMatch(/javascript/);
   await expect(page.locator("canvas.maplibregl-canvas")).toBeVisible();
   await expect(page.getByText("07:45", { exact: true })).toBeVisible();
-  await expect(page.getByText(/횡단보도 \d+곳 통제 중/)).toBeVisible();
+  await expect(page.getByText(/서울 통제 중 \d+건/)).toBeVisible(); // 지금 지도 사건 수 (T7.4)
   await expect(page.getByText("마라톤 1구간 세종대로 사거리~숭례문 오거리")).toBeVisible();
   await expect(page.getByText("23분 뒤 해제")).toBeVisible(); // 1구간 08:08 해제 — 배지가 잘리지 않는다
   // 타일 출처 — VWorld 키 전까진 OSM. 길찾기 바·칩·하단 시트에 가리지 않는다

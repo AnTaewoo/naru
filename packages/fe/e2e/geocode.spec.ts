@@ -27,7 +27,13 @@ test("홈 검색 '교보빌딩' → 출발, 도착 칸 '덕수궁' → 대한문
   page,
 }) => {
   const errors = consoleErrors(page);
-  await page.goto(`/?${T}`);
+  // 지도 가운데를 기록할 때의 near(FE 기본 중심 37.5675,126.9775, MANIFEST T5.8)로 고정 — 첫 화면은 그 시각
+  // 사건 범위로 맞춰지니(T7.4) 카메라를 주소(#map=)로 준다
+  await page.goto(`/?${T}#map=15/37.5675/126.9775`);
+  await expect(page.getByRole("region", { name: "지도", exact: true })).toHaveAttribute(
+    "data-band",
+    "crosswalk",
+  );
   const searched = page.waitForRequest((r) => r.url().includes("/api/geocode/search"));
   await page.getByRole("searchbox", { name: "장소·주소 검색" }).fill("교보빌딩");
   const near = new URL((await searched).url()).searchParams.get("near") ?? "";
