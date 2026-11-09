@@ -348,6 +348,18 @@ describe("closureReducer — 지금 지도 사건·지도 맞춤 (T5.4·T7.4)", 
     expect(closureReducer(s0, { type: "pick", ids: [] })).toBe(s0);
   });
 
+  it("frame (T7.11 예시로 보기) — 지도 맞춤 요청은 누를 때마다 순번, 카드·묶음은 닫는다", () => {
+    const opened = closureReducer(initialClosureState(), { type: "select", id: "2e930ec6deeb" });
+    // 11/7 r04 의 bbox (closure_events_live_1107_1530.json)
+    const bbox: [number, number, number, number] = [
+      126.975691, 37.5605144, 126.9875484, 37.5749426,
+    ];
+    const f1 = closureReducer(opened, { type: "frame", bbox });
+    expect(f1.frame).toEqual({ bbox, seq: 1 });
+    expect([f1.selected, f1.picked]).toEqual([null, null]);
+    expect(closureReducer(f1, { type: "frame", bbox }).frame?.seq).toBe(2);
+  });
+
   it("?event= — 사건 id(12자 소문자 16진)만 받는다", () => {
     expect(eventFromLocation("?event=2e930ec6deeb&t=2026-11-07T15:00:00%2B09:00")).toBe(
       "2e930ec6deeb",

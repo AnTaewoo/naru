@@ -46,6 +46,8 @@ export interface ClosureState {
   selected: string | null;
   /** 클러스터·겹친 구역을 누르면 그 사건들만 목록으로 (T7.5). null = 지금 서울 통제 전체 */
   picked: string[] | null;
+  /** 지도 맞춤 요청 (T7.11 예시로 보기) — 같은 범위를 다시 눌러도 맞추도록 순번을 올린다 */
+  frame: { bbox: Bbox4; seq: number } | null;
 }
 
 /** [minLng, minLat, maxLng, maxLat] */
@@ -87,7 +89,8 @@ export type ClosureAction =
   | { type: "failEvents"; error: string }
   | { type: "select"; id: string | null }
   | { type: "pick"; ids: string[] }
-  | { type: "unpick" };
+  | { type: "unpick" }
+  | { type: "frame"; bbox: Bbox4 };
 
 export const EMPTY_CLOSURES: FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -116,6 +119,7 @@ export function initialClosureState(partial: Partial<ClosureState> = {}): Closur
     dataAsOf: null,
     selected: null,
     picked: null,
+    frame: null,
     ...partial,
   };
 }
@@ -164,6 +168,14 @@ export function closureReducer(state: ClosureState, action: ClosureAction): Clos
     }
     case "unpick":
       return { ...state, picked: null };
+    case "frame":
+      // 예시로 보기 — 카드·묶음은 닫고 그 구역으로
+      return {
+        ...state,
+        selected: null,
+        picked: null,
+        frame: { bbox: action.bbox, seq: (state.frame?.seq ?? 0) + 1 },
+      };
   }
 }
 

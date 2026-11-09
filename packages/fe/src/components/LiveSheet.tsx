@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  EXAMPLE_KO,
   GROUP_KO,
   dataAsOfKo,
   eventDetailKo,
@@ -21,8 +22,9 @@ import {
   liveGroups,
   type ListedEvent,
 } from "../map/eventKinds";
+import { EXAMPLES } from "../map/examples";
 import { asBbox4, useClosureDispatch, useClosures } from "../state/ClosureProvider";
-import { useTime } from "../state/TimeProvider";
+import { useTime, useTimeDispatch } from "../state/TimeProvider";
 import { BottomSheet, type SheetStage } from "./BottomSheet";
 import { ClosureTimeline } from "./ClosureTimeline";
 import { EventCard } from "./EventCard";
@@ -36,6 +38,7 @@ export function LiveSheet() {
   const { events, eventsAt, eventsError, truncated, dataAsOf, bbox, selected, picked } =
     useClosures();
   const dispatch = useClosureDispatch();
+  const timeDispatch = useTimeDispatch();
   const { t, ready } = useTime();
   const atMs = eventsAt ? Date.parse(eventsAt) : 0;
   const [district, setDistrict] = useState<string | null>(null);
@@ -167,6 +170,24 @@ export function LiveSheet() {
             {events !== null && groups.length === 0 && (
               <p className={styles.empty}>이 시각부터 내일까지 서울에 잡힌 통제가 없어요.</p>
             )}
+            {/* 예시로 보기 (T7.11) — 그 날짜·시각으로 옮기고 지도를 그 통제 구역에 */}
+            <section aria-label="예시로 보기" className={styles.examples}>
+              <h3 className={styles.groupHead}>예시로 보기</h3>
+              {EXAMPLES.map((x) => (
+                <button
+                  key={x.key}
+                  type="button"
+                  className={styles.example}
+                  onClick={() => {
+                    timeDispatch({ type: "set", t: x.t });
+                    dispatch({ type: "frame", bbox: x.bbox });
+                  }}
+                >
+                  <b>{EXAMPLE_KO[x.key].title}</b>
+                  <span>{EXAMPLE_KO[x.key].sub}</span>
+                </button>
+              ))}
+            </section>
           </div>
         </>
       )}

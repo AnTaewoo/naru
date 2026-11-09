@@ -149,3 +149,22 @@ describe("LiveSheet — 지금 서울 통제", () => {
     expect(screen.getByRole("article", { name: "국회의사당앞 → 효자동삼거리 행진" })).toBeDefined();
   });
 });
+
+describe("LiveSheet — 예시로 보기 (T7.11)", () => {
+  it("시트 맨 아래 셋, 누르면 그 날짜·시각으로", () => {
+    render(
+      <Providers live={live1109}>
+        <LiveSheet />
+      </Providers>,
+    );
+    const examples = within(screen.getByRole("region", { name: "예시로 보기" }));
+    expect(examples.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "2026 서울마라톤3월 15일 07:45 광화문",
+      "광화문 집회·행진11월 7일 15:00 세종대로",
+      "국회대로 행진11월 9일 12:00",
+    ]);
+    fireEvent.click(examples.getByRole("button", { name: /2026 서울마라톤/ }));
+    expect(screen.getByLabelText<HTMLInputElement>("날짜").value).toBe("2026-03-15");
+    expect(screen.getByText("07:45")).toBeDefined();
+  });
+});

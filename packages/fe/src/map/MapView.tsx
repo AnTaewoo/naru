@@ -258,7 +258,7 @@ export function MapView({ visible }: MapViewProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const loaded = useRef(false);
-  const { closures, bbox, coverage, events, eventsAt, selected } = useClosures();
+  const { closures, bbox, coverage, events, eventsAt, selected, frame } = useClosures();
   const dispatch = useClosureDispatch();
   const { route, from, to, active, view } = useRoute();
   // 원래 길 카드를 골랐나 (T5.11) — 피한 통제가 없으면 원래 길도 없다
@@ -525,6 +525,25 @@ export function MapView({ visible }: MapViewProps) {
     if (!changed || !map || !loaded.current || !bounds) return;
     map.fitBounds(bounds, { padding: fitPadding(map), maxZoom: 17 });
   }, [original, route]);
+
+  // 예시로 보기 (T7.11) — 그 통제 구역으로, 절반 시트 위에. 누를 때마다(순번)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !frame) return;
+    const [w, s, e, n] = frame.bbox;
+    const run = () => {
+      framed.current = true;
+      map.fitBounds(
+        [
+          [w, s],
+          [e, n],
+        ],
+        { padding: framePadding(map), maxZoom: 16 },
+      );
+    };
+    if (loaded.current) run();
+    else map.once("load", run);
+  }, [frame]);
 
   // 고른 사건 윤곽 (T7.5)
   useEffect(() => {
