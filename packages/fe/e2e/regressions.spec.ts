@@ -1,7 +1,8 @@
 // T5.5 라우터 정확성 회귀 (ADR-011) — iPhone 13 크기로. 좌표·시각은 태우가 2026-11-08 실서버에 보낸 요청.
 // ② 11/7 15:00 세종대로 건너기: 예정 집회(공지 창 안)를 시청 지하보도로 피하고 "공지상 통제 시간" 표기
 //    (recorded naru_api/route_1107_1500.json — 935 s·1,122.5 m, 예정 1곳 16:00까지, 원래 길 871 s)
-// ① 잠실: 그래프 밖 → 범위 밖 안내 (recorded naru_api/error_out_of_coverage.json)
+// ① 경기 성남: 그래프 밖 → 범위 밖 안내. T6.9 부터 보행망이 서울 전체라 잠실(옛 회귀)은 안이다 — 태우 2026-11-09
+//    지점 37.3947,127.1112 → 37.3960,127.1150 (BE test_route_regressions SEONGNAM 과 같다)
 import { devices, expect, test } from "@playwright/test";
 import { consoleErrors, expandSheet, ownErrors } from "./helpers";
 
@@ -41,8 +42,8 @@ test("② 11/7 15:00 세종대로 건너기 — 예정 집회를 시청 지하�
   expect(ownErrors(errors)).toEqual([]);
 });
 
-test("① 잠실(그래프 밖) — 범위 밖 안내", async ({ page }) => {
+test("① 경기 성남(그래프 밖) — 범위 밖 안내", async ({ page }) => {
   // 422 응답은 브라우저 콘솔에 리소스 오류로 남는다 — 여기선 콘솔을 보지 않는다
-  await page.goto("/?t=2026-03-15T10:00:00+09:00&from=37.5133,127.0980&to=37.5145,127.1035");
-  await expect(page.getByText("이 위치는 아직 길찾기 범위(종로·중구) 밖이에요")).toBeVisible();
+  await page.goto("/?t=2026-03-15T10:00:00+09:00&from=37.3947,127.1112&to=37.3960,127.1150");
+  await expect(page.getByText("이 위치는 아직 길찾기 범위(서울) 밖이에요")).toBeVisible();
 });

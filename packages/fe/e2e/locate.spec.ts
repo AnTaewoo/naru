@@ -1,6 +1,7 @@
 // T5.7 내 위치 — iPhone 13 크기(보이는 영역 390×664). 위치는 Playwright 위치 권한으로 넣는다(실데이터 좌표):
-// 교보빌딩 = recorded route_0745 출발(카카오 24020019), 잠실 = recorded error_out_of_coverage 출발(태우 실서버 요청).
-// 보행망 범위 = /closures/events 의 coverage (recorded closure_events 와 같은 그래프)
+// 교보빌딩 = recorded route_0745 출발(카카오 24020019). 범위 밖 = 경기 성남 37.3947,127.1112 — T6.9 부터 보행망이
+// 서울 전체라 잠실은 안이다. 태우 2026-11-09 지점(ROADMAP T6.9 ②, BE test_route_regressions SEONGNAM 과 같다).
+// 보행망 범위 = /closures/events 의 coverage
 import { devices, expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { recorded } from "../src/test/recorded";
 import { consoleErrors, denyGeolocation, ownErrors } from "./helpers";
@@ -20,7 +21,7 @@ function geo(latLng: string | undefined) {
   return { latitude, longitude };
 }
 const KYOBO = geo(q["from"]);
-const JAMSIL = geo(recorded("error_out_of_coverage").query?.["from"]);
+const SEONGNAM = geo("37.3947,127.1112");
 const T = "t=2026-03-15T07:45:00+09:00";
 
 async function locatedAt(context: BrowserContext, where: { latitude: number; longitude: number }) {
@@ -81,16 +82,14 @@ test("길찾기를 켜면 출발은 내 위치(교보빌딩) — 지도를 한 �
   expect(ownErrors(errors)).toEqual([]);
 });
 
-test("범위 밖 — 잠실이면 출발 칸은 비우고 안내, 지도로 고르면 안내가 사라진다", async ({
+test("범위 밖 — 경기 성남이면 출발 칸은 비우고 안내, 지도로 고르면 안내가 사라진다", async ({
   page,
   context,
 }) => {
-  await locatedAt(context, JAMSIL);
+  await locatedAt(context, SEONGNAM);
   await gotoAfterCoverage(page, T);
   await page.getByRole("button", { name: "길찾기" }).click();
-  const note = page.getByText(
-    "내 위치가 길찾기 범위(종로·중구) 밖이에요. 지도를 눌러 출발을 고르세요",
-  );
+  const note = page.getByText("내 위치가 길찾기 범위(서울) 밖이에요. 지도를 눌러 출발을 고르세요");
   await expect(note).toBeVisible();
   await expect(
     page.getByRole("button", { name: "출발 지도를 눌러 출발을 고르세요" }),
@@ -132,15 +131,16 @@ test("지도 '내 위치 찾기'(GeolocateControl) — 교보빌딩이면 파란
   await expect(page.getByRole("button", { name: "축소" })).toBeVisible();
   await page.getByRole("button", { name: "내 위치 찾기" }).click();
   await expect(page.locator(".maplibregl-user-location-dot")).toBeVisible();
-  await expect(page.getByText("길찾기 범위(종로·중구) 밖")).toHaveCount(0);
+  await expect(page.getByText("길찾기 범위(서울) 밖")).toHaveCount(0);
   expect(ownErrors(errors)).toEqual([]);
 });
 
-test("지도 '내 위치 찾기' — 잠실이면 길찾기 범위 밖이라고 잠깐 안내", async ({ page, context }) => {
-  await locatedAt(context, JAMSIL);
+test("지도 '내 위치 찾기' — 경기 성남이면 길찾기 범위 밖이라고 잠깐 안내", async ({
+  page,
+  context,
+}) => {
+  await locatedAt(context, SEONGNAM);
   await gotoAfterCoverage(page, T);
   await page.getByRole("button", { name: "내 위치 찾기" }).click();
-  await expect(
-    page.getByRole("status").filter({ hasText: "길찾기 범위(종로·중구) 밖" }),
-  ).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "길찾기 범위(서울) 밖" })).toBeVisible();
 });
