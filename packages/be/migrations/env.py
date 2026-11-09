@@ -11,6 +11,7 @@ from naru_be.config import Settings
 from naru_be.models.entities.base import Base
 from naru_be.models.entities.bus_position import BusPositionEntity
 from naru_be.models.entities.candidate_batch import CandidateBatchEntity
+from naru_be.models.entities.closure_event import ClosureEventEntity
 from naru_be.models.entities.closure_state import ClosureStateEntity
 
 config = context.config
@@ -25,6 +26,7 @@ TABLES = (  # metadata 등록
     ClosureStateEntity.__tablename__,
     CandidateBatchEntity.__tablename__,
     BusPositionEntity.__tablename__,
+    ClosureEventEntity.__tablename__,
 )
 
 

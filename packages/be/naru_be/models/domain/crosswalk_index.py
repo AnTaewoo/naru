@@ -140,23 +140,30 @@ class CrosswalkIndex:
         c = self._by_id.get(crosswalk_id)
         return c.district if c is not None else None
 
-    def _within(self, area: shapely.Geometry) -> set[str]:
+    def within(self, area: shapely.Geometry) -> set[str]:
+        """EPSG:5179 모양과 겹치는 횡단보도."""
         return {
             self._items[int(i)].crosswalk_id for i in self._tree.query(area, predicate="intersects")
         }
 
-    def from_point(self, lng: float, lat: float, radius_m: float | None = None) -> set[str]:
+    def area_of_point(
+        self, lng: float, lat: float, radius_m: float | None = None
+    ) -> shapely.Polygon:
+        """점 → 반경(기본 30 m) 원 (EPSG:5179). from_point 가 고르는 모양."""
         x, y = _4326_TO_5179.transform(lng, lat)
-        return self._within(shapely.Point(x, y).buffer(radius_m or self.settings.point_radius_m))
+        return shapely.Point(x, y).buffer(radius_m or self.settings.point_radius_m)
 
-    def from_line(self, coords: Sequence[LngLat], buffer_m: float | None = None) -> set[str]:
+    def area_of_line(
+        self, coords: Sequence[LngLat], buffer_m: float | None = None
+    ) -> shapely.Polygon:
+        """선 → 버퍼(기본 15 m) (EPSG:5179). from_line 이 고르는 모양."""
         if len(coords) < 2:
             raise ValueError("선은 점이 둘 이상이어야 한다")
         line = shapely.LineString([_4326_TO_5179.transform(lng, lat) for lng, lat in coords])
-        return self._within(line.buffer(buffer_m or self.settings.line_buffer_m))
+        return line.buffer(buffer_m or self.settings.line_buffer_m)
 
-    def from_segment(self, seg: SegmentGeom) -> set[str]:
-        """구간 → 도로 그래프 최단경로 → 등급별 버퍼 → 횡단보도. RoadGraph가 없으면 쓸 수 없다."""
+    def area_of_segment(self, seg: SegmentGeom) -> shapely.Polygon:
+        """구간 → 도로 그래프 최단경로 → 등급별 버퍼(대로 25·로 15·길 8 m) (EPSG:5179)."""
         if self.road_graph is None:
             raise ValueError("from_segment에는 RoadGraph가 필요하다")
         points = [
@@ -171,4 +178,14 @@ class CrosswalkIndex:
             if road_class
             else self.settings.line_buffer_m
         )
-        return self.from_line(path.coords, buffer_m)
+        return self.area_of_line(path.coords, buffer_m)
+
+    def from_point(self, lng: float, lat: float, radius_m: float | None = None) -> set[str]:
+        return self.within(self.area_of_point(lng, lat, radius_m))
+
+    def from_line(self, coords: Sequence[LngLat], buffer_m: float | None = None) -> set[str]:
+        return self.within(self.area_of_line(coords, buffer_m))
+
+    def from_segment(self, seg: SegmentGeom) -> set[str]:
+        """구간 → 도로 그래프 최단경로 → 등급별 버퍼 → 횡단보도. RoadGraph가 없으면 쓸 수 없다."""
+        return self.within(self.area_of_segment(seg))
