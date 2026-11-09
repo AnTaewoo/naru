@@ -73,7 +73,7 @@ export type ClosureAction =
   | { type: "focus"; bbox: Bbox4 };
 
 export const EMPTY_CLOSURES: FeatureCollection = { type: "FeatureCollection", features: [] };
-/** 광화문 일대 — 데모 범위(BE Settings.districts 종로·중구) 안의 기본 bbox. 지도가 움직이면 setBbox */
+/** 처음 화면 광화문 일대 — 서비스 범위(BE Settings.districts 서울 25개 구, T6.9) 안. 지도가 움직이면 setBbox */
 export const DEFAULT_BBOX = "126.965,37.555,126.990,37.580";
 
 export function initialClosureState(partial: Partial<ClosureState> = {}): ClosureState {

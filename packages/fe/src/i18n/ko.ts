@@ -137,7 +137,7 @@ export function routeNoteKo(p: {
 export const ROUTE_ERROR_KO: Record<string, string> = {
   no_route: "이 시각엔 갈 수 있는 길을 찾지 못했어요",
   invalid_query: "출발·도착을 다시 골라 주세요",
-  out_of_coverage: "이 위치는 아직 길찾기 범위(종로·중구) 밖이에요", // ADR-011, INTERFACE §6
+  out_of_coverage: "이 위치는 아직 길찾기 범위(서울) 밖이에요", // ADR-011, INTERFACE §6
 };
 
 /** 경로가 피한 통제의 상태 (ADR-011 A) — confirmed 는 막힘, scheduled 는 공지상 시간이라 피했을 뿐 */
@@ -178,7 +178,7 @@ export function locateNoteKo(
     case "unavailable":
       return `내 위치를 찾지 못했어요. ${odHintKo(which)}`;
     case "outside":
-      return `내 위치가 길찾기 범위(종로·중구) 밖이에요. ${odHintKo(which)}`;
+      return `내 위치가 길찾기 범위(서울) 밖이에요. ${odHintKo(which)}`;
   }
 }
 
@@ -209,7 +209,7 @@ export function searchStatusKo(
 }
 
 /** 지도 오른쪽 위 '내 위치 찾기'(GeolocateControl) 결과가 보행망 밖일 때 */
-export const MAP_OUTSIDE_KO = "내 위치는 아직 길찾기 범위(종로·중구) 밖이에요";
+export const MAP_OUTSIDE_KO = "내 위치는 아직 길찾기 범위(서울) 밖이에요";
 
 /**
  * maplibre 컨트롤 문구 — 쓰는 컨트롤 것만. 키는 설치된 maplibre-gl 6.16.0 의 기본 영어 표

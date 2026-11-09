@@ -261,7 +261,7 @@ describe("RouteCard 렌더", () => {
         <RouteCard />
       </Providers>,
     );
-    expect(screen.getByText("이 위치는 아직 길찾기 범위(종로·중구) 밖이에요")).toBeDefined();
+    expect(screen.getByText("이 위치는 아직 길찾기 범위(서울) 밖이에요")).toBeDefined();
   });
 
   it("오류 — 실제 Flask 오류 코드(invalid_query)를 한국어 문구로", () => {
@@ -414,7 +414,7 @@ describe("내 위치 안내 (T5.7)", () => {
 
   it("범위 밖·거부·실패 — 칸은 비우고 지도로 고르라고, 찾는 중엔 지도로 골라도 된다고", () => {
     expect(note({ locate: { which: "from", status: "outside" } })).toContain(
-      "내 위치가 길찾기 범위(종로·중구) 밖이에요. 지도를 눌러 출발을 고르세요",
+      "내 위치가 길찾기 범위(서울) 밖이에요. 지도를 눌러 출발을 고르세요",
     );
     expect(note({ locate: { which: "from", status: "denied" } })).toContain(
       "위치 권한이 꺼져 있어요. 지도를 눌러 출발을 고르세요",
