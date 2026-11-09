@@ -15,7 +15,7 @@ test.use({
 });
 
 const HOME = "/?t=2026-11-07T15:30:00%2B09:00";
-const SHEET = "11월 7일 15:30 서울 통제"; // 기준 시각이 지금이 아니면 그 날짜·시각 (T7.5)
+const SHEET = "서울 통제"; // 기준 시각이 지금이 아니면 — 날짜·시각은 시트 맨 위 기준 줄 (T7.12)
 const live = recordedLive("closure_events_live_1107_1530");
 // 경찰청 r04 시의회~숭례문R → 광화문·고용노동청 — 15:00–16:00, 횡단보도 22곳, 공지뿐이라 15:30 에도 예정
 const RALLY = "시의회~숭례문오거리 집회 → 광화문·고용노동청 행진";
@@ -40,19 +40,18 @@ test("앱을 열면 그 시각 서울 사건 — 클러스터, 칩은 사건 수
   const chips = page.getByRole("group", { name: "지도 레이어" }).getByRole("button");
   await expect(chips).toHaveText(["통제 중 8", "예정 4", "예정 구역 0"]);
   const sheet = page.getByRole("region", { name: SHEET });
-  await expect(sheet).toContainText("15:30 기준 · 서울 통제 중 8건, 예정 4건");
+  await expect(sheet).toContainText("서울 통제 중 8건, 예정 4건"); // 시각은 맨 위 기준 줄 (T7.12)
   await expect(sheet).toContainText(RALLY);
   await expect(sheet).toContainText("5만 명 · 태평로");
   await expect(sheet).toContainText("15:00–16:00 · 횡단보도 22곳");
   await expect(sheet).not.toContainText("내자");
   await expect(sheet).not.toContainText(EXCERPT); // 원문은 카드의 '통제 근거 보기'에서만 (T5.9·T7.5)
-  // 지금 서울 통제 묶음 (T7.5) — 통제 중 8 → 1시간 안 시작 4
-  await expect(sheet.getByRole("region", { name: "통제 중" }).getByRole("button")).toHaveCount(8);
-  await expect(
-    sheet.getByRole("region", { name: "1시간 안 시작" }).getByRole("button"),
-  ).toHaveCount(4);
+  // 이 시각 묶음 (T7.12) — 통제 중 8 + 1시간 안 시작 4. 넓은 창 기록 closure_events_catalog_1107_1530 과 같다
+  await expect(sheet.getByRole("region", { name: "이 시각" }).getByRole("button")).toHaveCount(12);
   await expect(page.getByRole("button", { name: "통제 불러오기" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "지금 시각으로" })).toBeVisible();
+  await expect(sheet).toContainText("11월 7일 15:30 기준");
+  await expect(sheet.getByRole("button", { name: "지금으로 돌아가기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "지금 시각으로" })).toHaveCount(0); // 시트 안 슬라이더는 끔
   await page.waitForTimeout(1500);
   expect(crosswalks).toEqual([]); // 서울 전체 화면에선 횡단보도를 받지 않는다
   await page.screenshot({ path: "test-results/live-map-seoul.png" });
@@ -105,22 +104,28 @@ test("줌 15 부터 횡단보도 — 화면 bbox 로 /api/closures, 그 사건 �
   await page.screenshot({ path: "test-results/live-map-crosswalk.png" });
 });
 
-test("60초 뒤 같은 at 으로 If-None-Match → 304 — 칩·목록 그대로", async ({ page }) => {
+test("60초 뒤 같은 at 으로 If-None-Match → 304 — 지도 사건·시트 목록(넓은 창) 따로, 칩·목록 그대로", async ({
+  page,
+}) => {
   test.setTimeout(150_000);
-  const seen: { status: number; etag: string | null; sent: string | null }[] = [];
+  const seen: { list: boolean; status: number; etag: string | null; sent: string | null }[] = [];
   page.on("response", (r) => {
     if (!r.url().includes("/api/closures/events")) return;
+    const list = new URL(r.url()).searchParams.has("from"); // 시트 목록 t 앞뒤 365일 (T7.12)
     const sent = r.request().headers()["if-none-match"] ?? null;
-    seen.push({ status: r.status(), etag: r.headers()["etag"] ?? null, sent });
+    seen.push({ list, status: r.status(), etag: r.headers()["etag"] ?? null, sent });
   });
   await page.goto(HOME);
-  await expect.poll(() => seen.length).toBe(1);
-  expect(seen[0]?.status).toBe(200);
-  expect(seen[0]?.sent).toBeNull();
+  await expect.poll(() => seen.length).toBe(2);
   await page.waitForTimeout(62_000);
-  expect(seen).toHaveLength(2);
-  expect(seen[1]?.status).toBe(304);
-  expect(seen[1]?.sent).toBe(seen[0]?.etag);
+  for (const list of [false, true]) {
+    const xs = seen.filter((x) => x.list === list);
+    expect(xs).toHaveLength(2);
+    expect(xs[0]?.status).toBe(200);
+    expect(xs[0]?.sent).toBeNull();
+    expect(xs[1]?.status).toBe(304);
+    expect(xs[1]?.sent).toBe(xs[0]?.etag);
+  }
   await expect(page.getByRole("button", { name: "통제 중 8" })).toBeVisible();
   await expect(page.getByRole("region", { name: SHEET })).toContainText(RALLY);
 });
@@ -144,7 +149,7 @@ test("행을 누르면 사건 카드 — 남은 시간·출처·확신도·근�
   await page.waitForTimeout(1200); // 카드를 열면 지도가 그 사건으로
   await page.screenshot({ path: "test-results/live-map-card.png" });
   await card.getByRole("button", { name: "카드 닫기" }).click();
-  await expect(sheet.getByRole("region", { name: "통제 중" })).toBeVisible();
+  await expect(sheet.getByRole("region", { name: "이 시각" })).toBeVisible();
   expect(ownErrors(errors)).toEqual([]);
 });
 
@@ -197,9 +202,9 @@ test("달력으로 날짜를 바꾸면 그날 같은 시각 — 11/7 07:45 → 3
   await page.getByLabel("날짜").fill("2026-03-15");
   // 사건 v2 기록 closure_events_live_0315_0745 — 통제 중 9 · 예정 7
   await expect(page.getByRole("button", { name: "통제 중 9" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "3월 15일 07:45 서울 통제" })).toContainText(
-    "마라톤 1구간 세종대로 사거리~숭례문 오거리",
-  );
+  const sheet = page.getByRole("region", { name: SHEET });
+  await expect(sheet).toContainText("3월 15일 07:45 기준");
+  await expect(sheet).toContainText("마라톤 1구간 세종대로 사거리~숭례문 오거리");
 });
 
 test("예시로 보기 — 국회대로 행진을 누르면 11/9 12:00, 지도가 그 행진 구역으로 (T7.11)", async ({
@@ -210,9 +215,9 @@ test("예시로 보기 — 국회대로 행진을 누르면 11/9 12:00, 지도�
   const examples = sheet.getByRole("region", { name: "예시로 보기" });
   await examples.getByRole("button", { name: /국회대로 행진/ }).click();
   await expect(page.getByLabel("날짜")).toHaveValue("2026-11-09");
-  const now = page.getByRole("region", { name: "11월 9일 12:00 서울 통제" });
+  await expect(sheet).toContainText("11월 9일 12:00 기준");
   // TOPIS 통제지도 1109233 — 12:00 엔 돌발 연결로 통제 중 (T7.3)
-  await expect(now.getByRole("region", { name: "통제 중" })).toContainText(
+  await expect(sheet.getByRole("region", { name: "이 시각" })).toContainText(
     "국회의사당앞 → 효자동삼거리 행진",
   );
   // 9.5 km 행진 bbox(examples.ts)에 절반 시트 위로 맞춤 — 다 담으면 11.6 이라 구역이 그려지는 12 로
@@ -225,4 +230,38 @@ test("예시로 보기 — 국회대로 행진을 누르면 11/9 12:00, 지도�
   );
   await page.waitForTimeout(1500);
   await page.screenshot({ path: "test-results/live-map-example.png" });
+});
+
+test("11/8 12:00 그 시각 통제 없음 — 한 줄 + 내일·지난 통제, 지난 행 → 그 시작 시각·카드·지도, 지금으로 돌아가기 (T7.12)", async ({
+  page,
+}) => {
+  const errors = consoleErrors(page);
+  await page.goto("/?t=2026-11-08T12:00:00%2B09:00");
+  const sheet = page.getByRole("region", { name: SHEET });
+  // 넓은 창 기록 closure_events_catalog_1108_1200 — 이 시각 0 · 내일(11/9) 다섯 · 지난 28
+  await expect(sheet).toContainText("11월 8일 12:00 기준");
+  await expect(sheet.getByRole("region", { name: "이 시각" })).toContainText(
+    "이 시각 서울에 걸린 통제가 없어요",
+  );
+  await fullSheet(page, SHEET);
+  const upcoming = sheet.getByRole("region", { name: "다가오는 통제" });
+  await expect(upcoming.getByRole("group", { name: "내일" }).getByRole("button")).toHaveCount(5);
+  const past = sheet.getByRole("region", { name: "지난 통제" });
+  await expect(
+    past.getByRole("button", { name: /^의사당역 5번출구 → 민주당사 행진/ }),
+  ).toContainText("11월 7일"); // 11/7 19:00 끝 — 가장 최근
+  await page.screenshot({ path: "test-results/live-map-sections.png" });
+  await past.getByRole("button", { name: "더 보기 (23)" }).click();
+  await past.getByRole("button", { name: new RegExp(`^${RALLY}`) }).click();
+  // 경찰청 r04 15:00 시작으로 — 카드 위에도 기준 줄, 지도는 그 구역(첫 화면 맞춤 13 보다 가깝게)
+  await expect(page.getByRole("article", { name: RALLY })).toContainText("15:00–16:00");
+  await expect(sheet).toContainText("11월 7일 15:00 기준");
+  const zoom = () => Number(new URL(page.url()).hash.split("/")[0]?.slice(5));
+  await expect.poll(zoom).toBeGreaterThan(13);
+  await page.waitForTimeout(1200);
+  await page.screenshot({ path: "test-results/live-map-past-card.png" });
+  await sheet.getByRole("button", { name: "지금으로 돌아가기" }).click();
+  await expect(page.getByRole("region", { name: "지금 서울 통제" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "지금으로 돌아가기" })).toHaveCount(0);
+  expect(ownErrors(errors)).toEqual([]);
 });
