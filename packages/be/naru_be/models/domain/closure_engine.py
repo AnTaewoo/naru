@@ -5,7 +5,7 @@
   confirmed  실측 증거가 있는 후보가 window.start 를 지났을 때 — 코스 시각표(timetable),
              돌발 발생(topis_incident) 둘만. 공지(notice)만 있는 후보는 시간이 지나도 scheduled.
              버스(bus_skip·bus_return)는 상태를 바꾸지 않는다 — ADR-013 보류(태우 2026-11-09,
-             1개 차로 행진에서 버스 152회 정상 통과)
+             1개 차로 행진 시간 안에 버스가 구간을 124회 경로대로 지나감)
   released   window.end + released_grace_min 경과
 전이마다 evidence 를 하나 더 붙인다 (detail.transition, detail.rule). window.end 가 없으면
 start + unknown_end_hours 를 임시 end 로 두고 evidence 에 남긴다 (INTERFACE §1).
