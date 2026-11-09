@@ -12,6 +12,7 @@ T6.1: 기록 돌발(OA-13315 2026-11-07 15:40, 53건) → 집회 후보 9 → �
 import logging
 import shutil
 import time
+from collections import Counter
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
@@ -28,7 +29,7 @@ from naru_ai.worker import IngestWorker
 from naru_be.app import create_app
 from naru_be.config import Settings
 from naru_be.controllers._deps import NaruModels
-from naru_contracts import ClosureEventsResponse, FeatureCollection, Status
+from naru_contracts import ClosureEventsResponse, FeatureCollection, Source, Status
 
 BE_DIR = Path(__file__).resolve().parents[1]
 TOKEN = "naru-e2e-token"
@@ -327,6 +328,38 @@ def test_bus_targets_logged_on_change_and_every_10_minutes(
     lines = [r.__dict__ for r in caplog.records if r.getMessage() == "bus targets"]
     counts = [(x["marathon_events"], x["full_events"], x["routes"]) for x in lines]
     assert counts == [(11, 0, 20), (11, 0, 20), (0, 0, 0)]
+
+
+def test_live_events_on_nov7(app: Flask, quiet: dict[str, str]) -> None:
+    """T7.1 (ADR-014 A) — 11/7 15:30 지금 지도: [15:30, 11/9 00:00] 과 겹치는 사건 11.
+    TOPIS 돌발 집회 7(0.9)·TOPIS 공지 6300(0.8, 같은 횡단보도 돌발 근거) 통제 중, 경찰청 공지
+    r01(0.85)·r04(0.75)·r06(0.85)는 공지뿐이라 예정. 3/15 코스는 창 밖. 다시 실어도 id 그대로."""
+    models: NaruModels = app.extensions["naru"]
+
+    def load() -> ClosureEventsResponse:
+        models.repo.truncate()
+        w, publisher = _worker(
+            app, quiet, NARU_INCIDENT_RECORD=ACCINFO_1107, NARU_TOPIS_RECORD=TOPIS_1108
+        )
+        w.run_once()
+        publisher.publish(w.incident_batch())
+        batch = w.topis_batch(datetime(2026, 11, 7, 9, 0, tzinfo=KST))
+        assert batch is not None
+        publisher.publish(batch)
+        q = {"at": "2026-11-07T15:30:00+09:00"}
+        resp = app.test_client().get("/closures/events", query_string=q)
+        return ClosureEventsResponse.model_validate(resp.get_json())
+
+    body = load()
+    got = Counter((e.source, e.status) for e in body.events)
+    assert got == {
+        (Source.incident, Status.confirmed): 7,
+        (Source.topis, Status.confirmed): 1,
+        (Source.smpa, Status.scheduled): 3,
+    }
+    r04 = next(e for e in body.events if e.reason.startswith("15:00~16:00 시의회~숭례문R"))
+    assert (r04.id, r04.confidence) == ("2e930ec6deeb", 0.75)  # INTERFACE §3.1 예시와 같은 사건
+    assert sorted(e.id for e in load().events) == sorted(e.id for e in body.events)
 
 
 def test_bus_positions_need_token(app: Flask) -> None:

@@ -5,6 +5,7 @@ T5.4 — GET /closures/events (INTERFACE §3.1, ADR-010): 저장한 상태를 �
 (reason, window) 로 묶은 것과 비교한다.
 """
 
+import hashlib
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -19,6 +20,7 @@ from flask.testing import FlaskClient
 from naru_be.app import create_app
 from naru_be.config import Settings
 from naru_be.controllers._deps import NaruModels
+from naru_be.models.domain.closure_events import limit_events
 from naru_contracts import (
     ClosureEventsResponse,
     ClosureState,
@@ -219,3 +221,94 @@ def test_closure_events_have_districts(client: FlaskClient) -> None:
         "종로구",
         "중구",
     }
+
+
+# --- v0.14 사건 API (ADR-014 A, T7.1) -------------------------------------------------------
+# 3/15 서울마라톤 시각표(raw course seoul_marathon_2026_timetable.json): 출발지·15구간 05:00,
+# 11·14구간 07:10, 1구간 07:20, 2구간 07:23, 12구간 07:28, 13구간 07:35, 3구간 07:44, 4구간 08:17,
+# 5구간 08:29, 6구간 08:46, 7구간 08:49, 8구간 08:57, 9구간 09:00, 10구간 09:12 시작.
+# 끝은 08:08~14:30
+
+
+def _live(client: FlaskClient, **q: str) -> ClosureEventsResponse:
+    resp = client.get("/closures/events", query_string=q)
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    return ClosureEventsResponse.model_validate(resp.get_json())
+
+
+def _short(ev_reason: str) -> str:
+    return ev_reason.split(" ")[1]  # "marathon 1구간 …" → "1구간"
+
+
+def test_live_events_status_and_id(client: FlaskClient) -> None:
+    body = _live(client, at="2026-03-15T07:45:00+09:00")
+    assert body.at == datetime(2026, 3, 15, 7, 45, tzinfo=KST) and body.truncated is False
+    # 07:45 — 16구간 다 창 안(끝+30분 ≥ 07:45). 시작한 9구간 통제 중, 4~10구간 예정. 시각표 0.9
+    status = {_short(e.reason): e.status.value for e in body.events}
+    assert sorted(k for k, v in status.items() if v == "confirmed") == sorted(
+        ["출발지", "15구간", "11구간", "14구간", "1구간", "2구간", "12구간", "13구간", "3구간"]
+    )
+    assert sorted(k for k, v in status.items() if v == "scheduled") == sorted(
+        ["4구간", "5구간", "6구간", "7구간", "8구간", "9구간", "10구간"]
+    )
+    assert {e.confidence for e in body.events} == {0.9}
+    seg1 = next(e for e in body.events if _short(e.reason) == "1구간")
+    key = f"{seg1.reason}|2026-03-14T22:20:00Z|2026-03-14T23:08:00Z"  # 07:20~08:08 KST
+    assert seg1.id == hashlib.sha1(key.encode()).hexdigest()[:12] == "adaea2f4cc02"  # §3.1 예시
+    assert seg1.area is None and seg1.centroid is None  # 통제 구역은 T7.2
+
+
+def test_live_events_window(client: FlaskClient) -> None:
+    # 13:30 — 15구간(~14:30)만 창 안. 11·14구간은 12:55 끝 + 30분 = 13:25 라 빠진다
+    late = _live(client, at="2026-03-15T13:30:00+09:00")
+    assert [(_short(e.reason), e.status.value) for e in late.events] == [("15구간", "confirmed")]
+    # from 을 당기면 끝난 구간도 — 상태는 13:30 기준: 15구간만 통제 중, 나머지 해제
+    wide = _live(client, at="2026-03-15T13:30:00+09:00", **{"from": "2026-03-15T07:00:00+09:00"})
+    assert sorted(e.status.value for e in wide.events) == ["confirmed"] + ["released"] * 15
+    # 하루 전 07:00 — 기본 창 끝(다음 날 24:00 = 3/16 00:00) 안이라 16구간 다 예정
+    eve = _live(client, at="2026-03-14T07:00:00+09:00")
+    assert len(eve.events) == 16 and {e.status.value for e in eve.events} == {"scheduled"}
+    # to 를 3/14 안으로 자르면 없음
+    assert (
+        _live(client, at="2026-03-14T07:00:00+09:00", to="2026-03-14T23:59:00+09:00").events == []
+    )
+    # 파라미터가 없으면 지금처럼 전부 — status 는 서버 지금(3/15 뒤라 다 해제)
+    everything = _live(client)
+    assert len(everything.events) == 16 and {e.status.value for e in everything.events} == {
+        "released"
+    }
+    for bad in ({"at": "2026-03-15T07:45:00"}, {"from": "2026-03-15T07:45:00+09:00"}):
+        assert client.get("/closures/events", query_string=bad).status_code == 400
+
+
+def test_live_events_etag(client: FlaskClient) -> None:
+    q = {"at": "2026-03-15T07:45:00+09:00"}
+    first = client.get("/closures/events", query_string=q)
+    etag = first.headers["ETag"]
+    assert first.status_code == 200 and first.headers["Cache-Control"] == "no-cache"
+    again = client.get("/closures/events", query_string=q, headers={"If-None-Match": etag})
+    assert again.status_code == 304 and again.data == b"" and again.headers["ETag"] == etag
+    # 08:20 — 4구간(08:17)이 통제 중으로 바뀌어 본문이 다르다
+    later = client.get(
+        "/closures/events",
+        query_string={"at": "2026-03-15T08:20:00+09:00"},
+        headers={"If-None-Match": etag},
+    )
+    assert later.status_code == 200 and later.headers["ETag"] != etag
+
+
+def test_live_events_cap(client: FlaskClient) -> None:
+    # 상한(300)을 넘으면 심한 상태·시작 가까운 순으로 고른 뒤 시작 늦은 순 — 07:45 에 5건으로
+    # 잘라 보면
+    # 통제 중 9구간 중 시작이 07:45 에 가까운 3(07:44)·13(07:35)·12(07:28)·2(07:23)·1(07:20)구간
+    body = _live(client, at="2026-03-15T07:45:00+09:00")
+    at = datetime(2026, 3, 15, 7, 45, tzinfo=KST)
+    kept, truncated = limit_events(body.events, at, cap=5)
+    assert truncated and [_short(e.reason) for e in kept] == [
+        "3구간",
+        "13구간",
+        "12구간",
+        "2구간",
+        "1구간",
+    ]
+    assert limit_events(body.events, at, cap=300) == (body.events, False)
