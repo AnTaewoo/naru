@@ -2,6 +2,7 @@
 import type { GeoJSONSourceSpecification, LayerSpecification } from "maplibre-gl";
 import type { Feature, FeatureCollection, Status } from "../../types/contracts";
 import { STATUS_COLOR } from "../colors";
+import { CROSSWALK_MIN_ZOOM, LOW_CONFIDENCE } from "../eventKinds";
 import { ICON_IDS, ICON_PIXEL_RATIO } from "../icons";
 
 export const CLOSURE_SOURCE_ID = "naru-closures";
@@ -118,17 +119,28 @@ export function closureSource(fc: FeatureCollection): GeoJSONSourceSpecification
   return { type: "geojson", data: closurePoints(fc) };
 }
 
-/** 레이어 2장: 흰 테두리 상태색 점 → 그 위 표식 아이콘(× / !). 아이콘은 icons.ts 가 addImage */
+/**
+ * 레이어 2장: 흰 테두리 상태색 점 → 그 위 표식 아이콘(× / !). 아이콘은 icons.ts 가 addImage. 줌 15 부터 —
+ * 그 아래는 사건 구역·클러스터(eventLayer, T7.4). 해제·확신도 0.7 미만은 흐리게
+ */
 export function closureLayers(sourceId: string = CLOSURE_SOURCE_ID): LayerSpecification[] {
   return [
     {
       id: CLOSURE_LAYER_IDS.dot,
       type: "circle",
       source: sourceId,
+      minzoom: CROSSWALK_MIN_ZOOM,
       paint: {
         "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 5, 17, 11],
         "circle-color": ["get", "color"],
-        "circle-opacity": ["case", ["==", ["get", "status"], "released"], 0.45, 0.95],
+        "circle-opacity": [
+          "case",
+          ["==", ["get", "status"], "released"],
+          0.45,
+          ["<", ["get", "confidence"], LOW_CONFIDENCE],
+          0.45,
+          0.95,
+        ],
         "circle-stroke-color": "#ffffff",
         "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 13, 1.5, 17, 2.5],
       },
@@ -137,6 +149,7 @@ export function closureLayers(sourceId: string = CLOSURE_SOURCE_ID): LayerSpecif
       id: CLOSURE_LAYER_IDS.mark,
       type: "symbol",
       source: sourceId,
+      minzoom: CROSSWALK_MIN_ZOOM,
       layout: {
         "icon-image": ["get", "icon"],
         // 아이콘 한 변 24 px(×2 로 그림) → 점 지름에 맞춘다

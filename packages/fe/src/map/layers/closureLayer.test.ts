@@ -85,14 +85,29 @@ describe("closureLayer", () => {
     expect(mark.layout?.["text-field"]).toBeUndefined(); // 글리프 서버 없이
   });
 
-  it("칩 필터 → 상태 in 필터, 비면 null(전부)", () => {
+  it("칩 필터 → 상태 in 필터 — 칩을 다 끄면 아무것도 안 그린다(T7.4), 칩이 없으면 null(전부)", () => {
     expect(statusFilter(["confirmed", "scheduled"])).toEqual([
       "in",
       ["get", "status"],
       ["literal", ["confirmed", "scheduled"]],
     ]);
-    expect(statusFilter([])).toBeNull();
+    expect(statusFilter([])).toEqual(["in", ["get", "status"], ["literal", []]]);
     expect(statusFilter(undefined)).toBeNull();
+  });
+
+  it("횡단보도 점은 줌 15 부터, 해제·확신도 0.7 미만은 흐리게 (T7.4 줌 3단계)", () => {
+    const [dot, mark] = closureLayers();
+    expect(dot?.minzoom).toBe(15);
+    expect(mark?.minzoom).toBe(15);
+    if (dot?.type !== "circle") throw new Error("circle 레이어");
+    expect(dot.paint?.["circle-opacity"]).toEqual([
+      "case",
+      ["==", ["get", "status"], "released"],
+      0.45,
+      ["<", ["get", "confidence"], 0.7],
+      0.45,
+      0.95,
+    ]);
   });
 
   it("zoneLayer — 기록에 Polygon 이 없으면 비고, 레이어 스펙은 보라 빗금 + 점선", () => {

@@ -2,10 +2,10 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useState } from "react";
+import { CHIP_KINDS, type ChipKind } from "../map/eventKinds";
 import { useRoute } from "../state/RouteProvider";
-import type { Status } from "../types/contracts";
 import { ClosureSheet } from "./ClosureSheet";
-import { CHIP_STATUSES, LayerChips } from "./LayerChips";
+import { LayerChips } from "./LayerChips";
 import styles from "./NaruApp.module.css";
 import { RouteCard } from "./RouteCard";
 import { RoutePanel } from "./RoutePanel";
@@ -19,9 +19,10 @@ const MapView = dynamic(() => import("../map/MapView"), {
 // 홈(시안 01): 길찾기 바 + 칩 + 오늘 통제 시트. 길찾기(시안 02): 출발·도착 패널 + 경로 카드 시트
 export function NaruApp() {
   const { active } = useRoute();
-  const [visible, setVisible] = useState<readonly Status[]>(CHIP_STATUSES);
+  // 칩 = 필터 (T7.4) — 사건 구역·클러스터·횡단보도 점에 같이
+  const [visible, setVisible] = useState<readonly ChipKind[]>(CHIP_KINDS);
   const toggle = useCallback(
-    (s: Status) => setVisible((v) => (v.includes(s) ? v.filter((x) => x !== s) : [...v, s])),
+    (k: ChipKind) => setVisible((v) => (v.includes(k) ? v.filter((x) => x !== k) : [...v, k])),
     [],
   );
   return (

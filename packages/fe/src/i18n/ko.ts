@@ -9,6 +9,7 @@ import type {
   Status,
   SummarySegment,
 } from "../types/contracts";
+import type { ChipKind } from "../map/eventKinds";
 
 export const STATUS_KO: Record<Status, string> = {
   scheduled: "예정",
@@ -23,6 +24,13 @@ export const STATUS_BADGE_KO: Record<Status, string> = {
   scheduled: "제한",
   released: "해제",
   zone_scheduled: "예정",
+};
+
+/** 지금 지도 칩 (T7.4) — 사건 종류. 예정 = 1시간 안 + 오늘·내일 */
+export const CHIP_KO: Record<ChipKind, string> = {
+  confirmed: "통제 중",
+  scheduled: "예정",
+  zone: "예정 구역",
 };
 
 export const TYPE_KO: Record<ClosureType, string> = {

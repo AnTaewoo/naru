@@ -17,6 +17,7 @@ import { MAP_LOCALE_KO, MAP_OUTSIDE_KO } from "../i18n/ko";
 import { inBbox, useClosureDispatch, useClosures } from "../state/ClosureProvider";
 import { POSITION_OPTIONS, useRoute, useRouteDispatch } from "../state/RouteProvider";
 import type { FeatureCollection, RouteResponse, Status } from "../types/contracts";
+import { chipStatuses, type ChipKind } from "./eventKinds";
 import { ICON_IDS, ICON_PIXEL_RATIO, renderIcon } from "./icons";
 import {
   CLOSURE_LAYER_IDS,
@@ -59,8 +60,8 @@ import { baseStyle } from "./tiles";
 const WORKER_URL = new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).href;
 
 export interface MapViewProps {
-  /** 지도에 보일 상태. 비면 전부 */
-  visible?: readonly Status[];
+  /** 켜진 칩 (T7.4) — 횡단보도 점에 건다. 없으면 전부 */
+  visible?: readonly ChipKind[];
 }
 
 export function bboxOf(map: MapLibreMap): string {
@@ -91,8 +92,9 @@ export function centerOf(bbox: string): [number, number] {
   return [(w + e) / 2, (s + n) / 2];
 }
 
+/** 칩 필터 → 상태 in 필터. 칩을 다 끄면 아무것도 안 그린다 (T7.4) */
 export function statusFilter(visible: readonly Status[] | undefined): FilterSpecification | null {
-  return visible && visible.length ? ["in", ["get", "status"], ["literal", [...visible]]] : null;
+  return visible ? ["in", ["get", "status"], ["literal", [...visible]]] : null;
 }
 
 function applyClosures(map: MapLibreMap, fc: FeatureCollection) {
@@ -188,8 +190,8 @@ function syncPin(
   }
 }
 
-function applyFilter(map: MapLibreMap, visible: readonly Status[] | undefined) {
-  const filter = statusFilter(visible);
+function applyFilter(map: MapLibreMap, visible: readonly ChipKind[] | undefined) {
+  const filter = statusFilter(visible ? chipStatuses(visible) : undefined);
   for (const id of Object.values(CLOSURE_LAYER_IDS)) {
     if (map.getLayer(id)) map.setFilter(id, filter);
   }
