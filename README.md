@@ -147,7 +147,7 @@ git clone <repo-url> naru && cd naru
 make setup      # Python·Node 의존성 설치
 make check      # 린트·타입·테스트 (키 없이 기록으로 돔)
 make serve      # MySQL → 마이그레이션 → 빌드 → http://127.0.0.1:3050
-uv run python -m naru_ai.worker --loop   # 워커: 코스 · 공지 · TOPIS 돌발 5분 · 공지 통제 중 버스 위치 60초 (운영은 deploy/naru-worker.service)
+uv run python -m naru_ai.worker --loop   # 워커: 코스 · 공지 · TOPIS 돌발 5분 · 전면 통제·마라톤 버스 위치 60초 기록 (운영은 deploy/naru-worker.service)
 ```
 
 새 공지를 실제로 읽거나 지도 타일을 바꾸려면 `.env`에 키를 넣습니다: `ANTHROPIC_API_KEY`, 카카오 로컬·서울 열린데이터광장 키, 그리고 `packages/fe/.env.local`의 `NEXT_PUBLIC_VWORLD_KEY`.
@@ -187,7 +187,7 @@ naru/
 ## 앞으로
 
 - 2027년 3월 서울국제마라톤 현장에서 예측한 통제와 실제 통제를 비교합니다.
-- 버스 위치로 통제 확신도를 올리고 내리는 기능을 붙입니다 (ADR-013).
+- 2027년 3월 서울마라톤에서 버스 정류소 건너뜀으로 구간별 실제 통제·해제 시각을 확인합니다. 11월 9일 실측에서 부분 차로 행진에는 버스 신호가 맞지 않음을 확인해 전면 통제·마라톤으로 범위를 좁혔습니다.
 
 ## 데이터 출처
 

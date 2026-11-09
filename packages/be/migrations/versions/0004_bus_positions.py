@@ -1,6 +1,6 @@
 """bus_positions — 워커가 보낸 버스 위치 (T6.2, INTERFACE §1.2 v0.13, ADR-013 D)
 
-보정 계열(bus_corrections)은 T6.3 에서 계산 방식과 함께 만든다.
+보정 계열(bus_corrections)은 만들지 않는다 — ADR-013 보류(2026-11-09, 11/9 실측).
 
 Revision ID: 0004
 Revises: 0003

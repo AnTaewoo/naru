@@ -53,7 +53,7 @@ AI 워커가 내놓는 유일한 출력. BE의 `CandidateIntake`(Model)가 `Cros
 - `toward`: 종료 지점 없는 행진의 방향 표현을 **문장 그대로**(예: `"을지로입구역"`). `geometry.kind ∈ {point, segment}`일 때만. 리졸버가 풀면 AI가 `segment`(출발지 → toward)를 만들고 `confidence`를 0.65로 상한(검토 큐), 못 풀면 `point`만 보낸다.
 - `approx`: 파서가 근사 시간("14시경", "오후")을 양끝 10분씩 넓혔으면 `true`. BE는 window를 넓히지도 좁히지도 않고 상태·응답에 그대로 싣는다. 평가는 ±10분 허용.
 - `window.end`가 null이면 "종료 미정". 엔진은 시작+6시간을 임시 end로 두고 evidence에 남긴다.
-- `evidence[].kind ∈ {notice, timetable, topis_incident, bus_skip, bus_return, rtd_spike}`. `ref`는 데이터·recorded 파일 경로.
+- `evidence[].kind ∈ {notice, timetable, topis_incident, bus_skip, bus_return, rtd_spike}`. `ref`는 데이터·recorded 파일 경로. '통제 중' 근거는 `timetable`·`topis_incident` 둘뿐 — `bus_skip`·`bus_return` 은 값으로 남지만 상태를 바꾸지 않는다(ADR-013 보류, 2026-11-09).
 - 돌발(producer `incident`, T6.1): OA-13315 실시간 돌발 중 **집회(10B02)만** — 행사(차 없는 거리·축제)·공사·기타(버스 무정차)·사고와 "(인도)" 보도 집회는 후보가 아니다(README impact). `geometry` = TOPIS 링크 선(OA-13311 LinkVerInfo, 없으면 돌발 좌표 `point`), `type` rally, `confidence` 0.9, `status_hint` scheduled, `summary` = 링크 시작·끝 노드 이름과 도로명(OA-13310 LinkInfo). 같은 링크·같은 시각의 돌발은 한 후보(근거는 돌발마다, 후보 ID = 가장 작은 acc_id). `evidence` = `topis_incident`(`at` = 수신 시각, `ref` = 원문 기록 파일`#acc_id`, `detail.acc_id`·`link_id`). BE 는 같은 횡단보도·겹치는 시각의 공지 후보(smpa·topis·news·seoul_press) 전체에도 그 근거를 붙인다(어느 쪽이 먼저 와도) — 공지 확신도가 0.8 이상이면 시작 뒤 `confirmed`. 범위 안 돌발이 없어도 빈 배치를 보낸다.
 - `notice_ref`는 공지에서 온 후보에만. `excerpt`는 FE 사건 상세의 "공지 원문 보기"에서만 보인다(v0.12, ADR-012 — 목록·통제 근거에는 출처를 쓰지 않는다).
 - `summary` (v0.12, ADR-012, 선택) — 공지 item 의 **구조화 칸만**(문장 없음): `segments[]`{`from_`, `to`, `via[]`}·`points[]` 이름은 파서 spans 의 정규 이름(canonical) 그대로(좌표가 안 풀린 이름도 남는다), `reported_people` 숫자 또는 null, `roads[]` = road_hints·구간 road 의 정규 이름. 같은 item 의 후보는 같은 summary. 코스(시각표) 후보는 null. 화면 문장("…집회 → …행진", "5만 명")은 FE `i18n/ko.ts` 가 만든다.
@@ -79,10 +79,9 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 - 브라우저에서 부르지 않는다. Next.js rewrites 대상에서 `/internal/*`는 제외한다.
 
 ### §1.2 전송: `POST /internal/bus-positions` (AI 워커 → BE, v0.13 ADR-013 D)
-버스는 후보(통제)를 만들지 않는다. 워커가 받은 위치를 판단 없이 그대로 보내고, BE 는 저장만 한다(T6.2). 확신도 보정은 T6.3. 어느 노선을 부르나(ADR-013 G·I):
-- 1순위 공지 통제 — 통제 창(시작 1시간 전 ~ 끝+30분)에 그 통제 횡단보도 100 m 안 정류소가 많은 노선, 사건마다 최대 3개, 60초마다. 원문 `data/recorded/bus/notice/`.
-- 2순위 TOPIS 집회·행사 돌발(기준 데이터, 보정에는 안 씀) — 지금 걸린 돌발마다 링크 선 100 m 안 노선 1개, 120초마다, 하루 300회(공지가 쓰고 남은 만큼, 돌발 하나 30회까지). 원문 `data/recorded/bus/incident/`.
-- 둘 다 심야(N)·새벽 노선 제외, 전체 하루 900회 상한. 같은 배치 형식 — 어느 쪽인지는 `ref` 의 폴더로 안다.
+버스는 후보(통제)를 만들지 않고 상태도 바꾸지 않는다 — 확신도 보정은 뺐다(ADR-013 보류, 2026-11-09: 1개 차로 행진에서 버스 152회 정상 통과). 워커는 **기록만** 한다: `NARU_BUS_RECORD_ONLY=1`(기본)이면 이 엔드포인트를 부르지 않는다. 0 이면 받은 위치를 판단 없이 그대로 보내고 BE 는 `bus_positions` 에 저장만 한다(T6.2). 어느 노선을 부르나:
+- 전면 통제(공지 파싱 `lanes.scope` full·one_side_full)·마라톤(`type` marathon)의 통제 창(시작 1시간 전 ~ 끝+30분)에 그 통제 횡단보도 100 m 안 정류소가 많은 노선, 사건마다 최대 3개, 60초마다. 원문 `data/recorded/bus/notice/`(전면 통제)·`bus/marathon/`.
+- 심야(N)·새벽 노선 제외, 하루 900회 상한. `bus/incident/`(2순위 TOPIS 돌발)는 2026-11-09 까지의 기록 — 대상에서 뺐다.
 
 **요청** 헤더는 §1.1 과 같다. 예시는 2026-11-08 18:38 실제 기록(노선 01A 의 첫 차량).
 ```json
@@ -124,7 +123,7 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
   ],
   "avoided": [
     {"crosswalk_id": "<관리번호>", "status": "confirmed", "reason": "세종대로 전면통제", "until": "2027-03-21T11:15:00+09:00", "approx": false,
-     "evidence": [{"kind": "bus_skip", "ref": "data/recorded/seoul_bus_pos/20270321-080015.json", "at": "2027-03-21T08:00:15+09:00"}]}
+     "evidence": [{"kind": "topis_incident", "ref": "data/recorded/incident/20270321T080015_AccInfo.json", "at": "2027-03-21T08:00:15+09:00"}]}
   ],
   "baseline": {
     "route": {"type": "LineString", "coordinates": []},
@@ -266,3 +265,4 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 | 2026-11-08 | v0.12 (보충) | §1 돌발 후보(집회 10B02만·TOPIS 링크 선·0.9·`topis_incident` 를 같은 횡단보도·겹치는 시각의 공지 후보에도), §3.1 `data_as_of.topis_incident` = 돌발 배치를 마지막으로 받은 시각. 스키마 그대로 (ROADMAP T6.1) | 태우 (T6.1) |
 | 2026-11-08 | v0.13 | §1.2 `POST /internal/bus-positions` 버스 위치 전송 추가(getBusPosByRtid 필드 그대로, 같은 노선·차량·시각은 한 번) — 버스는 후보를 만들지 않는다 (ADR-013 D) | 태우 승인 (ADR-013) |
 | 2026-11-09 | v0.13 (보충) | §3.1 사건 `districts`(자치구, 기본 빈 목록) 추가 — 서비스 범위 서울 전체(T6.9)의 구 필터 칩 | 태우 (T6.9) |
+| 2026-11-09 | v0.13 (보충) | ADR-013 보류 — §1 `bus_skip`·`bus_return` 은 상태를 바꾸지 않는다('통제 중' 근거 = `timetable`·`topis_incident`), §1.2 버스는 전면 통제·마라톤만 기록(`NARU_BUS_RECORD_ONLY`), §2 예시 근거 `topis_incident`. 스키마 그대로 | 태우 (2026-11-09) |
