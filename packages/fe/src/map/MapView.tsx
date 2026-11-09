@@ -23,7 +23,14 @@ import {
 } from "../state/ClosureProvider";
 import { POSITION_OPTIONS, useRoute, useRouteDispatch } from "../state/RouteProvider";
 import type { ClosureEvent, FeatureCollection, RouteResponse, Status } from "../types/contracts";
-import { CHIP_KINDS, chipStatuses, zoomBand, type ChipKind, type ZoomBand } from "./eventKinds";
+import {
+  AREA_MIN_ZOOM,
+  CHIP_KINDS,
+  chipStatuses,
+  zoomBand,
+  type ChipKind,
+  type ZoomBand,
+} from "./eventKinds";
 import { ICON_IDS, ICON_PIXEL_RATIO, renderCount, renderIcon } from "./icons";
 import {
   CLOSURE_LAYER_IDS,
@@ -526,20 +533,21 @@ export function MapView({ visible }: MapViewProps) {
     map.fitBounds(bounds, { padding: fitPadding(map), maxZoom: 17 });
   }, [original, route]);
 
-  // 예시로 보기 (T7.11) — 그 통제 구역으로, 절반 시트 위에. 누를 때마다(순번)
+  // 예시로 보기 (T7.11) — 그 통제 구역으로, 절반 시트 위에. 누를 때마다(순번). 줌은 구역이 그려지는 12 이상 —
+  // 9.5 km 국회대로 행진은 다 담으면 11.6 이라 클러스터만 보인다
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !frame) return;
     const [w, s, e, n] = frame.bbox;
     const run = () => {
       framed.current = true;
-      map.fitBounds(
-        [
-          [w, s],
-          [e, n],
-        ],
-        { padding: framePadding(map), maxZoom: 16 },
-      );
+      const bounds: [[number, number], [number, number]] = [
+        [w, s],
+        [e, n],
+      ];
+      const cam = map.cameraForBounds(bounds, { padding: framePadding(map), maxZoom: 16 });
+      if (!cam) return;
+      map.easeTo({ ...cam, zoom: Math.max(cam.zoom ?? AREA_MIN_ZOOM, AREA_MIN_ZOOM) });
     };
     if (loaded.current) run();
     else map.once("load", run);

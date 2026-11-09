@@ -215,10 +215,14 @@ test("예시로 보기 — 국회대로 행진을 누르면 11/9 12:00, 지도�
   await expect(now.getByRole("region", { name: "통제 중" })).toContainText(
     "국회의사당앞 → 효자동삼거리 행진",
   );
-  // 9.5 km 행진 bbox(examples.ts)에 절반 시트 위로 맞춤 — 줌 12 안팎
-  await expect
-    .poll(() => Number(new URL(page.url()).hash.split("/")[0]?.slice(5)))
-    .toBeLessThan(13);
+  // 9.5 km 행진 bbox(examples.ts)에 절반 시트 위로 맞춤 — 다 담으면 11.6 이라 구역이 그려지는 12 로
+  const zoom = () => Number(new URL(page.url()).hash.split("/")[0]?.slice(5));
+  await expect.poll(zoom).toBeGreaterThanOrEqual(12);
+  expect(zoom()).toBeLessThan(13);
+  await expect(page.getByRole("region", { name: "지도", exact: true })).toHaveAttribute(
+    "data-band",
+    "area",
+  );
   await page.waitForTimeout(1500);
   await page.screenshot({ path: "test-results/live-map-example.png" });
 });
