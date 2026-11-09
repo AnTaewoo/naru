@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   type Dispatch,
   type ReactNode,
 } from "react";
@@ -14,7 +15,8 @@ import type { ClosureEvent, DataAsOf, FeatureCollection } from "../types/contrac
 import { useNaruApi } from "./ApiProvider";
 import { useTime } from "./TimeProvider";
 
-// Provider 3/4 — /api/closures 결과. t·bbox 가 바뀌면 다시 받는다 (이전 요청은 Abort). CONVENTIONS §5.5
+// Provider 3/4 — 지금 지도 사건(/api/closures/events?at=t, 60초 ETag)과 화면의 횡단보도(/api/closures).
+// t·화면이 바뀌면 다시 받는다 (이전 요청은 Abort). CONVENTIONS §5.5, T7.4
 export type ClosureStatus = "idle" | "loading" | "ready" | "error";
 
 export interface ClosureState {
@@ -25,8 +27,14 @@ export interface ClosureState {
   at: string | null;
   bbox: string;
   error: string | null;
-  /** 통제 불러오기 목록 (GET /closures/events, T5.4). null = 아직 못 받음 */
+  /** 지금 지도 사건 (GET /closures/events?at=t, ADR-014 A). null = 아직 못 받음 */
   events: ClosureEvent[] | null;
+  /** 사건 status 의 기준 시각 (응답 at) */
+  eventsAt: string | null;
+  /** 마지막 사건 응답의 ETag — 60초 요청의 If-None-Match */
+  eventsEtag: string | null;
+  /** 300건 상한에 잘렸나 */
+  truncated: boolean;
   eventsError: string | null;
   /** 보행망 범위 (같은 응답의 coverage, INTERFACE v0.10) — 내 위치가 밖이면 안내 (T5.7). null = 모름 */
   coverage: Bbox4 | null;
@@ -66,6 +74,9 @@ export type ClosureAction =
   | {
       type: "receiveEvents";
       events: ClosureEvent[];
+      at: string;
+      etag: string | null;
+      truncated: boolean;
       coverage: Bbox4 | null;
       dataAsOf: DataAsOf | null;
     }
@@ -84,6 +95,9 @@ export function initialClosureState(partial: Partial<ClosureState> = {}): Closur
     bbox: DEFAULT_BBOX,
     error: null,
     events: null,
+    eventsAt: null,
+    eventsEtag: null,
+    truncated: false,
     eventsError: null,
     coverage: null,
     dataAsOf: null,
@@ -113,6 +127,9 @@ export function closureReducer(state: ClosureState, action: ClosureAction): Clos
       return {
         ...state,
         events: action.events,
+        eventsAt: action.at,
+        eventsEtag: action.etag,
+        truncated: action.truncated,
         coverage: action.coverage,
         dataAsOf: action.dataAsOf,
         eventsError: null,
@@ -132,12 +149,15 @@ export function ClosureProvider({
   initialState,
   fetchEnabled = true,
   debounceMs = 250,
+  pollMs = 60_000,
 }: {
   children: ReactNode;
   /** 렌더 테스트: recorded 응답을 넣고 네트워크 없이 그린다 */
   initialState?: Partial<ClosureState>;
   fetchEnabled?: boolean;
   debounceMs?: number;
+  /** 사건 다시 받기 간격 (ADR-014 A — 60초, ETag 가 같으면 304) */
+  pollMs?: number;
 }) {
   const [state, dispatch] = useReducer(closureReducer, initialState, initialClosureState);
   const api = useNaruApi();
@@ -164,27 +184,53 @@ export function ClosureProvider({
     };
   }, [api, t, ready, bbox, fetchEnabled, debounceMs]);
 
-  // 통제 불러오기 목록 — 시각·범위와 상관없어 마운트 때 한 번 (ADR-010)
+  // 지금 지도 사건 (T7.4) — t 가 바뀌면 바로, 그 뒤 pollMs 마다 If-None-Match. 304 면 dispatch 하지
+  // 않는다(다시 그리지 않음). 숨은 탭은 건너뛰고 다시 보이면 바로 한 번
+  const etag = useRef(state.eventsEtag);
   useEffect(() => {
-    if (!fetchEnabled) return;
-    const controller = new AbortController();
-    api
-      .events({}, controller.signal)
-      .then((r) =>
-        dispatch({
-          type: "receiveEvents",
-          events: r.events,
-          coverage: asBbox4(r.coverage),
-          dataAsOf: r.data_as_of,
-        }),
-      )
-      .catch((e: unknown) => {
-        if (controller.signal.aborted) return;
-        const msg = e instanceof NaruApiError ? e.message : "통제 목록을 받지 못했다";
-        dispatch({ type: "failEvents", error: msg });
-      });
-    return () => controller.abort();
-  }, [api, fetchEnabled]);
+    etag.current = state.eventsEtag;
+  }, [state.eventsEtag]);
+  useEffect(() => {
+    if (!fetchEnabled || !ready) return;
+    let controller: AbortController | null = null;
+    const load = () => {
+      controller?.abort();
+      const c = new AbortController();
+      controller = c;
+      api
+        .events({ at: t }, c.signal, etag.current)
+        .then((r) => {
+          if (!r.changed) return;
+          dispatch({
+            type: "receiveEvents",
+            events: r.body.events,
+            at: r.body.at,
+            etag: r.etag,
+            truncated: r.body.truncated ?? false,
+            coverage: asBbox4(r.body.coverage),
+            dataAsOf: r.body.data_as_of,
+          });
+        })
+        .catch((e: unknown) => {
+          if (c.signal.aborted) return;
+          const msg = e instanceof NaruApiError ? e.message : "통제 목록을 받지 못했다";
+          dispatch({ type: "failEvents", error: msg });
+        });
+    };
+    load();
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "hidden") load();
+    }, pollMs);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      controller?.abort();
+    };
+  }, [api, t, ready, fetchEnabled, pollMs]);
 
   const value = useMemo(() => state, [state]);
   return (

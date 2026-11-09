@@ -16,6 +16,8 @@ import {
   parseGeocodeSearch,
   parseRouteResponse,
   placeLngLat,
+  readEvents,
+  eventsInit,
   routeUrl,
 } from "./naruApiClient";
 
@@ -83,7 +85,7 @@ describe("naruApiClient", () => {
     expect(() => parseFeatureCollection({ type: "Feature" })).toThrow(NaruApiError);
   });
 
-  it("통제 사건 (INTERFACE §3.1, T5.4) — URL 은 bbox 선택, recorded 응답을 그대로 파싱", () => {
+  it("통제 사건 (INTERFACE §3.1) — URL 은 bbox 선택, recorded 응답을 그대로 파싱", () => {
     expect(eventsUrl("/api")).toBe("/api/closures/events");
     const scoped = new URL(
       eventsUrl("/api", { bbox: "126.965,37.555,126.990,37.580" }),
@@ -91,23 +93,49 @@ describe("naruApiClient", () => {
     );
     expect(scoped.pathname).toBe("/api/closures/events");
     expect(scoped.searchParams.get("bbox")).toBe("126.965,37.555,126.990,37.580");
-    const rec = recorded("closure_events");
+    const rec = recorded("closure_events_live_1107_1530");
     expect(rec.path).toBe("/closures/events");
     const body = parseClosureEvents(rec.body);
-    // 기록 당시 개발 DB: 11/7 집회 2 + 3/15 마라톤 5, 시작 늦은 순 (closure_events.json 을 열어 확인)
-    expect(body.events).toHaveLength(7);
-    expect(body.events[0]?.window.start).toBe("2026-11-07T15:00:00+09:00");
-    expect(body.events[0]?.crosswalks).toBe(31);
-    expect(body.events.at(-1)?.reason).toBe("marathon 출발지 광화문 광장 (미국대사관 앞 세종대로)");
-    // v0.10 coverage — 보행망 노드 bbox (T5.7 재기록). 없으면 계약 위반
+    // 11/7 15:30 사건 13, 시작 늦은 순 — 처음은 경찰청 r06 16:00, 끝은 TOPIS 공지 6300 05:00 (기록을 열어 확인)
+    expect(body.events).toHaveLength(13);
+    expect(body.events[0]?.window.start).toBe("2026-11-07T16:00:00+09:00");
+    expect(body.events.at(-1)?.source).toBe("topis");
+    // v0.10 coverage — 보행망 bbox. 없으면 계약 위반
     expect(body.coverage).toHaveLength(4);
     expect(() => parseClosureEvents(recorded("closures_0745").body)).toThrow(NaruApiError);
     expect(() => parseClosureEvents({ events: body.events })).toThrow(NaruApiError);
-    // v0.12 data_as_of 필수 — 기록: 경찰청 11/6 18:00 공지, 마라톤 3/12 16:07 시각표
+    // v0.12 data_as_of 필수 — 경찰청 PDF 기준 작성 11/6 18:00
     expect(body.data_as_of.smpa).toBe("2026-11-06T18:00:00+09:00");
-    expect(() => parseClosureEvents({ events: body.events, coverage: body.coverage })).toThrow(
-      NaruApiError,
-    );
+    const { events, coverage, data_as_of } = body;
+    expect(() => parseClosureEvents({ events, coverage })).toThrow(NaruApiError);
+    expect(() => parseClosureEvents({ events, coverage, data_as_of })).toThrow(NaruApiError); // v0.14 at
+  });
+
+  it("사건 v2 조건부 요청 (T7.4) — at 질의, If-None-Match·no-store, 304 면 그대로", () => {
+    // scripts/record_live_events.py 가 실제 앱에서 받은 응답 — 보낸 질의·받은 ETag 를 같이 남겼다
+    const rec = recorded("closure_events_live_1107_1530");
+    expect(rec.query).toEqual({ at: "2026-11-07T15:30:00+09:00" });
+    const url = new URL(eventsUrl("/api", { at: "2026-11-07T15:30:00+09:00" }), "http://naru.test");
+    expect(url.pathname).toBe("/api/closures/events");
+    expect(url.searchParams.get("at")).toBe("2026-11-07T15:30:00+09:00");
+    const etag = rec.etag ?? null;
+    expect(etag).toMatch(/^"[0-9a-f]{40}"$/); // 본문 sha1 (closure_view.render_events)
+    const got = readEvents(200, etag, rec.body);
+    if (!got.changed) throw new Error("200 인데 바뀐 것 없음");
+    expect(got.etag).toBe(etag);
+    expect(got.body.at).toBe("2026-11-07T15:30:00+09:00");
+    expect(got.body.events).toHaveLength(13);
+    expect(got.body.truncated).toBe(false);
+    // 브라우저 캐시를 거치지 않고 If-None-Match 를 직접 단다 — 304 를 JS 가 본다
+    expect(eventsInit(null)).toMatchObject({ cache: "no-store", headers: {} });
+    expect(eventsInit(null).headers).not.toHaveProperty("if-none-match");
+    expect(eventsInit(etag).headers).toMatchObject({ "if-none-match": etag });
+    expect(readEvents(304, etag, null, etag)).toEqual({ changed: false, etag });
+    expect(readEvents(304, null, null, etag)).toEqual({ changed: false, etag }); // ETag 머리가 없으면 보낸 것
+    // v0.14 응답 at 필수 — 그 전 기록(closure_events.json, T5.4)은 계약 위반
+    expect(() => readEvents(200, null, recorded("closure_events").body)).toThrow(NaruApiError);
+    const err = recorded("error_invalid_query");
+    expect(() => readEvents(err.status, null, err.body)).toThrow(NaruApiError);
   });
 
   it("지오코딩 (INTERFACE §7, T5.8) — URL, recorded 검색·주소 응답 파싱, 오류 본문", () => {

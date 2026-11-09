@@ -14,7 +14,7 @@ import {
 } from "../i18n/ko";
 import { parseGeocodeSearch, placeLngLat } from "../api/naruApiClient";
 import type { LngLat } from "../map/layers/routeLayer";
-import type { ErrorBody } from "../types/contracts";
+import type { ClosureEventsResponse, ErrorBody } from "../types/contracts";
 import { recorded, recordedClosures, recordedEvents, recordedRoute } from "../test/recorded";
 import {
   DEFAULT_BBOX,
@@ -269,18 +269,33 @@ const events = recordedEvents().events;
 // 같은 파일의 coverage (INTERFACE v0.10) — 보행망 노드 bbox (T5.7 재기록, MANIFEST)
 const coverage = asBbox4(recordedEvents().coverage);
 
-describe("closureReducer — 통제 사건·지도 맞춤 (T5.4)", () => {
-  it("receiveEvents 로 목록, focus 는 누를 때마다 순번이 올라 같은 사건도 다시 맞춘다", () => {
+describe("closureReducer — 지금 지도 사건·지도 맞춤 (T5.4·T7.4)", () => {
+  // 사건 v2 기록 (scripts/record_live_events.py) — 11/7 15:30 사건 13, 응답 ETag 같이
+  const rec = recorded("closure_events_live_1107_1530");
+  const body = rec.body as ClosureEventsResponse;
+  it("receiveEvents 로 사건·기준 시각·ETag·잘림, focus 는 누를 때마다 순번이 올라 같은 사건도 다시 맞춘다", () => {
     const s0 = initialClosureState();
     expect(s0.events).toBeNull();
+    expect(s0.eventsEtag).toBeNull();
     expect(s0.focus).toBeNull();
     expect(s0.coverage).toBeNull();
-    const dataAsOf = recordedEvents().data_as_of;
-    const s1 = closureReducer(s0, { type: "receiveEvents", events, coverage, dataAsOf });
-    expect(s1.dataAsOf).toBe(dataAsOf);
-    expect(s1.events).toBe(events);
-    expect(s1.coverage).toBe(coverage);
-    const bbox = events[0] ? eventBbox(events[0]) : null;
+    const s1 = closureReducer(s0, {
+      type: "receiveEvents",
+      events: body.events,
+      at: body.at,
+      etag: rec.etag ?? null,
+      truncated: body.truncated ?? false,
+      coverage: asBbox4(body.coverage),
+      dataAsOf: body.data_as_of,
+    });
+    expect(s1.events).toBe(body.events);
+    expect(s1.eventsAt).toBe("2026-11-07T15:30:00+09:00");
+    expect(s1.eventsEtag).toBe(rec.etag);
+    expect(s1.truncated).toBe(false);
+    expect(s1.dataAsOf).toBe(body.data_as_of);
+    expect(s1.coverage).toEqual(body.coverage);
+    const first = body.events[0];
+    const bbox = first ? eventBbox(first) : null;
     if (!bbox) throw new Error("기록 사건에 bbox 가 없다");
     const f1 = closureReducer(s1, { type: "focus", bbox });
     expect(f1.focus).toEqual({ bbox, seq: 1 });
@@ -288,7 +303,7 @@ describe("closureReducer — 통제 사건·지도 맞춤 (T5.4)", () => {
     // 실제 Flask 오류 문구 (recorded naru_api/error_not_found.json)
     const err = recorded("error_not_found").body as ErrorBody;
     const failed = closureReducer(s1, { type: "failEvents", error: err.error.message });
-    expect(failed.events).toBe(events); // 실패해도 받아 둔 목록은 그대로
+    expect(failed.events).toBe(body.events); // 실패해도 받아 둔 사건은 그대로
     expect(failed.eventsError).toBe(err.error.message);
   });
 });

@@ -26,7 +26,14 @@ export interface ClosuresParams {
 export interface EventsParams {
   /** "minLng,minLat,maxLng,maxLat" — 없으면 전체 (INTERFACE §3.1) */
   bbox?: string;
+  /** ISO 8601 + 오프셋 — 사건 status 의 기준 시각, 기본 창 = 그때 진행 중 + 다음 날 24:00 KST (v0.14) */
+  at?: string;
 }
+
+/** 사건 조건부 요청 결과 (T7.4) — 304 면 바뀐 것 없음(본문 없음) */
+export type EventsFetch =
+  | { changed: false; etag: string }
+  | { changed: true; etag: string | null; body: ClosureEventsResponse };
 
 export interface GeocodeSearchParams {
   /** 검색어 2~50자 (INTERFACE §7.1) */
@@ -62,6 +69,7 @@ export function closuresUrl(baseUrl: string, p: ClosuresParams): string {
 
 export function eventsUrl(baseUrl: string, p: EventsParams = {}): string {
   const q = new URLSearchParams();
+  if (p.at) q.set("at", p.at);
   if (p.bbox) q.set("bbox", p.bbox);
   const qs = q.toString();
   return `${baseUrl}/closures/events${qs ? `?${qs}` : ""}`;
@@ -109,7 +117,37 @@ export function parseClosureEvents(json: unknown): ClosureEventsResponse {
   const coverage: unknown = json.coverage; // v0.10 부터 필수 — 보행망 bbox (T5.7)
   if (!Array.isArray(coverage) || coverage.length !== 4) throw new NaruApiError(200, null);
   if (!isRecord(json.data_as_of)) throw new NaruApiError(200, null); // v0.12 필수 (T5.9)
+  if (typeof json.at !== "string") throw new NaruApiError(200, null); // v0.14 필수 (T7.1)
   return json as unknown as ClosureEventsResponse;
+}
+
+/**
+ * 사건 요청 (T7.4) — 브라우저 HTTP 캐시를 거치지 않고(no-store) If-None-Match 를 직접 단다. 캐시에 맡기면
+ * 304 가 캐시 본문 200 으로 바뀌어 JS 가 '그대로'를 모른다
+ */
+export function eventsInit(etag: string | null, signal?: AbortSignal): RequestInit {
+  const headers: Record<string, string> = { accept: "application/json" };
+  if (etag) headers["if-none-match"] = etag;
+  return { signal, cache: "no-store", headers };
+}
+
+/** 사건 응답 읽기 — 304 는 바뀐 것 없음(ETag 머리가 없으면 보낸 것), 그 밖의 오류는 §6 본문 */
+export function readEvents(
+  status: number,
+  etag: string | null,
+  json: unknown,
+  sent: string | null = null,
+): EventsFetch {
+  if (status === 304) {
+    const tag = etag ?? sent;
+    if (!tag) throw new NaruApiError(304, null);
+    return { changed: false, etag: tag };
+  }
+  if (status < 200 || status >= 300) {
+    const body = isRecord(json) && isRecord(json.error) ? (json as unknown as ErrorBody) : null;
+    throw new NaruApiError(status, body);
+  }
+  return { changed: true, etag, body: parseClosureEvents(json) };
 }
 
 /** 장소 좌표 [lng, lat] (생성 타입이 unknown 튜플이라 숫자를 확인한다) */
@@ -143,7 +181,8 @@ export interface NaruApiClient {
   readonly baseUrl: string;
   route(p: RouteParams, signal?: AbortSignal): Promise<RouteResponse>;
   closures(p: ClosuresParams, signal?: AbortSignal): Promise<FeatureCollection>;
-  events(p?: EventsParams, signal?: AbortSignal): Promise<ClosureEventsResponse>;
+  /** etag 를 주면 조건부 — 그대로면 { changed: false } (T7.4) */
+  events(p?: EventsParams, signal?: AbortSignal, etag?: string | null): Promise<EventsFetch>;
   geocodeSearch(p: GeocodeSearchParams, signal?: AbortSignal): Promise<GeocodeSearchResponse>;
   geocodeReverse(p: GeocodeReverseParams, signal?: AbortSignal): Promise<GeocodeReverseResponse>;
 }
@@ -172,8 +211,11 @@ export function createNaruApiClient(
       parseRouteResponse(await getJson(routeUrl(baseUrl, p), fetchImpl, signal)),
     closures: async (p, signal) =>
       parseFeatureCollection(await getJson(closuresUrl(baseUrl, p), fetchImpl, signal)),
-    events: async (p, signal) =>
-      parseClosureEvents(await getJson(eventsUrl(baseUrl, p), fetchImpl, signal)),
+    events: async (p, signal, etag = null) => {
+      const res = await fetchImpl(eventsUrl(baseUrl, p), eventsInit(etag, signal));
+      const json: unknown = res.status === 304 ? null : await res.json().catch(() => null);
+      return readEvents(res.status, res.headers.get("etag"), json, etag);
+    },
     geocodeSearch: async (p, signal) =>
       parseGeocodeSearch(await getJson(geocodeSearchUrl(baseUrl, p), fetchImpl, signal)),
     geocodeReverse: async (p, signal) =>

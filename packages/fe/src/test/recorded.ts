@@ -11,6 +11,8 @@ interface Recorded {
   /** 기록할 때 보낸 질의 (예: route 의 from·to·depart_at) */
   query?: Record<string, string>;
   status: number;
+  /** 응답 ETag (사건 v2 기록, scripts/record_live_events.py) */
+  etag?: string;
   body: unknown;
 }
 
