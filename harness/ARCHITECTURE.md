@@ -94,10 +94,11 @@
 | `app/layout.tsx` · `app/page.tsx` | Server | 뼈대·푸터, `<NaruApp />` 렌더만 |
 | `app/providers.tsx` | **'use client'** | `ApiProvider > TimeProvider > ClosureProvider > RouteProvider` |
 | `components/NaruApp.tsx` | **'use client'** | 화면 루트, `MapView`를 `dynamic(..., { ssr: false })` |
-| `api/naruApiClient.ts` | client | `/api/route`, `/api/closures` — 네트워크 만지는 유일한 파일 |
+| `api/naruApiClient.ts` | client | `/api/route`, `/api/closures`, `/api/closures/events`(If-None-Match → 304, T7.4) — 네트워크 만지는 유일한 파일 |
 | `state/*Provider.tsx` | client | 각각 StateCtx + DispatchCtx, `useReducer` |
 | `map/MapView.tsx` | client | `useRef(maplibre.Map)`, `source.setData()` |
-| `map/layers/{closure,route,zone}Layer.ts` | 순수 함수 | contracts → MapLibre source |
+| `map/layers/{closure,route,zone,event}Layer.ts` | 순수 함수 | contracts → MapLibre source. event = 지금 지도 사건 중심점(클러스터)·구역 (T7.4) |
+| `map/eventKinds.ts` | 순수 함수 | 사건 종류(통제 중·1시간 안·예정·예정 구역·해제)·칩 수·목록 순서·줌 3단계 (T7.4) |
 | `components/TimeSlider` · `LegList` · `EvidencePopover` · `Footer` | client | |
 
 ## 흐름
