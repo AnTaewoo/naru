@@ -12,13 +12,20 @@ import {
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { SHEET_COLLAPSED_PX } from "../components/BottomSheet";
+import { SHEET_COLLAPSED_PX, stageHeight } from "../components/BottomSheet";
 import { MAP_LOCALE_KO, MAP_OUTSIDE_KO } from "../i18n/ko";
-import { inBbox, useClosureDispatch, useClosures } from "../state/ClosureProvider";
+import { inBbox, useClosureDispatch, useClosures, type Bbox4 } from "../state/ClosureProvider";
 import { POSITION_OPTIONS, useRoute, useRouteDispatch } from "../state/RouteProvider";
-import type { FeatureCollection, RouteResponse, Status } from "../types/contracts";
-import { chipStatuses, type ChipKind } from "./eventKinds";
-import { ICON_IDS, ICON_PIXEL_RATIO, renderIcon } from "./icons";
+import type { ClosureEvent, FeatureCollection, RouteResponse, Status } from "../types/contracts";
+import {
+  AREA_MIN_ZOOM,
+  CHIP_KINDS,
+  chipStatuses,
+  zoomBand,
+  type ChipKind,
+  type ZoomBand,
+} from "./eventKinds";
+import { ICON_IDS, ICON_PIXEL_RATIO, renderCount, renderIcon } from "./icons";
 import {
   CLOSURE_LAYER_IDS,
   CLOSURE_SOURCE_ID,
@@ -47,6 +54,17 @@ import {
   viewPaint,
   type LngLat,
 } from "./layers/routeLayer";
+import {
+  EVENT_AREA_SOURCE_ID,
+  EVENT_LAYER_IDS,
+  EVENT_POINT_SOURCE_ID,
+  eventAreaSource,
+  eventAreas,
+  eventLayers,
+  eventPointSource,
+  eventPoints,
+  eventsBounds,
+} from "./layers/eventLayer";
 import { ZONE_SOURCE_ID, zoneLayers, zonePolygons } from "./layers/zoneLayer";
 import styles from "./MapView.module.css";
 import { baseStyle } from "./tiles";
@@ -60,9 +78,12 @@ import { baseStyle } from "./tiles";
 const WORKER_URL = new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).href;
 
 export interface MapViewProps {
-  /** 켜진 칩 (T7.4) — 횡단보도 점에 건다. 없으면 전부 */
+  /** 켜진 칩 (T7.4) — 사건 구역·클러스터와 횡단보도 점에 같이 건다. 없으면 전부 */
   visible?: readonly ChipKind[];
 }
+
+/** 처음 화면 — 서울 쪽(줌 10). 사건 응답이 오면 그 사건들(없으면 coverage)에 맞춘다 (T7.4) */
+const START_ZOOM = 10;
 
 export function bboxOf(map: MapLibreMap): string {
   const b = map.getBounds();
@@ -102,6 +123,19 @@ function applyClosures(map: MapLibreMap, fc: FeatureCollection) {
   if (points instanceof GeoJSONSource) void points.setData(closurePoints(fc));
   const zones = map.getSource(ZONE_SOURCE_ID);
   if (zones instanceof GeoJSONSource) void zones.setData(zonePolygons(fc));
+}
+
+/** 지금 지도 사건 (T7.4) — 칩이 꺼진 종류는 소스에서 뺀다(클러스터 개수가 소스에서 세어진다) */
+function applyEvents(
+  map: MapLibreMap,
+  events: readonly ClosureEvent[],
+  atMs: number,
+  visible: readonly ChipKind[],
+) {
+  const points = map.getSource(EVENT_POINT_SOURCE_ID);
+  if (points instanceof GeoJSONSource) void points.setData(eventPoints(events, atMs, visible));
+  const areas = map.getSource(EVENT_AREA_SOURCE_ID);
+  if (areas instanceof GeoJSONSource) void areas.setData(eventAreas(events, atMs, visible));
 }
 
 function applyRoute(map: MapLibreMap, route: RouteResponse | null) {
@@ -146,6 +180,19 @@ function fitPadding(map: MapLibreMap) {
   const top = Math.round(Math.max(ctrlBottom, 0) + 50);
   const bottom = Math.max(0, Math.min(SHEET_COLLAPSED_PX + 24, h - top - 80));
   return { top, bottom, left: 40, right: 40 };
+}
+
+/** 첫 화면 맞춤 여백 (T7.4) — 위는 지도 컨트롤 윗변(검색·칩 아래), 아래는 절반 시트 */
+function framePadding(map: MapLibreMap) {
+  const container = map.getContainer();
+  const h = container.clientHeight;
+  const ctrl = container.querySelector(".maplibregl-ctrl-top-right");
+  const ctrlTop = ctrl
+    ? ctrl.getBoundingClientRect().top - container.getBoundingClientRect().top
+    : 0;
+  const top = Math.round(Math.max(ctrlTop, 0));
+  const bottom = Math.max(0, Math.min(stageHeight("half", h) + 8, h - top - 80));
+  return { top, bottom, left: 24, right: 24 };
 }
 
 function fitRoute(map: MapLibreMap, route: RouteResponse | null, fitted: RefObject<string | null>) {
@@ -201,7 +248,7 @@ export function MapView({ visible }: MapViewProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const loaded = useRef(false);
-  const { closures, bbox, focus, coverage } = useClosures();
+  const { closures, bbox, focus, coverage, events, eventsAt } = useClosures();
   const dispatch = useClosureDispatch();
   const { route, from, to, active, view } = useRoute();
   // 원래 길 카드를 골랐나 (T5.11) — 피한 통제가 없으면 원래 길도 없다
@@ -222,17 +269,28 @@ export function MapView({ visible }: MapViewProps) {
   const visibleRef = useRef(visible);
   const routeRef = useRef(route);
   const initialBbox = useRef(bbox);
+  // 지금 지도 사건 (T7.4) — 종류는 응답 at 기준
+  const atMs = eventsAt ? Date.parse(eventsAt) : 0;
+  const eventsRef = useRef({ events: events ?? [], atMs });
+  // 카메라를 사람·경로·맞춤이 이미 정했나 — 아니면 coverage(서울 전체)가 오면 한 번 맞춘다
+  const framed = useRef(false);
+  // 줌 3단계 (T7.4) — e2e 가 data-band 로 본다
+  const [band, setBand] = useState<ZoomBand>(zoomBand(START_ZOOM));
 
   useEffect(() => {
     if (!container.current) return;
     setWorkerUrl(WORKER_URL);
+    // 주소에 카메라가 있으면 그 화면 — 지도가 만들어지며 #map= 을 바로 쓰니 그 전에 본다
+    if (/[#&]map=/.test(window.location.hash)) framed.current = true;
     const map = new MapLibreMap({
       container: container.current,
       style: baseStyle(process.env.NEXT_PUBLIC_VWORLD_KEY),
       center: centerOf(initialBbox.current),
-      zoom: 15,
+      zoom: START_ZOOM,
       attributionControl: false,
       locale: MAP_LOCALE_KO,
+      // 카메라를 주소 #map=줌/위도/경도 로 — 링크로 그 화면, e2e 는 줌 단계를 바로 연다 (T7.4)
+      hash: "map",
     });
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     // 내 위치 찾기 (T5.7) — 한 번 찾아 파란 점을 찍고 옮긴다. 보행망 밖이면 안내
@@ -241,6 +299,7 @@ export function MapView({ visible }: MapViewProps) {
       fitBoundsOptions: { maxZoom: 16 },
     });
     geolocate.on("geolocate", (e) => {
+      framed.current = true;
       const cov = coverageRef.current;
       const outside = cov !== null && !inBbox([e.coords.longitude, e.coords.latitude], cov);
       setNotice(outside ? MAP_OUTSIDE_KO : null);
@@ -254,6 +313,10 @@ export function MapView({ visible }: MapViewProps) {
         const image = renderIcon(id);
         if (image && !map.hasImage(id)) map.addImage(id, image, { pixelRatio: ICON_PIXEL_RATIO });
       }
+      const layers = eventLayers();
+      const below = new Set<string>([EVENT_LAYER_IDS.areaFill, EVENT_LAYER_IDS.areaLine]);
+      map.addSource(EVENT_AREA_SOURCE_ID, eventAreaSource(eventAreas([], 0, CHIP_KINDS)));
+      map.addSource(EVENT_POINT_SOURCE_ID, eventPointSource(eventPoints([], 0, CHIP_KINDS)));
       map.addSource(ZONE_SOURCE_ID, {
         type: "geojson",
         data: zonePolygons({ type: "FeatureCollection", features: [] }),
@@ -270,17 +333,23 @@ export function MapView({ visible }: MapViewProps) {
         type: "geojson",
         data: avoidedPoints(null, { type: "FeatureCollection", features: [] }),
       });
-      // 아래부터: 예정 구역 → 원래 길 점선 → 경로 실선 → 터널 → (원래 길 보기의 원) → 통제 점 → 입구 마커
+      // 아래부터: 사건 구역 → 예정 구역 → 원래 길 점선 → 경로 실선 → 터널 → (원래 길 보기의 원) →
+      // 통제 점 → 사건 클러스터·점 → 입구 마커
+      for (const layer of layers.filter((l) => below.has(l.id))) map.addLayer(layer);
       for (const layer of zoneLayers()) map.addLayer(layer);
       for (const layer of baselineLayers()) map.addLayer(layer);
       for (const layer of routeLayers()) map.addLayer(layer);
       for (const layer of crossingLayers()) map.addLayer(layer);
       for (const layer of avoidedLayers()) map.addLayer(layer);
       for (const layer of closureLayers()) map.addLayer(layer);
+      for (const layer of layers.filter((l) => !below.has(l.id))) map.addLayer(layer);
       for (const layer of entranceLayers()) map.addLayer(layer);
       loaded.current = true;
       setReady(true);
+      setBand(zoomBand(map.getZoom()));
       applyClosures(map, closuresRef.current);
+      const now = eventsRef.current;
+      applyEvents(map, now.events, now.atMs, visibleRef.current ?? CHIP_KINDS);
       applyFilter(map, visibleRef.current);
       applyRoute(map, routeRef.current);
       applyView(map, routeRef.current, originalRef.current, closuresRef.current);
@@ -288,6 +357,27 @@ export function MapView({ visible }: MapViewProps) {
       dispatch({ type: "setView", ...viewOf(map, activeRef.current) });
     });
     map.on("moveend", () => dispatch({ type: "setView", ...viewOf(map, activeRef.current) }));
+    map.on("movestart", (e) => {
+      if (e.originalEvent) framed.current = true; // 사람이 움직였다
+    });
+    map.on("zoom", () => setBand(zoomBand(map.getZoom())));
+    // 클러스터 개수 아이콘은 지도가 찾을 때 그린다 (글리프 서버 없음, maplibre 6 resolver)
+    map.setMissingStyleImageResolver((id) => {
+      const image = renderCount(id);
+      if (image && !map.hasImage(id)) map.addImage(id, image, { pixelRatio: ICON_PIXEL_RATIO });
+    });
+    // 클러스터를 누르면 풀리는 줌으로, 낱개 사건 점은 구역이 보이는 줌으로 (카드는 T7.5)
+    map.on("click", EVENT_LAYER_IDS.cluster, (e) => {
+      const f = e.features?.[0];
+      const id: unknown = f?.properties.cluster_id;
+      const source = map.getSource(EVENT_POINT_SOURCE_ID);
+      if (!f || typeof id !== "number" || !(source instanceof GeoJSONSource)) return;
+      const center = e.lngLat;
+      void source.getClusterExpansionZoom(id).then((zoom) => map.easeTo({ center, zoom }));
+    });
+    map.on("click", EVENT_LAYER_IDS.dot, (e) => {
+      map.easeTo({ center: e.lngLat, zoom: AREA_MIN_ZOOM + 2 });
+    });
     // 길찾기가 켜져 있을 때만 reducer 가 받는다 — 출발, 다음 도착
     map.on("click", (e) => routeDispatch({ type: "pick", point: [e.lngLat.lng, e.lngLat.lat] }));
     mapRef.current = map;
@@ -341,6 +431,35 @@ export function MapView({ visible }: MapViewProps) {
     else map.once("load", run);
   }, [from, to]);
 
+  // 사건·칩이 바뀌면 사건 소스만 갱신 (T7.4)
+  useEffect(() => {
+    eventsRef.current = { events: events ?? [], atMs };
+    const map = mapRef.current;
+    if (map && loaded.current) applyEvents(map, events ?? [], atMs, visible ?? CHIP_KINDS);
+  }, [events, atMs, visible]);
+
+  // 처음 화면 — 사람·경로·주소(#map=)가 카메라를 정하기 전에 사건이 오면 한 번: 그 시각 서울 사건이 다
+  // 보이게(줌 13 까지), 사건이 없으면 서울 전체(coverage). 절반 시트 위에 (T7.4)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || events === null || framed.current) return;
+    const box: Bbox4 | null = eventsBounds(events, atMs) ?? coverage;
+    if (!box) return;
+    const run = () => {
+      if (framed.current || fitted.current !== null) return;
+      framed.current = true;
+      map.fitBounds(
+        [
+          [box[0], box[1]],
+          [box[2], box[3]],
+        ],
+        { padding: framePadding(map), maxZoom: 13, animate: false },
+      );
+    };
+    if (loaded.current) run();
+    else map.once("load", run);
+  }, [events, atMs, coverage]);
+
   // closures 가 바뀌면 소스 데이터만 갱신
   useEffect(() => {
     closuresRef.current = closures;
@@ -381,6 +500,7 @@ export function MapView({ visible }: MapViewProps) {
     if (!map || !focus) return;
     const [w, s, e, n] = focus.bbox;
     const run = () => {
+      framed.current = true;
       map.fitBounds(
         [
           [w, s],
@@ -418,7 +538,13 @@ export function MapView({ visible }: MapViewProps) {
 
   return (
     <div className={styles.wrap}>
-      <div ref={container} className={styles.map} role="region" aria-label="지도" />
+      <div
+        ref={container}
+        className={styles.map}
+        role="region"
+        aria-label="지도"
+        data-band={band}
+      />
       {!ready && (
         <div className={styles.loading} role="status" aria-label="지도 불러오는 중">
           <span className={styles.spinner} aria-hidden />

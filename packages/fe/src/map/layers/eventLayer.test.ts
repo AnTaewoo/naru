@@ -5,7 +5,7 @@ import { eventById, recordedLive } from "../../test/recorded";
 import { COLORS } from "../colors";
 import { CHIP_KINDS } from "../eventKinds";
 import { countFromIconId, countLabel } from "../icons";
-import { EVENT_LAYER_IDS, eventAreas, eventLayers, eventPoints } from "./eventLayer";
+import { EVENT_LAYER_IDS, eventAreas, eventLayers, eventPoints, eventsBounds } from "./eventLayer";
 
 describe("eventPoints", () => {
   const { body, atMs } = recordedLive("closure_events_live_1107_1530");
@@ -74,6 +74,20 @@ describe("eventAreas", () => {
     expect(eventAreas(body.events, atMs, ["scheduled"]).features).toHaveLength(5);
     const live = recordedLive("closure_events_live_1109_1330");
     expect(eventAreas(live.body.events, live.atMs, CHIP_KINDS).features).toHaveLength(4);
+  });
+});
+
+describe("첫 화면 범위", () => {
+  it("해제 뺀 사건 bbox 합집합 — 기록의 bbox 최소·최대 (11/7 15:30 여의도~서초~광화문, 11/9 하나증권 해제 빼고)", () => {
+    const a = recordedLive("closure_events_live_1107_1530");
+    expect(eventsBounds(a.body.events, a.atMs)).toEqual([
+      126.9165064, 37.4919024, 127.0270497, 37.5759494,
+    ]);
+    const b = recordedLive("closure_events_live_1109_1330");
+    expect(eventsBounds(b.body.events, b.atMs)).toEqual([
+      126.9174948, 37.504684, 127.0244062, 37.5830171,
+    ]);
+    expect(eventsBounds([], a.atMs)).toBeNull();
   });
 });
 

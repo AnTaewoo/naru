@@ -11,6 +11,7 @@ import type { ClosureEvent } from "../../types/contracts";
 import { COLORS } from "../colors";
 import {
   AREA_MIN_ZOOM,
+  CHIP_KINDS,
   KIND_COLOR,
   chipOf,
   eventKind,
@@ -154,6 +155,28 @@ export function eventAreas(
       features.push({ type: "Feature", geometry, properties: { id: event.id, kind, low, color } });
   }
   return { type: "FeatureCollection", features };
+}
+
+/** 첫 화면 범위 (T7.4) — 그리는 사건(해제 빼고)의 bbox 합집합. 없으면 null */
+export function eventsBounds(
+  events: readonly ClosureEvent[],
+  atMs: number,
+): [number, number, number, number] | null {
+  let out: [number, number, number, number] | null = null;
+  for (const { event } of shown(events, atMs, CHIP_KINDS)) {
+    const sw = pair(event.bbox.slice(0, 2));
+    const ne = pair(event.bbox.slice(2, 4));
+    if (!sw || !ne) continue;
+    out = out
+      ? [
+          Math.min(out[0], sw[0]),
+          Math.min(out[1], sw[1]),
+          Math.max(out[2], ne[0]),
+          Math.max(out[3], ne[1]),
+        ]
+      : [sw[0], sw[1], ne[0], ne[1]];
+  }
+  return out;
 }
 
 /** 중심점 소스 — 11 까지 묶고(12 부터는 낱개), 묶음의 sev 는 그 안의 가장 작은 값 */
