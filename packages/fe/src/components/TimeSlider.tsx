@@ -10,8 +10,9 @@ import {
 } from "../state/TimeProvider";
 import styles from "./TimeSlider.module.css";
 
-// 기준 시각 슬라이더 — Time state 만 읽는다 (closures 가 바뀌어도 재렌더되지 않는다, CONVENTIONS §5.5)
-export function TimeSlider() {
+// 기준 시각 슬라이더 — Time state 만 읽는다 (closures 가 바뀌어도 재렌더되지 않는다, CONVENTIONS §5.5).
+// nowButton false 면 '지금'·'지금으로' 를 안 그린다 — 서울 통제 시트는 맨 위에 "지금으로 돌아가기" (T7.12)
+export function TimeSlider({ nowButton = true }: { nowButton?: boolean } = {}) {
   const time = useTime();
   const dispatch = useTimeDispatch();
   const minutes = minutesFromDayStart(time);
@@ -43,7 +44,7 @@ export function TimeSlider() {
               }}
             />
             {/* 실제 지금이면 '지금' 배지(T5.9), 다른 날·시각이면 지금으로 돌아가는 버튼(T5.4) */}
-            {time.ready && isNowAt(time.t, Date.now()) ? (
+            {!nowButton ? null : time.ready && isNowAt(time.t, Date.now()) ? (
               <span className={styles.nowBadge}>지금</span>
             ) : (
               <button

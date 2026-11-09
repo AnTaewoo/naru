@@ -167,6 +167,19 @@ export const GROUP_KO: Record<GroupKey, string> = {
   later: "그 뒤",
 };
 
+/** 시트 세 묶음 머리 (T7.12) — 기준 시각이 지금이 아니면 "지금" 대신 "이 시각" */
+export const SECTION_KO = {
+  now: "지금",
+  nowAt: "이 시각",
+  upcoming: "다가오는 통제",
+  past: "지난 통제",
+} as const;
+
+/** 지난 통제 나머지 (T7.12) */
+export function moreKo(n: number): string {
+  return `더 보기 (${n})`;
+}
+
 /** 사건 카드 상태 배지 (T7.5) — 1시간 안이어도 시작 시각이 지났으면(근거 없는 예정) "확인 전" */
 export function kindBadgeKo(e: ClosureEvent, atMs: number): string {
   const kind = eventKind(e, atMs);
@@ -183,6 +196,19 @@ export function rowBadgeKo(e: ClosureEvent, atMs: number): string {
   if (e.status === "released") return "해제";
   const start = e.window.start ? Date.parse(e.window.start) : Number.NaN;
   return start > atMs ? `${durationKo(start - atMs)} 뒤 시작` : "확인 전";
+}
+
+/**
+ * 시트 목록 행 배지 (T7.12) — 지난 통제는 그 날짜 "3월 15일"(묶음에 날짜가 없다), 다른 날 시작하는 다가오는 통제는
+ * "예정"·"예정 구역"(날짜는 묶음 머리 — 365일 창이라 "4,000시간 뒤" 를 피한다), 그 밖은 rowBadgeKo
+ */
+export function sheetBadgeKo(e: ClosureEvent, atMs: number): string {
+  const kind = eventKind(e, atMs);
+  if (kind === "released") return dateKo(e.window.start ?? e.window.end);
+  const start = e.window.start ? Date.parse(e.window.start) : Number.NaN;
+  const otherDay = !Number.isNaN(start) && kstDay(start) !== kstDay(atMs);
+  if ((kind === "scheduled" || kind === "zone") && otherDay) return kindBadgeKo(e, atMs);
+  return rowBadgeKo(e, atMs);
 }
 
 export const SOURCE_KO: Record<Source, string> = {

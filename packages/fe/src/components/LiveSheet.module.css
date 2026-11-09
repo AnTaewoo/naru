@@ -224,3 +224,40 @@
   font-size: 12.5px;
   color: #666;
 }
+
+/* 지금이 아닌 시각을 볼 때 시트 맨 위 (T7.12) — "11월 7일 15:00 기준 · 지금으로 돌아가기" */
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 20px 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #eaf1ff;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e1e1e;
+}
+
+/* 다가오는 통제 날짜 머리 (T7.12) */
+.dayHead {
+  margin: 0;
+  padding: 6px 20px 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #888;
+}
+
+/* 지난 통제 더 보기 (T7.12) */
+.more {
+  margin: 4px 20px 0;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #2d6bff;
+  cursor: pointer;
+}

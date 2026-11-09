@@ -12,6 +12,7 @@ import {
   kindBadgeKo,
   nowEmptyKo,
   rowBadgeKo,
+  sheetBadgeKo,
   eventDetailKo,
   eventTitleKo,
   isStale,
@@ -114,6 +115,14 @@ describe("사건 카드 문구 (T7.5)", () => {
     expect(liveTitleKo(t, Date.parse("2026-11-09T19:00:00+09:00"))).toBe(
       "3월 15일 07:45 서울 통제",
     );
+  });
+
+  it("시트 목록 배지 (T7.12) — 지난 통제는 날짜, 다른 날 시작하는 다가오는 통제는 '예정'(날짜는 묶음 머리)", () => {
+    const c = recordedLive("closure_events_catalog_1108_1200"); // 넓은 창 11/8 12:00
+    expect(sheetBadgeKo(ev(c, "a1199bc3db1d"), c.atMs)).toBe("11월 7일"); // r06 11/7 16:00–19:00 해제
+    expect(sheetBadgeKo(ev(c, "1deaa20a0218"), c.atMs)).toBe("예정"); // 하나증권 11/9 10:30
+    expect(sheetBadgeKo(ev(m, "e1d0e06932a8"), m.atMs)).toBe("1시간 27분 뒤 시작"); // 10구간 같은 날 09:12
+    expect(sheetBadgeKo(ev(m, "adaea2f4cc02"), m.atMs)).toBe("23분 뒤 해제"); // 1구간 08:08
   });
 
   it("긴 경로는 처음·끝만(경유 3곳부터), 도로는 셋까지 '외 N곳' — 카드에는 지나는 곳 전부 (T7.3 숙제)", () => {

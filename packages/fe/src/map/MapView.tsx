@@ -265,7 +265,7 @@ export function MapView({ visible }: MapViewProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const loaded = useRef(false);
-  const { closures, bbox, coverage, events, eventsAt, selected, frame } = useClosures();
+  const { closures, bbox, coverage, events, eventsAt, selected, frame, catalog } = useClosures();
   const dispatch = useClosureDispatch();
   const { route, from, to, active, view } = useRoute();
   // 원래 길 카드를 골랐나 (T5.11) — 피한 통제가 없으면 원래 길도 없다
@@ -562,11 +562,13 @@ export function MapView({ visible }: MapViewProps) {
     }
   }, [selected]);
 
-  // 사건 카드를 열면(T7.5) 그 사건 범위로 — 절반 시트 위에. 고른 사건이 바뀔 때 한 번(60초 갱신엔 안 움직인다)
+  // 사건 카드를 열면(T7.5) 그 사건 범위로 — 절반 시트 위에. 고른 사건이 바뀔 때 한 번(60초 갱신엔 안 움직인다).
+  // 시트 목록(T7.12)의 다가오는·지난 사건은 지도 응답에 아직 없을 수 있다 — 넓은 창 목록에서도 찾는다
   const fittedEvent = useRef<string | null>(null);
   useEffect(() => {
     const map = mapRef.current;
-    const event = selected ? events?.find((e) => e.id === selected) : undefined;
+    const find = (xs: readonly ClosureEvent[] | null) => xs?.find((e) => e.id === selected);
+    const event = selected ? (find(events) ?? find(catalog)) : undefined;
     if (!selected) fittedEvent.current = null;
     if (!map || !event || fittedEvent.current === event.id) return;
     const box = eventBbox(event); // 해제된 사건(?event= 옛 링크)도 맞춘다
@@ -584,7 +586,7 @@ export function MapView({ visible }: MapViewProps) {
     };
     if (loaded.current) run();
     else map.once("load", run);
-  }, [selected, events]);
+  }, [selected, events, catalog]);
 
   // 길찾기를 켜고 끄면 횡단보도 점이 필요한지도 바뀐다 (원래 길 원·통제 근거가 점을 쓴다)
   useEffect(() => {
