@@ -1,10 +1,10 @@
 // 지금 지도 사건 레이어 (T7.4) — 입력은 사건 v2 기록(scripts/record_live_events.py 가 실제 앱에서 받은 응답).
 // 기대값은 기록을 열어 확인한 사건 id·centroid·area (data/MANIFEST.md 2026-11-09 재기록(T7.4))
 import { describe, expect, it } from "vitest";
-import { recordedLive } from "../../test/recorded";
+import { eventById, recordedLive } from "../../test/recorded";
 import { COLORS } from "../colors";
 import { CHIP_KINDS } from "../eventKinds";
-import { eventPoints } from "./eventLayer";
+import { eventAreas, eventPoints } from "./eventLayer";
 
 describe("eventPoints", () => {
   const { body, atMs } = recordedLive("closure_events_live_1107_1530");
@@ -37,5 +37,25 @@ describe("eventPoints", () => {
     );
     expect(ids).toHaveLength(4);
     expect(ids).not.toContain("1deaa20a0218");
+  });
+});
+
+describe("eventAreas", () => {
+  const { body, atMs } = recordedLive("closure_events_live_1107_1530");
+
+  it("구역 — 기록의 Polygon 그대로, 1시간 안은 진한 주황, 0.7 미만은 회색", () => {
+    const areas = eventAreas(body.events, atMs, CHIP_KINDS);
+    expect(areas.features).toHaveLength(13);
+    const area = areas.features.find((f) => f.properties.id === "2e930ec6deeb");
+    expect(area?.geometry).toEqual(eventById(body.events, "2e930ec6deeb").area); // 시의회~숭례문R 22곳
+    expect(area?.properties).toMatchObject({ kind: "soon", color: COLORS.soon, low: false });
+    const low = areas.features.find((f) => f.properties.id === "3f036e3f24e0");
+    expect(low?.properties).toMatchObject({ kind: "soon", color: COLORS.gray, low: true });
+  });
+
+  it("칩 = 필터 — 구역도 켜진 종류만, 해제는 없다", () => {
+    expect(eventAreas(body.events, atMs, ["scheduled"]).features).toHaveLength(5);
+    const live = recordedLive("closure_events_live_1109_1330");
+    expect(eventAreas(live.body.events, live.atMs, CHIP_KINDS).features).toHaveLength(4);
   });
 });
