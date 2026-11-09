@@ -16,9 +16,13 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
+import shapely
+
 from naru_be.config import Settings
 from naru_be.models.domain.closure_engine import ClosureEngine
+from naru_be.models.domain.closure_events import event_id
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
+from naru_be.models.domain.event_area import event_area
 from naru_be.models.domain.road_graph import RoadGraph
 from naru_be.models.domain.types import CandidateMeta, IntakeResult
 from naru_be.models.repositories.closure_repository import ClosureRepository
@@ -63,13 +67,17 @@ class CandidateIntake:
             return done
         at = datetime.now(UTC)
         accepted = review = updated = 0
+        shapes: dict[tuple[str, datetime | None, datetime | None], list[shapely.Geometry]] = {}
         for raw in batch.candidates:
             candidate = self.promote_unknown(raw)
-            ids = self.crosswalk_ids(candidate)
+            ids, shape = self.selection(candidate)
             candidate = self.link_incidents(candidate, ids)
             states = self.engine.apply(candidate, ids, at=at)
             meta = CandidateMeta.of(candidate)
             updated += self.repo.upsert_many(states, candidate.candidate_id, meta)
+            if states and shape is not None:  # 사건 = (reason, 시작, 끝) — 후보의 상태는 다 같다
+                key = (states[0].reason, states[0].window.start, states[0].window.end)
+                shapes.setdefault(key, []).append(shape)
             if candidate.source is Source.incident and ids:
                 window, _ = self.engine.effective_window(candidate)
                 linked = self.repo.attach(ids, window, NOTICE_SOURCES, list(candidate.evidence))
@@ -80,6 +88,11 @@ class CandidateIntake:
                     )
             accepted += 1
             review += int(candidate.review_required)
+        # 사건 구역 (T7.2) — 한 사건의 후보는 한 배치에서 온다(같은 문장·같은 돌발 묶음):
+        # 배치마다 다시 만든다
+        for (reason, start, end), parts in shapes.items():
+            eid = event_id(reason, start, end)
+            self.repo.save_event_area(eid, reason, start, end, event_area(parts))
         result = IntakeResult(batch.batch_id, accepted, review, updated)
         self.repo.save_batch(result, batch.producer, batch.produced_at)
         log.info(
@@ -98,19 +111,26 @@ class CandidateIntake:
         add = [e for e in found if e.ref not in refs]
         return c.model_copy(update={"evidence": [*c.evidence, *add]}) if add else c
 
-    def crosswalk_ids(self, c: ClosureCandidate) -> set[str]:
+    def selection(self, c: ClosureCandidate) -> tuple[set[str], shapely.Geometry | None]:
+        """후보 → (횡단보도, 고른 모양 EPSG:5179). 모양은 사건 구역(T7.2)이 다시 쓴다 — 경로는
+        한 번만 계산한다."""
         g = c.geometry
         if isinstance(g, PointGeom):
             if c.impact is Impact.unknown:
-                return set()  # 승격 안 된 unknown: 표시만 (zone_scheduled), 횡단보도 상태 없음
-            return self.index.from_point(*g.coordinates)
-        if isinstance(g, LineGeom):
-            return self.index.from_line(g.coordinates)
-        if isinstance(g, SegmentGeom):
-            return self.index.from_segment(g)
-        assert isinstance(g, ZoneGeom)
-        log.warning("zone candidate skipped", extra={"candidate_id": c.candidate_id})
-        return set()
+                return (
+                    set(),
+                    None,
+                )  # 승격 안 된 unknown: 표시만 (zone_scheduled), 횡단보도 상태 없음
+            shape = self.index.area_of_point(*g.coordinates)
+        elif isinstance(g, LineGeom):
+            shape = self.index.area_of_line(g.coordinates)
+        elif isinstance(g, SegmentGeom):
+            shape = self.index.area_of_segment(g)
+        else:
+            assert isinstance(g, ZoneGeom)
+            log.warning("zone candidate skipped", extra={"candidate_id": c.candidate_id})
+            return set(), None
+        return self.index.within(shape), shape
 
     def promote_unknown(self, c: ClosureCandidate) -> ClosureCandidate:
         """impact unknown 인 지점이 도로 링크 30 m 안이면 blocks 로 (ADR-008 §9.2-12)."""

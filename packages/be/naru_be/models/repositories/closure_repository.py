@@ -18,8 +18,10 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from naru_be.config import Settings
 from naru_be.models.domain.closure_events import EventWindow, event_id, overlaps, worst
+from naru_be.models.domain.event_area import EventArea
 from naru_be.models.domain.types import CandidateMeta, IntakeResult
 from naru_be.models.entities.candidate_batch import CandidateBatchEntity
+from naru_be.models.entities.closure_event import ClosureEventEntity
 from naru_be.models.entities.closure_state import ClosureStateEntity
 from naru_contracts import (
     CandidateSummary,
@@ -191,10 +193,22 @@ class ClosureRepository:
             groups: dict[EventKey, list[ClosureStateEntity]] = {}
             for row in s.scalars(stmt):
                 groups.setdefault((row.reason, row.window_start, row.window_end), []).append(row)
-            for (reason, start_utc, end_utc), rows in groups.items():
+            keep: list[tuple[str, datetime | None, datetime | None, str]] = []
+            for reason, start_utc, end_utc in groups:
                 start, end = to_kst(start_utc), to_kst(end_utc)
-                if window is not None and not overlaps(start, end, window, self.settings):
-                    continue
+                if window is None or overlaps(start, end, window, self.settings):
+                    keep.append((reason, start_utc, end_utc, event_id(reason, start, end)))
+            ids = [k[3] for k in keep]
+            areas = {  # 사건 구역 (T7.2) — 없으면 null
+                a.event_id: a
+                for a in s.scalars(
+                    select(ClosureEventEntity).where(ClosureEventEntity.event_id.in_(ids))
+                )
+            }
+            for reason, start_utc, end_utc, eid in keep:
+                rows = groups[(reason, start_utc, end_utc)]
+                start, end = to_kst(start_utc), to_kst(end_utc)
+                found = areas.get(eid)
                 states = [self._state(r) for r in rows]
                 meta = next(
                     ((r.source, r.type, r.summary, r.notice) for r in rows if r.source is not None),
@@ -210,9 +224,13 @@ class ClosureRepository:
                         bbox=(min(lngs), min(lats), max(lngs), max(lats)),
                         approx=any(r.approx for r in rows),
                         districts=sorted(d for d in names if d),
-                        id=event_id(reason, start, end),
+                        id=eid,
                         status=worst(status_of(st) for st in states),
                         confidence=max(st.confidence for st in states),
+                        area=found.area if found else None,
+                        centroid=(float(found.centroid_lng), float(found.centroid_lat))
+                        if found
+                        else None,
                         **_event_meta(meta),
                     )
                 )
@@ -301,6 +319,31 @@ class ClosureRepository:
         with self._sessions.begin() as s:
             s.query(ClosureStateEntity).delete()
             s.query(CandidateBatchEntity).delete()
+            s.query(ClosureEventEntity).delete()
+
+    def save_event_area(
+        self,
+        event_id: str,
+        reason: str,
+        start: datetime | None,
+        end: datetime | None,
+        area: EventArea,
+    ) -> None:
+        """사건 구역 저장 (T7.2) — 같은 id 면 덮는다."""
+        row = {
+            "event_id": event_id,
+            "reason": reason,
+            "window_start": to_utc_naive(start),
+            "window_end": to_utc_naive(end),
+            "area": area.area.model_dump(mode="json"),
+            "centroid_lng": Decimal(f"{area.centroid[0]:.7f}"),
+            "centroid_lat": Decimal(f"{area.centroid[1]:.7f}"),
+            "updated_at": datetime.now(UTC).replace(tzinfo=None, microsecond=0),
+        }
+        stmt = insert(ClosureEventEntity).values(row)
+        stmt = stmt.on_duplicate_key_update({k: stmt.inserted[k] for k in row if k != "event_id"})
+        with self._sessions.begin() as s:
+            s.execute(stmt)
 
     @staticmethod
     def _row(
