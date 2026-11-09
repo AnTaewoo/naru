@@ -107,24 +107,6 @@
   font-size: 14px;
 }
 
-/* 목록 위 데이터 기준 시각 (T5.9, 결정 C) — 실시간 돌발이 없거나 오래면 회색 경고 한 줄 */
-.asof {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  margin-top: 4px;
-  font-size: 12px;
-  color: #777;
-}
-
-.asofWarn {
-  color: #9a9a9a;
-}
-
-.asofWarn::before {
-  content: "⚠ ";
-}
-
 /* 행 둘째 줄 — 인원 · 도로 (T5.9) */
 .rowDetail {
   display: block;

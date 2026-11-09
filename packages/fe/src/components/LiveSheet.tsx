@@ -5,7 +5,6 @@ import {
   EXAMPLE_KO,
   SECTION_KO,
   bannerKo,
-  dataAsOfKo,
   dayLabelKo,
   eventDetailKo,
   eventTitleKo,
@@ -44,18 +43,8 @@ const PAST_FIRST = 5;
 // 지난 통제(최근 5 + 더 보기) → 예시로 보기. 목록은 t 앞뒤 365일 넓은 창(catalog, 아직이면 지도 사건).
 // 지금 행은 카드, 다가오는·지난 행은 그 시작 시각으로 옮기고 카드. 0.7 미만은 목록에 없다(지도에서 고른 묶음엔 있다)
 export function LiveSheet() {
-  const {
-    events,
-    eventsAt,
-    eventsError,
-    truncated,
-    dataAsOf,
-    bbox,
-    selected,
-    picked,
-    catalog,
-    catalogAt,
-  } = useClosures();
+  const { events, eventsAt, eventsError, truncated, bbox, selected, picked, catalog, catalogAt } =
+    useClosures();
   const dispatch = useClosureDispatch();
   const timeDispatch = useTimeDispatch();
   const { t, ready, live: following } = useTime();
@@ -108,7 +97,6 @@ export function LiveSheet() {
       : (counted ?? "서울 통제");
   // 슬라이더를 옮겨 새 시각의 사건을 받는 중
   const loading = ready && (events === null || (eventsAt !== null && atMs !== Date.parse(t)));
-  const asof = ready && dataAsOf ? dataAsOfKo(dataAsOf, Date.now()) : null;
   // 다가오는·지난 행 — 예전 '통제 불러오기'처럼 그 시작 시각으로(지금 모드 끔) + 카드 + 지도 맞춤
   const jump = (e: ClosureEvent) => {
     if (e.window.start) timeDispatch({ type: "set", t: e.window.start });
@@ -170,12 +158,6 @@ export function LiveSheet() {
               {eventsError && <span className={styles.error}> · {eventsError}</span>}
               {truncated && <span className={styles.loading}> · 가까운 300건만</span>}
             </div>
-            {asof && (
-              <div className={styles.asof}>
-                <span>{asof.text}</span>
-                {asof.warning && <span className={styles.asofWarn}>{asof.warning}</span>}
-              </div>
-            )}
           </div>
           <ClosureTimeline />
           <TimeSlider nowButton={false} />

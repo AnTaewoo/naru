@@ -17,7 +17,7 @@ const live1109 = recordedLive("closure_events_live_1109_1330");
 // 넓은 창(at 앞뒤 365일) — 시트 목록 (T7.12)
 const catalog1107 = recordedLive("closure_events_catalog_1107_1530");
 const catalog1108 = recordedLive("closure_events_catalog_1108_1200");
-// 목록 위 기준 시각은 실시간 돌발이 없던 기록으로 — 있으면 '지금'에 따라 경고가 바뀐다 (T5.9)
+// 데이터 기준 시각(data_as_of)은 시트에 안 보인다(태우 11/10) — 실시간 돌발이 없던 기록이라 예전엔 경고 줄도 떴다
 const dataAsOf = recordedEvents().data_as_of;
 
 type Live = typeof live0745;
@@ -76,6 +76,9 @@ describe("LiveSheet — 세 묶음 (T7.12)", () => {
     // 기준 줄이 제목 자리 — 제목 줄·부제의 "15:30 기준" 이 따로 없다(절반 시트에 목록이 보이게, iPhone 13 실측)
     expect(screen.queryByText("서울 통제", { exact: true })).toBeNull();
     expect(screen.getByText("서울 통제 중 8건, 예정 4건")).toBeDefined(); // 지도 사건 v2 11/7 15:30
+    // 데이터 기준 시각 줄은 시트에서 뺐다(태우 11/10) — 기록 data_as_of 는 "경찰청 11/6 공지 · 마라톤 3/12 시각표 기준"
+    expect(screen.queryByText(/시각표 기준$/)).toBeNull();
+    expect(screen.queryByText(/실시간 돌발/)).toBeNull();
     expect(section("이 시각").getAllByRole("button")).toHaveLength(12);
     const upcoming = section("다가오는 통제");
     expect(upcoming.getByText("11월 9일 (월)")).toBeDefined();
