@@ -5,7 +5,7 @@ import { expectAttributionUncovered } from "./helpers";
 test("홈이 열린다", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "나루" })).toBeAttached();
-  await expect(page.getByText("오늘 통제", { exact: true })).toBeVisible();
+  await expect(page.getByText("지금 서울 통제", { exact: true })).toBeVisible(); // T7.5
 });
 
 test("/api/closures 가 Flask 로 프록시된다", async ({ request }) => {
