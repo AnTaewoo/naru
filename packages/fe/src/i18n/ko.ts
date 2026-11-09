@@ -10,7 +10,7 @@ import type {
   Status,
   SummarySegment,
 } from "../types/contracts";
-import { eventKind, type ChipKind, type GroupKey } from "../map/eventKinds";
+import { eventKind, kstDay, type ChipKind, type GroupKey } from "../map/eventKinds";
 import type { ExampleKey } from "../map/examples";
 
 export const STATUS_KO: Record<Status, string> = {
@@ -140,6 +140,23 @@ export const EXAMPLE_KO: Record<ExampleKey, { title: string; sub: string }> = {
   rally: { title: "광화문 집회·행진", sub: "11월 7일 15:00 세종대로" },
   march: { title: "국회대로 행진", sub: "11월 9일 12:00" },
 };
+
+/** 시트 세 묶음 (T7.12) — 다가오는 통제 날짜 머리: 기준 시각의 KST 날짜로 오늘·내일, 그 밖은 "11월 9일 (월)" */
+export function dayLabelKo(day: string, atMs: number): string {
+  if (day === kstDay(atMs)) return "오늘";
+  if (day === kstDay(atMs + 24 * 60 * 60_000)) return "내일";
+  return dayKo(`${day}T12:00:00+09:00`);
+}
+
+/** 지금이 아닌 시각을 볼 때 시트 위 (T7.12) — "11월 7일 15:00 기준" */
+export function bannerKo(t: string): string {
+  return `${dateKo(t)} ${hhmm(t)} 기준`;
+}
+
+/** 지금 묶음이 비면 (T7.12) — 빈 화면 대신 한 줄 + 다가오는·지난 통제 */
+export function nowEmptyKo(live: boolean): string {
+  return live ? "지금 서울에 걸린 통제가 없어요" : "이 시각 서울에 걸린 통제가 없어요";
+}
 
 /** 지금 서울 통제 묶음 머리 (T7.5) */
 export const GROUP_KO: Record<GroupKey, string> = {

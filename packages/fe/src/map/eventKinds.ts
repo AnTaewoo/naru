@@ -137,7 +137,8 @@ const GROUP_ORDER: readonly GroupKey[] = ["now", "soon", "today", "tomorrow", "l
 const KST_MS = 9 * 60 * 60_000;
 const DAY_MS = 24 * 60 * 60_000;
 
-function kstDay(ms: number): string {
+/** ms → KST 날짜 "YYYY-MM-DD" */
+export function kstDay(ms: number): string {
   return new Date(ms + KST_MS).toISOString().slice(0, 10);
 }
 
@@ -208,4 +209,60 @@ export function byDistrict(
 ): ClosureEvent[] {
   if (district === null) return [...events];
   return events.filter((e) => (e.districts ?? []).includes(district));
+}
+
+/**
+ * 시트 세 묶음 (T7.12, 태우 11/10) — 응답 at(t) 기준. 지금 = 통제 중 + 1시간 안 시작, 다가오는 통제 = 예정·예정
+ * 구역을 KST 날짜별(시작 이른 순), 지난 통제 = 해제(끝 늦은 순 — 최근 먼저). withLow 는 지도에서 고른 묶음
+ */
+export interface DayGroup {
+  /** KST 날짜 "YYYY-MM-DD" */
+  day: string;
+  items: ListedEvent[];
+}
+
+export interface SheetSections {
+  now: ListedEvent[];
+  upcoming: DayGroup[];
+  past: ListedEvent[];
+}
+
+/** 끝 시각 — 없으면 시작 + 6시간 (BE 임시 end 와 같은 규칙, INTERFACE §1) */
+function endMs(e: ClosureEvent): number {
+  if (e.window.end) return Date.parse(e.window.end);
+  return e.window.start ? Date.parse(e.window.start) + 6 * 60 * 60_000 : Number.NEGATIVE_INFINITY;
+}
+
+export function sheetSections(
+  events: readonly ClosureEvent[],
+  atMs: number,
+  withLow = false,
+): SheetSections {
+  const rows = events
+    .map((event) => ({ event, kind: eventKind(event, atMs) }))
+    .filter(({ event }) => withLow || !isLow(event));
+  const byStart = (a: ListedEvent, b: ListedEvent) =>
+    KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
+    startMs(a.event) - startMs(b.event) ||
+    a.event.reason.localeCompare(b.event.reason);
+  const now = rows.filter((r) => r.kind === "confirmed" || r.kind === "soon").sort(byStart);
+  const upcoming: DayGroup[] = [];
+  const later = rows
+    .filter((r) => (r.kind === "scheduled" || r.kind === "zone") && r.event.window.start)
+    .sort((a, b) => startMs(a.event) - startMs(b.event) || byStart(a, b));
+  for (const row of later) {
+    const day = kstDay(startMs(row.event));
+    const last = upcoming.at(-1);
+    if (last && last.day === day) last.items.push(row);
+    else upcoming.push({ day, items: [row] });
+  }
+  const past = rows
+    .filter((r) => r.kind === "released")
+    .sort(
+      (a, b) =>
+        endMs(b.event) - endMs(a.event) ||
+        startMs(b.event) - startMs(a.event) ||
+        a.event.reason.localeCompare(b.event.reason),
+    );
+  return { now, upcoming, past };
 }

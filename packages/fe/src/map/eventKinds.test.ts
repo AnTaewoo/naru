@@ -12,6 +12,7 @@ import {
   eventKind,
   listedEvents,
   liveGroups,
+  sheetSections,
   zoomBand,
 } from "./eventKinds";
 
@@ -133,5 +134,34 @@ describe("지금 서울 통제 묶음·구 칩 (T7.5)", () => {
       "a1199bc3db1d",
     ]);
     expect(byDistrict(listed, null)).toHaveLength(12);
+  });
+});
+
+// T7.12 시트 세 묶음 — 넓은 창 기록(at 앞뒤 365일, scripts/record_live_events.py)을 열어 확인한 사건 id·창
+describe("sheetSections — 지금·다가오는 통제·지난 통제 (T7.12)", () => {
+  it("11/7 15:30 — 지금 12(통제 중 8·1시간 안 4, 0.65 뺌) · 다가오는 11/9 다섯 · 지난 3/15 마라톤 16(늦게 끝난 것부터)", () => {
+    const { body, atMs } = recordedLive("closure_events_catalog_1107_1530");
+    const { now, upcoming, past } = sheetSections(body.events, atMs);
+    expect(now.map((r) => r.kind)).toEqual([
+      ...Array<string>(8).fill("confirmed"),
+      ...Array<string>(4).fill("soon"),
+    ]);
+    expect(upcoming.map((d) => [d.day, d.items.length])).toEqual([["2026-11-09", 5]]);
+    expect(upcoming[0]?.items[0]?.event.id).toBe("1deaa20a0218"); // 하나증권 10:30
+    expect(past).toHaveLength(16);
+    expect(past[0]?.event.id).toBe("5f206eb9e97c"); // 15구간 ~14:30
+    expect(past.at(-1)?.event.window.end).toBe("2026-03-15T08:08:00+09:00"); // 1구간
+  });
+
+  it("11/8 12:00 — 그 시각 걸린 통제 없음, 다가오는 11/9 다섯, 지난 28(11/7 19:00 끝 r06 부터)", () => {
+    const { body, atMs } = recordedLive("closure_events_catalog_1108_1200");
+    const { now, upcoming, past } = sheetSections(body.events, atMs);
+    expect(now).toEqual([]);
+    expect(upcoming.map((d) => [d.day, d.items.length])).toEqual([["2026-11-09", 5]]);
+    expect(past).toHaveLength(28);
+    expect(past[0]?.event.id).toBe("a1199bc3db1d"); // 경찰청 r06 16:00~19:00
+    expect(past.map((r) => r.event.id)).toContain("2e930ec6deeb"); // r04
+    // 지도에서 고른 묶음엔 흐린 사건도 — 0.65 r05 가 지난 쪽에
+    expect(sheetSections(body.events, atMs, true).past).toHaveLength(29);
   });
 });

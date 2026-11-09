@@ -7,7 +7,10 @@ import {
   confidenceKo,
   dataAsOfKo,
   GROUP_KO,
+  bannerKo,
+  dayLabelKo,
   kindBadgeKo,
+  nowEmptyKo,
   rowBadgeKo,
   eventDetailKo,
   eventTitleKo,
@@ -125,5 +128,20 @@ describe("사건 카드 문구 (T7.5)", () => {
     expect(eventTitleKo(ev(a, "be5f89a4ebf3"))).toBe(
       "동화면세점 앞 → 종로1가사거리 → 동화면세점 앞 행진",
     );
+  });
+});
+
+describe("시트 세 묶음 문구 (T7.12)", () => {
+  it("다가오는 통제 날짜 머리 — 오늘·내일, 그 밖은 '11월 9일 (월)' (기준 시각의 KST 날짜로)", () => {
+    const at1108 = Date.parse("2026-11-08T12:00:00+09:00"); // 넓은 창 기록 11/8 12:00
+    const at1107 = Date.parse("2026-11-07T15:30:00+09:00"); // 넓은 창 기록 11/7 15:30
+    expect(dayLabelKo("2026-11-09", at1108)).toBe("내일");
+    expect(dayLabelKo("2026-11-08", at1108)).toBe("오늘");
+    expect(dayLabelKo("2026-11-09", at1107)).toBe("11월 9일 (월)");
+  });
+  it("지금이 아닐 때 시트 위 — '11월 7일 15:00 기준', 빈 지금 묶음 문구", () => {
+    expect(bannerKo("2026-11-07T15:00:00+09:00")).toBe("11월 7일 15:00 기준"); // 경찰청 r04 시작
+    expect(nowEmptyKo(true)).toBe("지금 서울에 걸린 통제가 없어요");
+    expect(nowEmptyKo(false)).toBe("이 시각 서울에 걸린 통제가 없어요");
   });
 });
