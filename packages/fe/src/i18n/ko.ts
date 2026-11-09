@@ -6,6 +6,7 @@ import type {
   EvidenceKind,
   Impact,
   LegKind,
+  Source,
   Status,
   SummarySegment,
 } from "../types/contracts";
@@ -108,6 +109,51 @@ export function untilKo(end: string | null | undefined, t: string): string {
   const h = Math.floor(diffMin / 60);
   const m = diffMin % 60;
   return m ? `${h}시간 ${m}분 뒤 해제` : `${h}시간 뒤 해제`;
+}
+
+/** "45분", "1시간 20분", "2시간" — 분 단위 반올림 */
+export function durationKo(ms: number): string {
+  const min = Math.max(0, Math.round(ms / 60_000));
+  if (min < 60) return `${min}분`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m ? `${h}시간 ${m}분` : `${h}시간`;
+}
+
+/**
+ * 사건 남은 시간 (T7.5) — 통제 중 "16:00 해제 예정", 예정 "1시간 20분 뒤 시작", 시작 시각이 지났는데 근거가
+ * 없어 아직 예정이면 "12:00 시작 · 확인 전", 해제 "13:00 해제"
+ */
+export function remainKo(e: Pick<ClosureEvent, "status" | "window">, atMs: number): string {
+  const { start, end } = e.window;
+  if (e.status === "confirmed") return end ? `${hhmm(end)} 해제 예정` : "해제 시각 미정";
+  if (e.status === "released") return end ? `${hhmm(end)} 해제` : "해제";
+  if (!start) return "시작 시각 미정";
+  const ms = Date.parse(start) - atMs;
+  return ms > 0 ? `${durationKo(ms)} 뒤 시작` : `${hhmm(start)} 시작 · 확인 전`;
+}
+
+export const SOURCE_KO: Record<Source, string> = {
+  course: "마라톤 시간표",
+  smpa: "경찰청 공지",
+  topis: "TOPIS 공지",
+  news: "보도",
+  seoul_press: "서울시 보도자료",
+  incident: "TOPIS 돌발",
+  bus: "버스",
+  rtd: "실시간 혼잡",
+};
+
+/** 출처 (T7.5) — TOPIS 통제지도 예정 통제(T7.3)는 출처가 topis 라 공지 id(topismap-)로 가른다 */
+export function sourceKo(e: Pick<ClosureEvent, "source" | "notice">): string {
+  if (e.notice?.notice_id.startsWith("topismap-")) return "TOPIS 통제지도";
+  return e.source ? SOURCE_KO[e.source] : "출처 미상";
+}
+
+/** 확신도 3단계 (P7 계획) — 0.8 이상 높음, 0.7 이상 보통, 그 아래 낮음 */
+export function confidenceKo(c: number): string {
+  if (c >= 0.8) return "높음";
+  return c >= 0.7 ? "보통" : "낮음";
 }
 
 /** 거리: 1 km 아래는 m 반올림("840m"), 넘으면 km 소수 한 자리("1.7km") */
@@ -252,6 +298,12 @@ export function dayKo(iso: string | null | undefined): string {
   return p ? `${p.m}월 ${p.d}일 (${WEEKDAY_KO[p.wd] ?? ""})` : "시간 미정";
 }
 
+/** 지금 서울 통제 시트 제목 (T7.5) — 기준 시각이 지금(±5분)이면 "지금 서울 통제", 아니면 그 날짜·시각 */
+export function liveTitleKo(t: string, nowMs: number): string {
+  if (Math.abs(Date.parse(t) - nowMs) <= 5 * 60_000) return "지금 서울 통제";
+  return `${dateKo(t)} ${hhmm(t)} 서울 통제`;
+}
+
 /** 하단 시트 제목 — 기준 시각 t 가 지금과 같은 날(KST)이면 "오늘 통제", 아니면 "3월 15일 통제" */
 export function sheetTitleKo(t: string, nowMs: number): string {
   const a = kstParts(t);
@@ -267,10 +319,26 @@ function uniq(xs: string[]): string[] {
   return xs.filter((x, i) => xs.indexOf(x) === i);
 }
 
-/** 구간 경로 "A → B → C" (via 포함, 같은 이름이 이어지면 하나로) */
-function pathKo(s: SummarySegment): string {
+/** 경유가 이보다 많으면 제목은 처음·끝만 — 지나는 곳 전부는 카드의 longRouteKo (T7.5) */
+const MAX_VIA = 2;
+/** 둘째 줄 도로는 이만큼까지, 나머지는 "외 N곳" */
+const MAX_ROADS = 3;
+
+/** 구간 경로 전부 "A → B → C" (via 포함, 같은 이름이 이어지면 하나로) */
+function fullPathKo(s: SummarySegment): string {
   const names = [s.from_, ...(s.via ?? []), s.to];
   return names.filter((n, i) => i === 0 || n !== names[i - 1]).join(" → ");
+}
+
+/** 제목용 구간 경로 — 경유가 MAX_VIA 보다 많으면 "A → Z" */
+function pathKo(s: SummarySegment): string {
+  return (s.via ?? []).length > MAX_VIA ? `${s.from_} → ${s.to}` : fullPathKo(s);
+}
+
+/** 제목에서 줄인 긴 경로의 전부 — 없으면 null (사건 카드, T7.5) */
+export function longRouteKo(e: Pick<ClosureEvent, "summary">): string | null {
+  const long = (e.summary?.segments ?? []).filter((x) => (x.via ?? []).length > MAX_VIA);
+  return long.length ? long.map(fullPathKo).join(", ") : null;
 }
 
 /**
@@ -307,7 +375,11 @@ export function eventDetailKo(e: Pick<ClosureEvent, "summary">): string {
   const s = e.summary;
   if (!s) return "";
   const people = s.reported_people ?? null;
-  const roads = (s.roads ?? []).join("·");
+  const all = s.roads ?? [];
+  const roads =
+    all.length > MAX_ROADS
+      ? `${all.slice(0, MAX_ROADS).join("·")} 외 ${all.length - MAX_ROADS}곳`
+      : all.join("·");
   return [people === null ? "" : peopleKo(people), roads].filter(Boolean).join(" · ");
 }
 
