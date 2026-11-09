@@ -42,8 +42,10 @@ export interface ClosureState {
   coverage: Bbox4 | null;
   /** 출처별 기준 시각 (같은 응답의 data_as_of, v0.12) — 목록 위에 쓴다 (T5.9). null = 모름 */
   dataAsOf: DataAsOf | null;
-  /** 지도 맞춤 요청 — 같은 범위를 다시 눌러도 맞추도록 순번을 올린다 (MapView 가 본다) */
-  focus: { bbox: Bbox4; seq: number } | null;
+  /** 연 사건 카드 (T7.5) — 행·구역·점·?event= 로 연다. id 만 두고 사건은 events 에서 찾는다 */
+  selected: string | null;
+  /** 클러스터·겹친 구역을 누르면 그 사건들만 목록으로 (T7.5). null = 지금 서울 통제 전체 */
+  picked: string[] | null;
 }
 
 /** [minLng, minLat, maxLng, maxLat] */
@@ -83,9 +85,17 @@ export type ClosureAction =
       dataAsOf: DataAsOf | null;
     }
   | { type: "failEvents"; error: string }
-  | { type: "focus"; bbox: Bbox4 };
+  | { type: "select"; id: string | null }
+  | { type: "pick"; ids: string[] }
+  | { type: "unpick" };
 
 export const EMPTY_CLOSURES: FeatureCollection = { type: "FeatureCollection", features: [] };
+
+/** ?event=<사건 id> (T7.5, 알림 클릭은 T7.10) — 12자 소문자 16진만 (INTERFACE §3.1 v0.14 id) */
+export function eventFromLocation(search: string): string | null {
+  const id = new URLSearchParams(search).get("event");
+  return id && /^[0-9a-f]{12}$/.test(id) ? id : null;
+}
 /** 화면 bbox 자리값(광화문 일대, 장소 검색의 near) — 지도가 뜨면 setView 로 실제 화면 */
 export const DEFAULT_BBOX = "126.965,37.555,126.990,37.580";
 
@@ -104,7 +114,8 @@ export function initialClosureState(partial: Partial<ClosureState> = {}): Closur
     eventsError: null,
     coverage: null,
     dataAsOf: null,
-    focus: null,
+    selected: null,
+    picked: null,
     ...partial,
   };
 }
@@ -141,8 +152,18 @@ export function closureReducer(state: ClosureState, action: ClosureAction): Clos
       };
     case "failEvents":
       return { ...state, eventsError: action.error };
-    case "focus":
-      return { ...state, focus: { bbox: action.bbox, seq: (state.focus?.seq ?? 0) + 1 } };
+    case "select":
+      return state.selected === action.id ? state : { ...state, selected: action.id };
+    case "pick": {
+      const [only, ...more] = action.ids;
+      if (only === undefined) return state;
+      // 하나면 바로 카드, 여럿이면 그 묶음 목록 — 카드를 닫으면 묶음으로 돌아온다
+      return more.length === 0
+        ? { ...state, selected: only }
+        : { ...state, picked: action.ids, selected: null };
+    }
+    case "unpick":
+      return { ...state, picked: null };
   }
 }
 
@@ -189,6 +210,13 @@ export function ClosureProvider({
       controller.abort();
     };
   }, [api, t, ready, bbox, points, fetchEnabled, debounceMs]);
+
+  // ?event= 로 열면 그 사건 카드 — 사건이 오면 시트가 찾는다 (T7.5)
+  useEffect(() => {
+    if (!fetchEnabled) return;
+    const id = eventFromLocation(window.location.search);
+    if (id) dispatch({ type: "select", id });
+  }, [fetchEnabled]);
 
   // 지금 지도 사건 (T7.4) — t 가 바뀌면 바로, 그 뒤 pollMs 마다 If-None-Match. 304 면 dispatch 하지
   // 않는다(다시 그리지 않음). 숨은 탭은 건너뛰고 다시 보이면 바로 한 번

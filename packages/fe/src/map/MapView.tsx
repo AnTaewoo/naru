@@ -14,7 +14,13 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { SHEET_COLLAPSED_PX, stageHeight } from "../components/BottomSheet";
 import { MAP_LOCALE_KO, MAP_OUTSIDE_KO } from "../i18n/ko";
-import { inBbox, useClosureDispatch, useClosures, type Bbox4 } from "../state/ClosureProvider";
+import {
+  eventBbox,
+  inBbox,
+  useClosureDispatch,
+  useClosures,
+  type Bbox4,
+} from "../state/ClosureProvider";
 import { POSITION_OPTIONS, useRoute, useRouteDispatch } from "../state/RouteProvider";
 import type { ClosureEvent, FeatureCollection, RouteResponse, Status } from "../types/contracts";
 import {
@@ -248,7 +254,7 @@ export function MapView({ visible }: MapViewProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const loaded = useRef(false);
-  const { closures, bbox, focus, coverage, events, eventsAt } = useClosures();
+  const { closures, bbox, coverage, events, eventsAt, selected } = useClosures();
   const dispatch = useClosureDispatch();
   const { route, from, to, active, view } = useRoute();
   // 원래 길 카드를 골랐나 (T5.11) — 피한 통제가 없으면 원래 길도 없다
@@ -494,24 +500,29 @@ export function MapView({ visible }: MapViewProps) {
     map.fitBounds(bounds, { padding: fitPadding(map), maxZoom: 17 });
   }, [original, route]);
 
-  // 통제 불러오기(T5.4) — 고른 통제의 범위로 지도를 맞춘다. 순번이 바뀔 때마다
+  // 사건 카드를 열면(T7.5) 그 사건 범위로 — 절반 시트 위에. 고른 사건이 바뀔 때 한 번(60초 갱신엔 안 움직인다)
+  const fittedEvent = useRef<string | null>(null);
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !focus) return;
-    const [w, s, e, n] = focus.bbox;
+    const event = selected ? events?.find((e) => e.id === selected) : undefined;
+    if (!selected) fittedEvent.current = null;
+    if (!map || !event || fittedEvent.current === event.id) return;
+    const box = eventBbox(event); // 해제된 사건(?event= 옛 링크)도 맞춘다
+    if (!box) return;
+    fittedEvent.current = event.id;
     const run = () => {
       framed.current = true;
       map.fitBounds(
         [
-          [w, s],
-          [e, n],
+          [box[0], box[1]],
+          [box[2], box[3]],
         ],
-        { padding: fitPadding(map), maxZoom: 16 },
+        { padding: framePadding(map), maxZoom: 16 },
       );
     };
     if (loaded.current) run();
     else map.once("load", run);
-  }, [focus]);
+  }, [selected, events]);
 
   // 길찾기를 켜고 끄면 횡단보도 점이 필요한지도 바뀐다 (원래 길 원·통제 근거가 점을 쓴다)
   useEffect(() => {

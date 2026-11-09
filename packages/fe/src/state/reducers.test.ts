@@ -21,7 +21,7 @@ import {
   EMPTY_CLOSURES,
   asBbox4,
   closureReducer,
-  eventBbox,
+  eventFromLocation,
   inBbox,
   initialClosureState,
 } from "./ClosureProvider";
@@ -279,11 +279,10 @@ describe("closureReducer — 지금 지도 사건·지도 맞춤 (T5.4·T7.4)", 
   // 사건 v2 기록 (scripts/record_live_events.py) — 11/7 15:30 사건 13, 응답 ETag 같이
   const rec = recorded("closure_events_live_1107_1530");
   const body = rec.body as ClosureEventsResponse;
-  it("receiveEvents 로 사건·기준 시각·ETag·잘림, focus 는 누를 때마다 순번이 올라 같은 사건도 다시 맞춘다", () => {
+  it("receiveEvents 로 사건·기준 시각·ETag·잘림, 실패해도 받아 둔 사건은 그대로", () => {
     const s0 = initialClosureState();
     expect(s0.events).toBeNull();
     expect(s0.eventsEtag).toBeNull();
-    expect(s0.focus).toBeNull();
     expect(s0.coverage).toBeNull();
     const s1 = closureReducer(s0, {
       type: "receiveEvents",
@@ -300,17 +299,36 @@ describe("closureReducer — 지금 지도 사건·지도 맞춤 (T5.4·T7.4)", 
     expect(s1.truncated).toBe(false);
     expect(s1.dataAsOf).toBe(body.data_as_of);
     expect(s1.coverage).toEqual(body.coverage);
-    const first = body.events[0];
-    const bbox = first ? eventBbox(first) : null;
-    if (!bbox) throw new Error("기록 사건에 bbox 가 없다");
-    const f1 = closureReducer(s1, { type: "focus", bbox });
-    expect(f1.focus).toEqual({ bbox, seq: 1 });
-    expect(closureReducer(f1, { type: "focus", bbox }).focus?.seq).toBe(2);
     // 실제 Flask 오류 문구 (recorded naru_api/error_not_found.json)
     const err = recorded("error_not_found").body as ErrorBody;
     const failed = closureReducer(s1, { type: "failEvents", error: err.error.message });
     expect(failed.events).toBe(body.events); // 실패해도 받아 둔 사건은 그대로
     expect(failed.eventsError).toBe(err.error.message);
+  });
+
+  it("사건 카드 (T7.5) — select 로 열고 null 로 닫는다. pick 은 묶음 목록(하나면 바로 카드), unpick 은 전체로", () => {
+    const s0 = initialClosureState();
+    expect([s0.selected, s0.picked]).toEqual([null, null]);
+    // 11/7 15:30 광화문 묶음 일부 — 돌발 사직로(통제 중)·경찰청 r04(1시간 안)
+    const opened = closureReducer(s0, { type: "select", id: "159e13bfe71a" });
+    expect(opened.selected).toBe("159e13bfe71a");
+    expect(closureReducer(opened, { type: "select", id: null }).selected).toBeNull();
+    const two = closureReducer(s0, { type: "pick", ids: ["159e13bfe71a", "2e930ec6deeb"] });
+    expect([two.picked, two.selected]).toEqual([["159e13bfe71a", "2e930ec6deeb"], null]);
+    const card = closureReducer(two, { type: "select", id: "2e930ec6deeb" });
+    expect(card.picked).toEqual(["159e13bfe71a", "2e930ec6deeb"]); // 카드를 닫으면 묶음으로 돌아간다
+    expect(closureReducer(card, { type: "unpick" })).toMatchObject({ picked: null });
+    const one = closureReducer(s0, { type: "pick", ids: ["2e930ec6deeb"] });
+    expect([one.picked, one.selected]).toEqual([null, "2e930ec6deeb"]);
+    expect(closureReducer(s0, { type: "pick", ids: [] })).toBe(s0);
+  });
+
+  it("?event= — 사건 id(12자 소문자 16진)만 받는다", () => {
+    expect(eventFromLocation("?event=2e930ec6deeb&t=2026-11-07T15:00:00%2B09:00")).toBe(
+      "2e930ec6deeb",
+    );
+    expect(eventFromLocation("?event=<script>")).toBeNull();
+    expect(eventFromLocation("")).toBeNull();
   });
 });
 
