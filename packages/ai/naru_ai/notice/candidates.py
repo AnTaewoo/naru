@@ -170,6 +170,20 @@ class CandidateBuilder:
         )
 
 
+FULL_SCOPES = frozenset({"full", "one_side_full"})
+
+
+def full_closure_stems(parsed: ParsedNotice) -> tuple[str, ...]:
+    """차로 전부(양방향·한쪽 방향)를 막는 item 의 후보 ID 앞부분 — 버스 기록 대상(ADR-013 보류,
+    태우 2026-11-09). 부분 차로(1개 차로 행진)는 버스가 그대로 지나가 대상이 아니다."""
+    stem = candidate_stem(parsed.envelope.sentence_id)
+    return tuple(
+        f"{stem}-i{i}-"
+        for i, pi in enumerate(parsed.items, start=1)
+        if any(seg.lanes.scope in FULL_SCOPES for seg in pi.segments)
+    )
+
+
 def candidate_stem(sentence_id: str) -> str:
     """후보 ID 앞부분 — TOPIS 글 버전(-u<고친 시각>)을 뗀다. 고친 글이 같은 ID 로 덮는다 (T6.4)."""
     return POST_VERSION.sub("", sentence_id)

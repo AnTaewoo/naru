@@ -26,7 +26,7 @@ from naru_contracts import BusPosition
 BUS_API = "http://ws.bus.go.kr/api/rest/buspos/getBusPosByRtid"
 ROUTE_PATH_API = "http://ws.bus.go.kr/api/rest/busRouteInfo/getRoutePath"
 NO_VEHICLES = "8"  # headerCd 8 운행 종료 (메모 bus-position-api)
-KINDS = ("notice", "incident")
+KINDS = ("notice", "incident", "marathon")  # incident 는 11/9 까지(2순위 돌발, ADR-013 보류로 뺌)
 
 
 class BusFeedError(Exception):

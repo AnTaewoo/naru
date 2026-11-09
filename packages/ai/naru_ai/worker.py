@@ -6,8 +6,9 @@
     uv run python -m naru_ai.worker --once --live   # 기록 없는 공지 문장을 Claude 로 (상한 안에서)
 
 공지는 기본적으로 기록된 LLM 응답(data/recorded/llm)만 재생한다 — 키 없이도 돈다. 돌발은
-NARU_INCIDENT_SOURCE=live 면 OA-13315 를 불러 원문을 기록하고, 아니면 기록을 재생한다. 버스(T6.2)는
-공지 통제 창에만 근처 노선 위치를 받아 POST /internal/bus-positions (NARU_BUS_SOURCE, 하루 상한).
+NARU_INCIDENT_SOURCE=live 면 OA-13315 를 불러 원문을 기록하고, 아니면 기록을 재생한다. 버스는
+전면 통제(공지 lanes.scope full·one_side_full)·마라톤 창에만 근처 노선 위치를 받아 기록만 한다 —
+NARU_BUS_RECORD_ONLY=1(기본)이면 BE 로 안 보낸다(ADR-013 보류, NARU_BUS_SOURCE, 하루 상한).
 TOPIS 공지(T6.4)는 NARU_TOPIS_SOURCE=live 면 NoticeList 를 10분마다 불러 기록하고,
 기록 없는 글(새 글·고친 글)은 --live 일 때만 Claude 로 — 한 번 NARU_LLM_MAX_CALLS ·
 하루 NARU_LLM_DAILY_CAP (ADR-011 D). 경찰청 '오늘의 주요집회' PDF(T6.6)는 태우가 smpa/inbox/ 에
@@ -33,22 +34,22 @@ import httpx
 
 from naru_ai.config import Settings
 from naru_ai.ingest.course import CourseIngestor
-from naru_ai.ingest.incident import EVENT_TYPE, RALLY, Incident, IncidentIngestor, parse_accinfo
-from naru_ai.ingest.topis_api import IncidentFeed, LinkBook, SeoulOpenApi, lnglat_5181
+from naru_ai.ingest.incident import IncidentIngestor, parse_accinfo
+from naru_ai.ingest.topis_api import IncidentFeed, LinkBook, SeoulOpenApi
 from naru_ai.llm.client import AnthropicClient, LLMRefusalError, LLMTruncatedError
 from naru_ai.llm.prompt import NoticeEnvelope
 from naru_ai.llm.recorder import LLMRecorder
 from naru_ai.log import configure_logging
-from naru_ai.notice.candidates import CandidateBuilder
+from naru_ai.notice.candidates import CandidateBuilder, full_closure_stems
 from naru_ai.notice.gazetteer import Gazetteer
-from naru_ai.notice.parser import NoticeParser
+from naru_ai.notice.parser import NoticeParser, ParsedNotice
 from naru_ai.notice.resolver import KakaoRecords, Resolver
 from naru_ai.notice.smpa_inbox import SmpaInbox
 from naru_ai.notice.source import NoticeSentence
 from naru_ai.notice.topis_feed import TopisNotices, post_sentences
 from naru_ai.publish import CandidatePublisher, PublishError
 from naru_ai.signal.bus_feed import BusApi, RoutePaths
-from naru_ai.signal.bus_poller import BusPoller, IncidentTarget, RouteStops
+from naru_ai.signal.bus_poller import BusPoller, RouteStops
 from naru_contracts import (
     BusPositionBatchResponse,
     CandidateBatch,
@@ -139,6 +140,9 @@ class IngestWorker:
         self._coverage: str | None = None  # BE 범위 — batch_id 에 섞는다(_scoped)
         self._coverage_at = 0.0
         self.parse_failed: set[str] = set()  # 이 프로세스에서 다시 안 부를 문장(버전) — TOPIS·smpa
+        # 전면 통제 공지의 (발췌, 시작) — BE 사건(reason, 시작)과 같다. 버스 기록 대상
+        # (ADR-013 보류)
+        self.full_closures: set[tuple[str, datetime]] = set()
         self.live_budget = client.max_calls if client is not None else 0
         live_seoul = "live" in (settings.incident_source, settings.topis_source)
         seoul = (
@@ -164,19 +168,15 @@ class IngestWorker:
             raise ValueError("DATA_GO_KR_KEY 없음 — 버스 live 를 쓸 수 없다")
         live_bus = settings.bus_source == "live"
         route_key = settings.data_go_kr_route_key.get_secret_value() or bus_key
-        self._incident_rows: list[Incident] = []
         self.bus = BusPoller(
             RouteStops.load(_latest(raw, "bus_routes_*") / "OA-1095.xlsx"),
             BusApi(recorded, bus_key if live_bus else None, until=settings.bus_record_until),
             publisher.events,
             publisher.closures,
-            self.incident_targets,
+            lambda: self.full_closures,
             RoutePaths(raw, route_key if live_bus else None),
             per_event=settings.bus_routes_per_event,
             daily_cap=settings.bus_daily_cap,
-            incident_cap=settings.bus_incident_daily_cap,
-            incident_every_s=settings.bus_incident_interval_s,
-            incident_each=settings.bus_incident_calls_each,
         )
         self.sources = [
             _Source("course", None, lambda _: self._send(self.course_batch())),
@@ -235,7 +235,7 @@ class IngestWorker:
         candidates: list[ClosureCandidate] = []
         for sid in [*recorded, *fresh]:
             parsed = self.parser.parse(NoticeEnvelope.from_sentence(rows[sid]))
-            candidates.extend(self.builder.build(parsed))
+            candidates.extend(self._built(parsed, self.builder.build(parsed)))
         log.info(
             "notices parsed",
             extra={"recorded": len(recorded), "live": len(fresh), "candidates": len(candidates)},
@@ -260,7 +260,6 @@ class IngestWorker:
         """TOPIS 돌발 — 범위 안 집회가 없어도 빈 배치를 보낸다(수신 시각이 data_as_of 가 된다)."""
         feed = self.incidents.fetch()
         rows = parse_accinfo(feed.raw)
-        self._incident_rows = rows  # 버스 2순위(집회·행사 돌발)가 쓴다
         candidates = self.incident_ingestor.build(rows, feed.path.as_posix(), feed.received_at)
         log.info(
             "incidents",
@@ -333,7 +332,9 @@ class IngestWorker:
                 got.live += 1
             try:
                 parsed = self.parser.parse(NoticeEnvelope.from_sentence(s.to_json()))
-                got.candidates.extend(self.builder.build(parsed, refs[s.sentence_id]))
+                got.candidates.extend(
+                    self._built(parsed, self.builder.build(parsed, refs[s.sentence_id]))
+                )
             except (ValueError, LLMRefusalError, LLMTruncatedError) as e:  # ValidationError 포함
                 self.parse_failed.add(s.sentence_id)
                 got.skipped += 1
@@ -367,20 +368,15 @@ class IngestWorker:
         saved = self.recorder.saved_today(now)
         return live_budget(self.client.max_calls, self.settings.llm_daily_cap, saved)
 
-    def incident_targets(self) -> list[IncidentTarget]:
-        """버스 2순위 — 가장 최근 돌발 원문의 집회·행사(A10), 같은 링크·시각은 하나 (T6.2)."""
-        groups: dict[tuple[str, datetime, datetime | None], list[Incident]] = {}
-        for i in self._incident_rows:
-            if i.acc_type == EVENT_TYPE and i.start is not None:
-                groups.setdefault((i.link_id, i.start, i.end), []).append(i)
-        out: list[IncidentTarget] = []
-        for (link_id, start, end), group in groups.items():
-            first = min(group, key=lambda i: int(i.acc_id))
-            link = self.incident_ingestor.links.get(link_id)
-            coords = link.coords if link else (lnglat_5181(first.x, first.y),)
-            rally = any(i.acc_dtype == RALLY for i in group)
-            out.append(IncidentTarget(first.acc_id, rally, start, end, tuple(coords)))
-        return out
+    def _built(
+        self, parsed: ParsedNotice, candidates: list[ClosureCandidate]
+    ) -> list[ClosureCandidate]:
+        """전면 통제(lanes.scope full·one_side_full) item 의 후보를 버스 기록 대상으로 적는다."""
+        stems = full_closure_stems(parsed)
+        for c in candidates:
+            if stems and c.candidate_id.startswith(stems) and c.notice_ref and c.window.start:
+                self.full_closures.add((c.notice_ref.excerpt, c.window.start))
+        return candidates
 
     # --- 실행 ---------------------------------------------------------------------
     def _publish(self, batch: CandidateBatch) -> CandidateBatchResponse:
@@ -414,8 +410,12 @@ class IngestWorker:
         return batch.model_copy(update={"batch_id": scoped})
 
     def bus_round(self, now: datetime) -> list[Response]:
-        """창 안 공지 통제의 근처 노선 위치 → BE (T6.2). 볼 노선이 없으면 부르지 않는다."""
-        return [self.publisher.publish_bus(b) for b in self.bus.batches(now)]
+        """창 안 전면 통제·마라톤의 근처 노선 위치를 부른다(원문 기록). 기록만이면(기본) 여기서
+        끝 — BE 로 안 보낸다. 볼 노선이 없으면 부르지 않는다."""
+        batches = self.bus.batches(now)
+        if self.settings.bus_record_only:
+            return []
+        return [self.publisher.publish_bus(b) for b in batches]
 
     def run_once(self, include_course: bool = True) -> list[CandidateBatchResponse]:
         batches = [self.course_batch()] if include_course else []
