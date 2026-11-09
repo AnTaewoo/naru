@@ -357,14 +357,69 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - 🧑 태우: 오늘 경찰청 PDF 를 inbox 에. 16:00 뒤 버스 기록(bus/notice·incident)을 열어 이탈·무정차·정상 통과 확인 → 찍혔으면 T6.3 실측 대기 풀기
 
 ### T6.8 마감
-- status: DOING
+- status: DONE
 - depends: T6.9
 - 산출: VWorld 키 넣으면 타일 교체(그 전까진 OSM). docker-compose MySQL 포트 127.0.0.1:3307:3306. 2026 JTBC 서울마라톤(11/1) 교통통제 안내(news.seoul.go.kr)로 코스 시각표 추가 가능한지 보고 — 3/15 보다 최근이라 시연용
 
 ### P6 이후 (해커톤 이후, M2)
 버스 운영계정 상향(🧑 태우, 마라톤·M2 전). 버스 확신도 보정(ADR-013)은 보류 — 2027년 3월 서울마라톤에서 버스 정류소 건너뜀으로 구간별 실제 통제·해제 시각을 확인한다(폴러 기록 + `RoutePath`). (IncidentIngestor 는 T6.1 로 당김)
 
-## P7 — 현장 실증 (2027-03)
+## P7 — 실시간 통제 지도 · PWA 알림 (태우 2026-11-09, ADR-014)
+> 계획 `harness/plans/active/P7_plan.md`(정할 것 15개는 추천안 그대로 — 태우 "다음" 2026-11-09 17:05). A(T7.1~T7.6)는 11/16 최종 제출 전, B(T7.7~T7.10)는 그다음. Task 마다 보고에 실제 앱 화면 iPhone 13 스크린샷 1장. 알림 발송은 태우 PC Chrome·폰 실제 구독으로 확인(가짜 엔드포인트 없음)
+
+### T7.1 BE 사건 API v2 — id·상태·시간 창·ETag
+- status: DOING
+- depends: T6.9
+- 산출: `GET /closures/events?at=&from=&to=(&bbox=)` — 사건 `id`(sha1(reason·시작·끝) 12자), `status`(at 기준 가장 심한), `confidence`(최대), 기본 창(진행 중 + 내일 24:00 KST), 300건 상한(`truncated`), ETag/304. 파라미터 없으면 지금처럼. 계약 v0.14(`area`·`centroid` 는 T7.2 까지 null)
+
+### T7.2 BE 통제 구역 — 사건 area·centroid
+- status: TODO
+- depends: T7.1
+- 산출: 접수 때 후보 모양(구간 경로 + 등급 버퍼, 선 15 m, 점 30 m)을 사건 단위 union → 5 m 단순화 → `area`·`centroid`, 표 `closure_events`(Alembic 0005)
+
+### T7.3 TOPIS 통제지도 예정 통제 소스 (T6.5)
+- status: TODO
+- depends: T7.1
+- 산출: 목록·통제 도로 AJAX 10분(ADR-011 E) → 예정 통제 후보(링크 순서 경로, 꼭짓점 OA-13311, 후보 ID = 돌발과 같은 acc_id, 예정 근거는 공지처럼 0.85, 전체 통제는 버스 기록 대상)
+
+### T7.4 FE 실시간 지도 — 줌 3단계·칩 필터·60초 갱신
+- status: TODO
+- depends: T7.2
+- 산출: 앱 열면 서울 전체 사건 — 클러스터(< 12)·구역(12~15)·횡단보도(≥ 15), 상태 5종, 칩 = 필터, 60초 ETag, data_as_of. "통제 불러오기"·빈 상태 삭제. 성능 측정 보고
+
+### T7.5 FE 시트 — 지금 서울 통제·사건 카드
+- status: TODO
+- depends: T7.4
+- 산출: "지금 서울 통제"(통제 중 → 1시간 안 → 오늘 → 내일, 구 칩 유지), 사건 카드(원인·제목·시각·상태·남은 시간·출처·확신도 3단계·횡단보도 수·버튼 셋), 클러스터 목록, `?event=<id>`
+
+### T7.6 날짜 선택·3/15 회귀·이 구역 피해서 길찾기
+- status: TODO
+- depends: T7.5
+- 산출: 슬라이더 날짜 선택, `?t=` 3/15 07:45 공유 링크 회귀 e2e, `/route?avoid=<id>`(그 사건 무조건 막음, 계약 v0.14)
+- PC-7A (T7.6 뒤): 태우가 운영 화면으로 실시간 지도 확인 — "PC 통과"면 B
+
+### T7.7 PWA 기반 — manifest·서비스워커·iOS 안내·권한 버튼
+- status: TODO
+- depends: T7.5
+- 산출: `app/manifest.ts`, `public/sw.js`(push → 항상 showNotification, 클릭 → `/?event=`), iOS 16.4+ 홈 화면 안내, 권한은 버튼으로만. Provider 추가 안 함
+
+### T7.8 BE 구독·관심 지역 API
+- status: TODO
+- depends: T7.7
+- 산출: `GET /push/vapid-public-key`, `POST·DELETE /push/subscribe`, `GET·POST·DELETE /watch-areas`(saved 300·500·1000 m, last_seen 150 m 격자·3시간), 표 셋(0006). 🧑 태우: VAPID 키(.env). 구독 테스트 입력 = 태우 실제 구독을 가린 기록(`{D}/recorded/push/`)
+
+### T7.9 매칭·발송
+- status: TODO
+- depends: T7.2, T7.8
+- 산출: created·confirmed → blocks·≥ 0.7 → STRtree → (구독, 사건, 종류) 한 번 → 22~07 created 는 07시 → pywebpush(410·404 끔). 워커 `push` 60초 → `POST /internal/push/dispatch`
+
+### T7.10 알림 → 카드, ☆ 이 근처 알림 받기, 관심 지역 관리
+- status: TODO
+- depends: T7.9
+- 산출: 알림 클릭 → 사건 카드, 카드 ☆(중심 반경 500 m), 관심 지역 목록·삭제, last_seen. 운영에서 태우 실제 구독으로 끝에서 끝
+- PC-7B (T7.10 뒤): 태우 PC Chrome·폰에 실제 통제 알림이 오고 눌러서 카드
+
+## P8 — 현장 실증 (2027-03) (P7 에서 번호만 옮김, 태우 2026-11-09)
 현장 데이터 규칙(`data/raw/field/<YYYYMMDD>/`: smpa.pdf, topis_notices.json, track.gpx, photos/<HHMMSS>_*.jpg, notes.md + 같은 시각 recorded)은 v0.4와 같다. 예측 통제 vs 관측 대조 → 보고서.
 
 ## 보류 (ADR 필요)
