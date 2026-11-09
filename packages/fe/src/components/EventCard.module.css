@@ -1,0 +1,82 @@
+/* 사건 카드 (T7.5) — 목업 03_closure: 배지 → 제목 → 큰 남은 시간 → 근거 */
+.card {
+  padding: 4px 20px 16px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.badges {
+  display: flex;
+  gap: 6px;
+}
+
+.badge {
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.gray {
+  background: #f0f0f0;
+  color: #777;
+}
+
+.close {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 16px;
+  background: #f4f4f4;
+  font-size: 20px;
+  line-height: 1;
+  color: #666;
+  cursor: pointer;
+}
+
+.title {
+  margin: 10px 0 0;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.detail {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #666;
+}
+
+/* 제목에서 줄인 긴 경로 — 지나는 곳 전부 */
+.route {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #888;
+  line-height: 1.5;
+}
+
+.when {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* 가장 큰 글자는 언제 풀리는지·언제 시작하는지 (목업 03_closure) */
+.remain {
+  margin: 2px 0 0;
+  font-size: 24px;
+  font-weight: 800;
+}
