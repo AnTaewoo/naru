@@ -225,13 +225,13 @@
   color: #666;
 }
 
-/* 지금이 아닌 시각을 볼 때 시트 맨 위 (T7.12) — "11월 7일 15:00 기준 · 지금으로 돌아가기" */
+/* 지금이 아닌 시각을 볼 때 시트 맨 위 (T7.12) — "11월 7일 15:00 기준 · 지금으로 돌아가기", 목록에선 제목 자리 */
 .banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin: 0 20px 8px;
+  margin: 0 0 6px;
   padding: 8px 12px;
   border-radius: 10px;
   background: #eaf1ff;

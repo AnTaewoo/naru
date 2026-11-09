@@ -73,6 +73,9 @@ describe("LiveSheet — 세 묶음 (T7.12)", () => {
     expect(screen.getByText("11월 7일 15:30 기준")).toBeDefined();
     expect(screen.getByRole("button", { name: "지금으로 돌아가기" })).toBeDefined();
     expect(screen.queryByRole("button", { name: "지금 시각으로" })).toBeNull(); // 슬라이더 쪽은 숨김
+    // 기준 줄이 제목 자리 — 제목 줄·부제의 "15:30 기준" 이 따로 없다(절반 시트에 목록이 보이게, iPhone 13 실측)
+    expect(screen.queryByText("서울 통제", { exact: true })).toBeNull();
+    expect(screen.getByText("서울 통제 중 8건, 예정 4건")).toBeDefined(); // 지도 사건 v2 11/7 15:30
     expect(section("이 시각").getAllByRole("button")).toHaveLength(12);
     const upcoming = section("다가오는 통제");
     expect(upcoming.getByText("11월 9일 (월)")).toBeDefined();
@@ -125,6 +128,7 @@ describe("LiveSheet — 세 묶음 (T7.12)", () => {
     });
     expect(screen.queryByRole("button", { name: "지금으로 돌아가기" })).toBeNull();
     expect(screen.getByRole("region", { name: "지금 서울 통제" })).toBeDefined();
+    expect(screen.getByText("지금 서울 통제", { exact: true })).toBeDefined(); // 지금이면 제목 줄
   });
 });
 

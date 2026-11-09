@@ -93,13 +93,19 @@ export function LiveSheet() {
   const title = liveTitleKo(!ready || live);
   const total = counts.confirmed + counts.scheduled + counts.zone;
   const zone = counts.zone > 0 ? `, 예정 구역 ${counts.zone}건` : "";
+  const counted =
+    events === null
+      ? null
+      : total === 0
+        ? "서울 통제 없음"
+        : `서울 통제 중 ${counts.confirmed}건, 예정 ${counts.scheduled}건${zone}`;
+  // 지금이면 "02:31 기준 · …", 아니면 시각은 맨 위 기준 줄에 있다
+  const at = `${hhmm(t)} 기준`;
   const subtitle = !ready
     ? "시각 확인 중…"
-    : events === null
-      ? `${hhmm(t)} 기준`
-      : total === 0
-        ? `${hhmm(t)} 기준 통제 없음`
-        : `${hhmm(t)} 기준 · 서울 통제 중 ${counts.confirmed}건, 예정 ${counts.scheduled}건${zone}`;
+    : live
+      ? [at, counted].filter((x) => x !== null).join(" · ")
+      : (counted ?? "서울 통제");
   // 슬라이더를 옮겨 새 시각의 사건을 받는 중
   const loading = ready && (events === null || (eventsAt !== null && atMs !== Date.parse(t)));
   const asof = ready && dataAsOf ? dataAsOfKo(dataAsOf, Date.now()) : null;
@@ -113,6 +119,15 @@ export function LiveSheet() {
     dispatch({ type: "select", id: null });
     dispatch({ type: "unpick" });
   };
+  // 지금이 아닌 시각이면 시트 맨 위 기준 줄 — 목록에선 제목 자리(절반 시트에 목록이 보이게), 카드 위에도
+  const banner = ready && !live && (
+    <div className={styles.banner}>
+      <span>{bannerKo(t)}</span>
+      <button type="button" className={styles.back} onClick={backToNow}>
+        지금으로 돌아가기
+      </button>
+    </div>
+  );
   const row = ({ event, kind }: ListedEvent, open: (e: ClosureEvent) => void) => {
     const detail = eventDetailKo(event);
     return (
@@ -136,25 +151,19 @@ export function LiveSheet() {
   };
   return (
     <BottomSheet label={title} stage={stage} onStage={setStage}>
-      {/* 지금이 아닌 시각이면 시트 맨 위 — 카드를 열어도 (목록에서 지난·다가오는 통제를 누르면 시각이 옮겨진다) */}
-      {ready && !live && (
-        <div className={styles.banner}>
-          <span>{bannerKo(t)}</span>
-          <button type="button" className={styles.back} onClick={backToNow}>
-            지금으로 돌아가기
-          </button>
-        </div>
-      )}
       {card ? (
-        <EventCard
-          event={card}
-          atMs={cardAtMs}
-          onClose={() => dispatch({ type: "select", id: null })}
-        />
+        <>
+          {banner && <div className={styles.pad}>{banner}</div>}
+          <EventCard
+            event={card}
+            atMs={cardAtMs}
+            onClose={() => dispatch({ type: "select", id: null })}
+          />
+        </>
       ) : (
         <>
           <div className={styles.pad}>
-            <div className={styles.title}>{title}</div>
+            {banner || <div className={styles.title}>{title}</div>}
             <div className={styles.sub}>
               {subtitle}
               {loading && !eventsError && <span className={styles.loading}> · 불러오는 중</span>}
