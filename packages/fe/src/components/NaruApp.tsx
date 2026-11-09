@@ -4,8 +4,8 @@ import dynamic from "next/dynamic";
 import { useCallback, useState } from "react";
 import { CHIP_KINDS, type ChipKind } from "../map/eventKinds";
 import { useRoute } from "../state/RouteProvider";
-import { ClosureSheet } from "./ClosureSheet";
 import { LayerChips } from "./LayerChips";
+import { LiveSheet } from "./LiveSheet";
 import styles from "./NaruApp.module.css";
 import { RouteCard } from "./RouteCard";
 import { RoutePanel } from "./RoutePanel";
@@ -16,7 +16,7 @@ const MapView = dynamic(() => import("../map/MapView"), {
   loading: () => <div className={styles.mapLoading}>지도 불러오는 중…</div>,
 });
 
-// 홈(시안 01): 길찾기 바 + 칩 + 오늘 통제 시트. 길찾기(시안 02): 출발·도착 패널 + 경로 카드 시트
+// 홈(시안 01): 길찾기 바 + 칩 + 지금 서울 통제 시트(T7.5). 길찾기(시안 02): 출발·도착 패널 + 경로 카드 시트
 export function NaruApp() {
   const { active } = useRoute();
   // 칩 = 필터 (T7.4) — 사건 구역·클러스터·횡단보도 점에 같이
@@ -31,7 +31,7 @@ export function NaruApp() {
       <MapView visible={visible} />
       <RoutePanel />
       {!active && <LayerChips visible={visible} onToggle={toggle} />}
-      {active ? <RouteCard /> : <ClosureSheet />}
+      {active ? <RouteCard /> : <LiveSheet />}
     </main>
   );
 }
