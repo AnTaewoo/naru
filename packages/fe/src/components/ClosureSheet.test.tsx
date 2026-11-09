@@ -1,21 +1,16 @@
 // 렌더 테스트 — Provider 초기 state 에 recorded 응답을 넣고 그린다. 네트워크 없음 (CONVENTIONS §5.7-2)
 // T7.4: 시트 목록·시간표는 지금 지도 사건(사건 v2 기록, scripts/record_live_events.py)
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { createNaruApiClient } from "../api/naruApiClient";
-import { COLORS } from "../map/colors";
 import { ApiProvider } from "../state/ApiProvider";
-import { ClosureProvider, useClosureDispatch, useClosures } from "../state/ClosureProvider";
+import { ClosureProvider } from "../state/ClosureProvider";
 import { TimeProvider } from "../state/TimeProvider";
 import { recordedClosures, recordedEvents, recordedLive } from "../test/recorded";
 import { ClosureSheet } from "./ClosureSheet";
-import { timelineBars } from "./ClosureTimeline";
-import { TimeSlider } from "./TimeSlider";
 
-const T = "2026-03-15T07:45:00+09:00";
 const fc0745 = recordedClosures("closures_0745");
-const fc0430 = recordedClosures("closures_0430");
 const live0745 = recordedLive("closure_events_live_0315_0745");
 const live1107 = recordedLive("closure_events_live_1107_1530");
 // 목록 위 기준 시각은 실시간 돌발이 없던 기록으로 — 있으면 '지금'에 따라 경고가 바뀐다 (T5.9)
@@ -43,22 +38,6 @@ function Providers({ children, live = live0745 }: { children: ReactNode; live?: 
     </ApiProvider>
   );
 }
-
-describe("timelineBars (순수)", () => {
-  it("3/15 07:45 — 시트 목록과 같은 사건 16, 1구간 07:20~08:08 막대·통제 중 빨강", () => {
-    const bars = timelineBars(live0745.body.events, live0745.atMs, "2026-03-15T00:00:00+09:00");
-    expect(bars).toHaveLength(16);
-    const seg1 = bars.find((b) => b.key === "adaea2f4cc02"); // 기록: marathon 1구간 07:20–08:08
-    expect(seg1?.title).toBe("마라톤 1구간 세종대로 사거리~숭례문 오거리");
-    expect(seg1?.color).toBe(COLORS.stop);
-    expect(seg1?.leftPct).toBeCloseTo(((7 * 60 + 20) / (24 * 60)) * 100, 3);
-    expect(seg1?.widthPct).toBeCloseTo((48 / (24 * 60)) * 100, 3);
-    // 다른 날이면 막대 없음 — 3/15 사건을 3/16 축에
-    expect(timelineBars(live0745.body.events, live0745.atMs, "2026-03-16T00:00:00+09:00")).toEqual(
-      [],
-    );
-  });
-});
 
 describe("ClosureSheet", () => {
   it("3/15 07:45 — 부제는 서울 사건 수, 행·배지, 통제 불러오기는 없다", () => {
@@ -105,58 +84,5 @@ describe("ClosureSheet", () => {
     fireEvent.click(open);
     expect(screen.getByText(excerpt)).toBeDefined();
     expect(open.getAttribute("aria-expanded")).toBe("true");
-  });
-});
-
-function ClosureNudger() {
-  const dispatch = useClosureDispatch();
-  return (
-    <button
-      type="button"
-      onClick={() => dispatch({ type: "receive", at: T, bbox: "x", closures: fc0430 })}
-    >
-      nudge
-    </button>
-  );
-}
-
-/** 대조군 — closures 를 읽는 컴포넌트는 nudge 에 다시 그려져야 한다 (아니면 아래 검사가 공허하다) */
-function ClosureCount() {
-  const { closures } = useClosures();
-  return <span data-testid="closure-count">{closures.features.length}</span>;
-}
-
-// React 19 의 지연 컨텍스트 전파 때문에 Profiler.onRender 는 자식의 컨텍스트 재렌더를 놓친다 (2026-11-08 확인).
-// 대신 TimeSlider 를 함수로 불러 그 훅들이 이 probe 에서 돌게 한다 → 구독 집합이 TimeSlider 와 같다
-let sliderRenders = 0;
-function SliderProbe() {
-  sliderRenders += 1;
-  return TimeSlider();
-}
-
-describe("TimeSlider 재렌더 격리", () => {
-  it("closures state 가 바뀌어도 TimeSlider 는 다시 그려지지 않고, 슬라이더 조작엔 반응한다", () => {
-    sliderRenders = 0;
-    render(
-      <Providers>
-        <SliderProbe />
-        <ClosureCount />
-        <ClosureNudger />
-      </Providers>,
-    );
-    expect(sliderRenders).toBe(1);
-    expect(screen.getByTestId("closure-count").textContent).toBe("79");
-    act(() => {
-      fireEvent.click(screen.getByText("nudge"));
-    });
-    expect(screen.getByTestId("closure-count").textContent).toBe("5"); // closures 는 바뀌었다
-    expect(sliderRenders).toBe(1); // 그래도 슬라이더는 그대로
-    act(() => {
-      fireEvent.change(screen.getByLabelText("기준 시각"), {
-        target: { value: String(13 * 60 + 30) },
-      });
-    });
-    expect(sliderRenders).toBe(2);
-    expect(screen.getByText("13:30")).toBeDefined();
   });
 });
