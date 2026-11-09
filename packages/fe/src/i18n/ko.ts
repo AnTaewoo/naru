@@ -10,7 +10,7 @@ import type {
   Status,
   SummarySegment,
 } from "../types/contracts";
-import type { ChipKind } from "../map/eventKinds";
+import { eventKind, type ChipKind, type GroupKey } from "../map/eventKinds";
 
 export const STATUS_KO: Record<Status, string> = {
   scheduled: "예정",
@@ -131,6 +131,33 @@ export function remainKo(e: Pick<ClosureEvent, "status" | "window">, atMs: numbe
   if (!start) return "시작 시각 미정";
   const ms = Date.parse(start) - atMs;
   return ms > 0 ? `${durationKo(ms)} 뒤 시작` : `${hhmm(start)} 시작 · 확인 전`;
+}
+
+/** 지금 서울 통제 묶음 머리 (T7.5) */
+export const GROUP_KO: Record<GroupKey, string> = {
+  now: "통제 중",
+  soon: "1시간 안 시작",
+  today: "오늘",
+  tomorrow: "내일",
+  later: "그 뒤",
+};
+
+/** 사건 카드 상태 배지 (T7.5) — 1시간 안이어도 시작 시각이 지났으면(근거 없는 예정) "확인 전" */
+export function kindBadgeKo(e: ClosureEvent, atMs: number): string {
+  const kind = eventKind(e, atMs);
+  if (kind === "soon") {
+    const start = e.window.start ? Date.parse(e.window.start) : Number.NaN;
+    return start > atMs ? "곧 시작" : "확인 전";
+  }
+  return { confirmed: "통제 중", scheduled: "예정", zone: "예정 구역", released: "해제" }[kind];
+}
+
+/** 목록 행 오른쪽 (T7.5) — 통제 중 "23분 뒤 해제", 예정 "1시간 27분 뒤 시작", 시작했는데 근거 없으면 "확인 전" */
+export function rowBadgeKo(e: ClosureEvent, atMs: number): string {
+  if (e.status === "confirmed") return untilKo(e.window.end ?? null, new Date(atMs).toISOString());
+  if (e.status === "released") return "해제";
+  const start = e.window.start ? Date.parse(e.window.start) : Number.NaN;
+  return start > atMs ? `${durationKo(start - atMs)} 뒤 시작` : "확인 전";
 }
 
 export const SOURCE_KO: Record<Source, string> = {

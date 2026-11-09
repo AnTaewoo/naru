@@ -73,6 +73,15 @@ export function chipStatuses(visible: readonly ChipKind[]): Status[] {
   return visible.map((k) => CHIP_STATUS[k]);
 }
 
+/** 종류 바탕(배지·행 아이콘) — 목업 01_home·03_closure 의 연한 바탕 */
+export const KIND_BG: Record<EventKind, string> = {
+  confirmed: COLORS.stopBg,
+  soon: COLORS.slowBg,
+  scheduled: COLORS.slowBg,
+  zone: COLORS.zoneBg,
+  released: COLORS.grayBg,
+};
+
 export const KIND_COLOR: Record<EventKind, string> = {
   confirmed: COLORS.stop,
   soon: COLORS.soon,
@@ -100,10 +109,14 @@ function startMs(e: ClosureEvent): number {
   return e.window.start ? Date.parse(e.window.start) : Number.POSITIVE_INFINITY;
 }
 
-export function listedEvents(events: readonly ClosureEvent[], atMs: number): ListedEvent[] {
+export function listedEvents(
+  events: readonly ClosureEvent[],
+  atMs: number,
+  withLow = false,
+): ListedEvent[] {
   return events
     .map((event) => ({ event, kind: eventKind(event, atMs) }))
-    .filter(({ event, kind }) => kind !== "released" && !isLow(event))
+    .filter(({ event, kind }) => kind !== "released" && (withLow || !isLow(event)))
     .sort(
       (a, b) =>
         KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
@@ -137,9 +150,14 @@ function groupOf({ event, kind }: ListedEvent, atMs: number): GroupKey {
   return day === kstDay(atMs + DAY_MS) ? "tomorrow" : "later";
 }
 
-export function liveGroups(events: readonly ClosureEvent[], atMs: number): EventGroup[] {
+/** withLow — 지도에서 고른 묶음(클러스터·겹친 구역)은 흐리게 그린 0.7 미만도 보여 준다 */
+export function liveGroups(
+  events: readonly ClosureEvent[],
+  atMs: number,
+  withLow = false,
+): EventGroup[] {
   const by = new Map<GroupKey, ListedEvent[]>();
-  for (const row of listedEvents(events, atMs)) {
+  for (const row of listedEvents(events, atMs, withLow)) {
     const key = groupOf(row, atMs);
     by.set(key, [...(by.get(key) ?? []), row]);
   }

@@ -6,6 +6,9 @@ import type { ClosureEvent } from "../types/contracts";
 import {
   confidenceKo,
   dataAsOfKo,
+  GROUP_KO,
+  kindBadgeKo,
+  rowBadgeKo,
   eventDetailKo,
   eventTitleKo,
   isStale,
@@ -88,6 +91,18 @@ describe("사건 카드 문구 (T7.5)", () => {
     expect(confidenceKo(ev(n, "ccaa9980c6ac").confidence)).toBe("높음"); // 통제지도 0.85
     expect(confidenceKo(ev(a, "2e930ec6deeb").confidence)).toBe("보통"); // r04 0.75
     expect(confidenceKo(ev(a, "3f036e3f24e0").confidence)).toBe("낮음"); // r05 0.65
+  });
+
+  it("배지 — 카드는 상태(곧 시작·확인 전 구분), 행은 남은 시간(통제 중 'N분 뒤 해제')", () => {
+    expect(kindBadgeKo(ev(n, "ccaa9980c6ac"), n.atMs)).toBe("통제 중");
+    expect(kindBadgeKo(ev(a, "a1199bc3db1d"), a.atMs)).toBe("곧 시작"); // 16:00, 30분 뒤
+    expect(kindBadgeKo(ev(a, "be5f89a4ebf3"), a.atMs)).toBe("확인 전"); // 12:00 시작, 공지뿐
+    expect(kindBadgeKo(ev(m, "e1d0e06932a8"), m.atMs)).toBe("예정"); // 09:12, 87분 뒤
+    expect(kindBadgeKo(ev(n, "1deaa20a0218"), n.atMs)).toBe("해제");
+    expect(rowBadgeKo(ev(m, "adaea2f4cc02"), m.atMs)).toBe("23분 뒤 해제"); // 1구간 08:08
+    expect(rowBadgeKo(ev(m, "e1d0e06932a8"), m.atMs)).toBe("1시간 27분 뒤 시작");
+    expect(rowBadgeKo(ev(a, "be5f89a4ebf3"), a.atMs)).toBe("확인 전");
+    expect(Object.values(GROUP_KO)).toEqual(["통제 중", "1시간 안 시작", "오늘", "내일", "그 뒤"]);
   });
 
   it("시트 제목 — 기준 시각이 지금(±5분)이면 '지금 서울 통제', 아니면 그 날짜·시각", () => {

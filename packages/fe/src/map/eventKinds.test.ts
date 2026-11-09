@@ -88,6 +88,10 @@ describe("listedEvents — 시트 목록·시간표", () => {
     expect(listedEvents(b.body.events, b.atMs).map((r) => r.event.id)).not.toContain(
       "1deaa20a0218",
     );
+    // 지도에서 고른 묶음은 흐린 사건도 (withLow) — 해제는 여전히 없다
+    expect(listedEvents(a.body.events, a.atMs, true).map((r) => r.event.id)).toContain(
+      "3f036e3f24e0",
+    );
   });
 });
 
