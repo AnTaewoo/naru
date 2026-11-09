@@ -80,3 +80,34 @@ export const KIND_COLOR: Record<EventKind, string> = {
   zone: COLORS.zone,
   released: COLORS.gray,
 };
+
+/** 목록·시간표의 사건 (T7.4) — 칩과 같은 기준(해제·확신도 0.7 미만 빼고), 통제 중 → 1시간 안 → 예정 →
+ * 예정 구역, 같으면 시작 이른 순 */
+export interface ListedEvent {
+  event: ClosureEvent;
+  kind: EventKind;
+}
+
+const KIND_ORDER: Record<EventKind, number> = {
+  confirmed: 0,
+  soon: 1,
+  scheduled: 2,
+  zone: 3,
+  released: 4,
+};
+
+function startMs(e: ClosureEvent): number {
+  return e.window.start ? Date.parse(e.window.start) : Number.POSITIVE_INFINITY;
+}
+
+export function listedEvents(events: readonly ClosureEvent[], atMs: number): ListedEvent[] {
+  return events
+    .map((event) => ({ event, kind: eventKind(event, atMs) }))
+    .filter(({ event, kind }) => kind !== "released" && !isLow(event))
+    .sort(
+      (a, b) =>
+        KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
+        startMs(a.event) - startMs(b.event) ||
+        a.event.reason.localeCompare(b.event.reason),
+    );
+}

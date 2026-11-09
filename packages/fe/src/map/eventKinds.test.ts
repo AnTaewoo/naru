@@ -2,7 +2,14 @@
 // 받은 응답). 기대값은 기록을 열어 확인한 사건 id·status·시작·확신도 (data/MANIFEST.md 2026-11-09 재기록(T7.4))
 import { describe, expect, it } from "vitest";
 import { eventById, recordedLive } from "../test/recorded";
-import { CHIP_KINDS, chipCounts, chipStatuses, eventKind, zoomBand } from "./eventKinds";
+import {
+  CHIP_KINDS,
+  chipCounts,
+  chipStatuses,
+  eventKind,
+  listedEvents,
+  zoomBand,
+} from "./eventKinds";
 
 describe("eventKind·chipCounts", () => {
   it("11/7 15:30 — 통제 중 8, 예정 5 는 다 1시간 안(16:00 시작 하나 + 이미 시작했는데 근거 없는 넷)", () => {
@@ -48,5 +55,34 @@ describe("칩·줌 단계", () => {
       "crosswalk",
       "crosswalk",
     ]);
+  });
+});
+
+describe("listedEvents — 시트 목록·시간표", () => {
+  it("3/15 07:45 — 통제 중 9(시작 순) → 1시간 안 2 → 예정 5, 같은 05:00 은 이유 순", () => {
+    const { body, atMs } = recordedLive("closure_events_live_0315_0745");
+    const rows = listedEvents(body.events, atMs);
+    expect(rows.map((r) => r.kind)).toEqual([
+      ...Array<string>(9).fill("confirmed"),
+      "soon",
+      "soon",
+      ...Array<string>(5).fill("scheduled"),
+    ]);
+    // 기록: 15구간·출발지 05:00, 11·14구간 07:10, 1구간 07:20 … 4구간 08:17(1시간 안) … 10구간 09:12
+    expect(rows[0]?.event.id).toBe("5f206eb9e97c"); // marathon 15구간 < marathon 출발지
+    expect(rows[1]?.event.id).toBe("3d608690c438");
+    expect(rows[9]?.event.id).toBe("cffcce1130c0");
+    expect(rows.at(-1)?.event.id).toBe("e1d0e06932a8");
+  });
+
+  it("11/7 15:30 — r05 0.65 는 목록에 없다(13 → 12), 11/9 13:30 해제 하나증권도 없다(5 → 4)", () => {
+    const a = recordedLive("closure_events_live_1107_1530");
+    const ids = listedEvents(a.body.events, a.atMs).map((r) => r.event.id);
+    expect(ids).toHaveLength(12);
+    expect(ids).not.toContain("3f036e3f24e0");
+    const b = recordedLive("closure_events_live_1109_1330");
+    expect(listedEvents(b.body.events, b.atMs).map((r) => r.event.id)).not.toContain(
+      "1deaa20a0218",
+    );
   });
 });

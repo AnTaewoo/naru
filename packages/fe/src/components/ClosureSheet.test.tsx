@@ -3,10 +3,11 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { createNaruApiClient } from "../api/naruApiClient";
+import { COLORS } from "../map/colors";
 import { ApiProvider } from "../state/ApiProvider";
 import { ClosureProvider, useClosureDispatch, useClosures } from "../state/ClosureProvider";
 import { TimeProvider } from "../state/TimeProvider";
-import { recordedClosures, recordedEvents } from "../test/recorded";
+import { recordedClosures, recordedEvents, recordedLive } from "../test/recorded";
 import { ClosureSheet, closureRows, withEvents } from "./ClosureSheet";
 import { timelineBars } from "./ClosureTimeline";
 import { TimeSlider } from "./TimeSlider";
@@ -52,11 +53,6 @@ describe("closureRows / timelineBars (순수)", () => {
     expect(seg1?.start).toBe("2026-03-15T07:20:00+09:00");
     expect(seg1?.end).toBe("2026-03-15T08:08:00+09:00");
     expect(seg1 && "evidence" in seg1).toBe(false); // 출처 줄(시각표·확신)은 쓰지 않는다 (T5.9)
-    const bars = timelineBars(fc0745, "2026-03-15T00:00:00+09:00");
-    expect(bars).toHaveLength(rows.length);
-    const seg1bar = bars.find((b) => b.reason.includes("1구간"));
-    expect(seg1bar?.leftPct).toBeCloseTo(((7 * 60 + 20) / (24 * 60)) * 100, 3);
-    expect(seg1bar?.widthPct).toBeCloseTo((48 / (24 * 60)) * 100, 3);
   });
   it("횡단보도 수는 화면 영역 말고 사건 전체 — 07:45 2구간 화면 안 23곳 → 58곳 (T5.9)", () => {
     const rows = withEvents(closureRows(fc0745), events);
@@ -75,6 +71,21 @@ describe("closureRows / timelineBars (순수)", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.status).toBe("scheduled");
     expect(rows[0]?.crosswalks).toBe(5);
+  });
+});
+
+describe("timelineBars (순수, T7.4 — 지금 지도 사건)", () => {
+  it("3/15 07:45 — 시트 목록과 같은 사건 16, 1구간 07:20~08:08 막대·통제 중 빨강", () => {
+    const live = recordedLive("closure_events_live_0315_0745");
+    const bars = timelineBars(live.body.events, live.atMs, "2026-03-15T00:00:00+09:00");
+    expect(bars).toHaveLength(16);
+    const seg1 = bars.find((b) => b.key === "adaea2f4cc02"); // 기록: marathon 1구간 07:20–08:08
+    expect(seg1?.title).toBe("마라톤 1구간 세종대로 사거리~숭례문 오거리");
+    expect(seg1?.color).toBe(COLORS.stop);
+    expect(seg1?.leftPct).toBeCloseTo(((7 * 60 + 20) / (24 * 60)) * 100, 3);
+    expect(seg1?.widthPct).toBeCloseTo((48 / (24 * 60)) * 100, 3);
+    // 다른 날이면 막대 없음 — 3/15 사건을 3/16 축에
+    expect(timelineBars(live.body.events, live.atMs, "2026-03-16T00:00:00+09:00")).toEqual([]);
   });
 });
 
