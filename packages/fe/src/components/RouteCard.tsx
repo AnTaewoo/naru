@@ -1,11 +1,22 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { LEG_KO, distanceKo, hhmm, locateNoteKo, routeErrorKo, routeNoteKo } from "../i18n/ko";
+import {
+  AVOID_KO,
+  LEG_KO,
+  avoidBannerKo,
+  distanceKo,
+  eventTitleKo,
+  hhmm,
+  locateNoteKo,
+  routeErrorKo,
+  routeNoteKo,
+} from "../i18n/ko";
 import { CROSSING_KINDS, routeOdKey } from "../map/layers/routeLayer";
+import { useClosures } from "../state/ClosureProvider";
 import { useRoute, useRouteDispatch, type RouteView } from "../state/RouteProvider";
 import { useTime } from "../state/TimeProvider";
-import type { LegKind, RouteResponse } from "../types/contracts";
+import type { Avoided, LegKind, RouteResponse } from "../types/contracts";
 import { BottomSheet, type SheetStage } from "./BottomSheet";
 import { EvidencePopover } from "./EvidencePopover";
 import { LegList } from "./LegList";
@@ -30,8 +41,27 @@ export interface OriginalCard {
   /** 상태별 횡단보도 수 — confirmed "통제 중" / scheduled "공지상 통제 시간 · 현장 확인 전" (ADR-011 A) */
   confirmed: number;
   scheduled: number;
-  /** 가장 늦은 해제 시각. 하나라도 종료 미정이면 null */
+  /** "이 구역 피해서"(T7.6)로 피한 곳 — 지금 통제 중이 아니면 상태(예정·해제)와 상관없이 여기 */
+  requested: number;
+  /** 상태로 피한 곳의 가장 늦은 해제 시각. 하나라도 종료 미정이거나 상태로 피한 곳이 없으면 null */
   until: string | null;
+}
+
+/** 길찾기 avoid 로 보낸 사건 (INTERFACE §2 v0.14) — 응답 avoided 에서 그 사건 항목을 reason·끝으로 알아본다 */
+export interface AvoidTarget {
+  reason: string;
+  end: string | null;
+}
+
+function sameEnd(a: string | null, b: string | null): boolean {
+  return a === b || (a !== null && b !== null && Date.parse(a) === Date.parse(b));
+}
+
+/** 피해 달라고 한 구역의 항목 — 통제 중이면 막힘 그대로. 해제·예정 구역은 avoid 로만 오고, 예정은 사건으로 가른다 */
+function isRequested(a: Avoided, avoid: AvoidTarget | null): boolean {
+  if (a.status === "confirmed") return false;
+  if (a.status !== "scheduled") return true;
+  return avoid !== null && a.reason === avoid.reason && sameEnd(a.until ?? null, avoid.end);
 }
 
 /** 카드에 세는 레그 종류와 순서 — 길을 건너는 방법 */
@@ -51,33 +81,42 @@ export function fastestCard(route: RouteResponse, t: string): FastestCard {
   return { minutes, distance: distanceKo(route.distance_m), arrive: hhmm(arrive), facts };
 }
 
-export function originalCard(route: RouteResponse): OriginalCard | null {
+export function originalCard(
+  route: RouteResponse,
+  avoid: AvoidTarget | null = null,
+): OriginalCard | null {
   if (route.avoided.length === 0) return null;
-  const untils = route.avoided.map((a) => a.until ?? null);
+  const ruled = route.avoided.filter((a) => !isRequested(a, avoid));
+  const untils = ruled.map((a) => a.until ?? null);
   let until: string | null = null;
   if (!untils.includes(null)) {
     for (const u of untils) {
       if (u && (!until || new Date(u).getTime() > new Date(until).getTime())) until = u;
     }
   }
-  const ids = (status: string) =>
-    new Set(route.avoided.filter((a) => a.status === status).map((a) => a.crosswalk_id)).size;
+  const count = (xs: readonly Avoided[]) => new Set(xs.map((a) => a.crosswalk_id)).size;
   return {
     minutes: minutesOf(route.baseline.duration_s),
     distance: distanceKo(route.baseline.distance_m),
     blocked: route.avoided.some((a) => a.status === "confirmed"),
-    crosswalks: new Set(route.avoided.map((a) => a.crosswalk_id)).size,
-    confirmed: ids("confirmed"),
-    scheduled: ids("scheduled"),
+    crosswalks: count(route.avoided),
+    confirmed: count(ruled.filter((a) => a.status === "confirmed")),
+    scheduled: count(ruled.filter((a) => a.status === "scheduled")),
+    requested: count(route.avoided.filter((a) => isRequested(a, avoid))),
     until,
   };
 }
 
-/** 원래 길 카드 둘째 줄 — "횡단보도 통제 중 2곳 · 08:30 해제", 예정이면 "공지상 통제 시간 1곳 · 현장 확인 전" */
+/**
+ * 원래 길 카드 둘째 줄 — "횡단보도 통제 중 2곳 · 08:30 해제", 예정이면 "공지상 통제 시간 1곳 · 현장 확인 전",
+ * 피해 달라고 한 구역(T7.6)은 "피한 구역 1곳"(해제 시각 없음)
+ */
 export function originalFactsKo(orig: OriginalCard): string {
   const parts: string[] = [];
   if (orig.confirmed > 0) parts.push(`통제 중 ${orig.confirmed}곳`);
   if (orig.scheduled > 0) parts.push(`공지상 통제 시간 ${orig.scheduled}곳 · 현장 확인 전`);
+  if (orig.requested > 0) parts.push(`피한 구역 ${orig.requested}곳`);
+  if (orig.confirmed + orig.scheduled === 0) return `횡단보도 ${parts.join(" · ")}`;
   const until = orig.until ? `${hhmm(orig.until)} 해제` : "종료 미정";
   return `횡단보도 ${parts.join(" · ")} · ${until}`;
 }
@@ -119,7 +158,12 @@ function CardPress({
 }
 
 export function RouteCard() {
-  const { status, route, errorCode, at, locate, view } = useRoute();
+  const { status, route, errorCode, at, locate, view, avoid } = useRoute();
+  // 피할 사건(T7.6) — 지도 사건·넓은 창 목록에서 제목과 reason·끝을 찾는다
+  const { events, catalog } = useClosures();
+  const target = avoid
+    ? (events?.find((e) => e.id === avoid) ?? catalog?.find((e) => e.id === avoid) ?? null)
+    : null;
   const dispatch = useRouteDispatch();
   const { t } = useTime();
   const [panel, setPanel] = useState<Panel>(null);
@@ -134,7 +178,9 @@ export function RouteCard() {
     setPanel(panel === p ? null : p);
   };
   const fast = route ? fastestCard(route, at ?? t) : null;
-  const orig = route ? originalCard(route) : null;
+  const orig = route
+    ? originalCard(route, target ? { reason: target.reason, end: target.window.end ?? null } : null)
+    : null;
   const hasAvoided = (route?.avoided.length ?? 0) > 0;
   const original = view === "original" && orig !== null;
   // 카드를 누르면 그 길을 지도에서 본다 — 시트를 접고 MapView 가 그 길에 맞춘다 (T5.11)
@@ -146,6 +192,14 @@ export function RouteCard() {
   const locateNote = locate ? locateNoteKo(locate.which, locate.status) : null;
   return (
     <BottomSheet label="길찾기 결과" stage={stage} onStage={setStage}>
+      {avoid && (
+        <p className={styles.avoid}>
+          <span>{avoidBannerKo(target ? eventTitleKo(target) : null)}</span>
+          <button type="button" onClick={() => dispatch({ type: "avoid", id: null })}>
+            {AVOID_KO.remove}
+          </button>
+        </p>
+      )}
       {route && fast ? (
         <>
           {locateNote && <p className={styles.msg}>{locateNote}</p>}
@@ -184,7 +238,11 @@ export function RouteCard() {
               >
                 <CardPress on pressed={original} onPress={() => choose("original")}>
                   <span className={`${styles.badge} ${orig.blocked ? styles.stop : styles.slow}`}>
-                    {orig.blocked ? "지금 못 감" : "공지상 통제 시간"}
+                    {orig.blocked
+                      ? "지금 못 감"
+                      : orig.scheduled > 0
+                        ? "공지상 통제 시간"
+                        : "피한 구역"}
                   </span>
                   <span className={styles.t}>
                     {orig.minutes}
@@ -204,6 +262,8 @@ export function RouteCard() {
               until: orig?.until ?? null,
               blocked: orig?.blocked ?? false,
               crossing: routeCrossing(route),
+              requested: orig?.requested ?? 0,
+              avoiding: avoid !== null,
             })}
           </p>
         </>

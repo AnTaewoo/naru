@@ -87,6 +87,7 @@ describe("카드·레그·근거 (순수)", () => {
       crosswalks: 2,
       confirmed: 2,
       scheduled: 0,
+      requested: 0,
       until: "2026-03-15T08:30:00+09:00",
     });
     expect(
@@ -120,6 +121,7 @@ describe("카드·레그·근거 (순수)", () => {
       crosswalks: 1,
       confirmed: 0,
       scheduled: 1,
+      requested: 0,
       until: "2026-11-07T16:00:00+09:00",
     });
     expect(fastestCard(r1107, T1107)).toMatchObject({

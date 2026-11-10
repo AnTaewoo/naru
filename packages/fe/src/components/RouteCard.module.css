@@ -165,3 +165,34 @@
   background: #2d6bff;
   color: #fff;
 }
+
+/* 이 구역 피해서 길찾기 (T7.6) — 시트 맨 위 "피하는 구역 · 제목 [빼기]" */
+.avoid {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 20px 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #fff4e5;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e1e1e;
+}
+
+.avoid span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.avoid button {
+  flex: none;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: #2d6bff;
+  cursor: pointer;
+}

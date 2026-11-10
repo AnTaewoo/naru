@@ -239,21 +239,40 @@ export function josaRo(word: string): string {
   return jong === 0 || jong === 8 ? "로" : "으로";
 }
 
-/** 길찾기 안내 문장 (시안 02 하단 note). crossing = 경로가 건너는 지하보도·육교 이름 */
+/**
+ * 길찾기 안내 문장 (시안 02 하단 note). crossing = 경로가 건너는 지하보도·육교 이름.
+ * requested = 그중 "이 구역 피해서"로 피한 곳(T7.6), avoiding = 피할 구역을 골랐는지
+ */
 export function routeNoteKo(p: {
   crosswalks: number;
   until: string | null;
   blocked: boolean;
   crossing: string | null;
+  requested?: number;
+  avoiding?: boolean;
 }): string {
-  if (p.crosswalks === 0) return "이 시각엔 경로에 걸린 통제가 없어요.";
+  if (p.crosswalks === 0) {
+    return p.avoiding
+      ? "이 길은 고른 구역을 지나지 않아요."
+      : "이 시각엔 경로에 걸린 통제가 없어요.";
+  }
   const via = p.crossing ? `${p.crossing}${josaRo(p.crossing)} 건너는` : null;
   const until = p.until ? `${hhmm(p.until)}까지 ` : "";
+  const ruled = p.crosswalks - (p.requested ?? 0); // 상태(통제 중·공지상 시간)로 피한 곳
+  if (ruled === 0)
+    return `고른 구역의 횡단보도 ${p.crosswalks}곳을 피해 ${via ?? "돌아가는"} 길을 골랐어요.`;
   if (!p.blocked) {
     // 예정만 피했다 — 공지 창 안이라 피했지만 현장 확인은 아직 (ADR-011 A)
-    return `횡단보도 ${p.crosswalks}곳이 ${until}공지상 통제 시간(현장 확인 전)이라 ${via ?? "피해 가는"} 길을 골랐어요.`;
+    return `횡단보도 ${ruled}곳이 ${until}공지상 통제 시간(현장 확인 전)이라 ${via ?? "피해 가는"} 길을 골랐어요.`;
   }
-  return `횡단보도 ${p.crosswalks}곳이 ${until}막혀 있어 ${via ?? "돌아가는"} 길을 골랐어요.`;
+  return `횡단보도 ${ruled}곳이 ${until}막혀 있어 ${via ?? "돌아가는"} 길을 골랐어요.`;
+}
+
+/** 이 구역 피해서 길찾기 (T7.6) — 사건 카드 버튼, 길찾기 시트 맨 위 줄 */
+export const AVOID_KO = { button: "이 구역 피해서 길찾기", remove: "빼기" } as const;
+
+export function avoidBannerKo(title: string | null): string {
+  return `피하는 구역 · ${title ?? "고른 통제"}`;
 }
 
 /** /route 오류 코드(INTERFACE §6) → 화면 문구 */
