@@ -339,3 +339,10 @@
 - 정한 것: 거리는 표시용이라 FE(geo.distanceM — BE distance_m 은 계약 변경), 홈 결과 줄의 [출발][도착]은 장소 카드로, 지도를 누르면(빈 곳·사건) 장소 닫힘, 예시 칩을 누르면 카드 맞춤(국회대로 행진은 줌 12 아래 윤곽)
 - 막힌 것 / 태우 대기: 태우가 정할 것 — 공지만 있는 통제의 "확신도 높음"(≥0.8, 예: 11/7 r01 '확인 전' 카드에 확신도 높음)·카드 "막히는 횡단보도 N곳" 단정, "확인 전"(카드·목록) ↔ "공지상 통제 시간 · 현장 확인 전"(통제 근거·길찾기, INTERFACE §5) 통일. 교보빌딩 정문 앞(11/8 r03 unknown 0.45)은 리졸버가 '교보빌딩'(카카오 기록: 교보타워 강남·교보빌딩 안양)을 종로에서 못 찾아 후보가 안 됨 — AI 레인. ARCHITECTURE DataAsOf 줄은 답 없음. PC-7A: 태우 "다 확인완료" — B(T7.7)는 "다음"에. 🧑 `sudo systemctl restart naru`(T7.12~T7.14 공개)
 - 커밋: 9c6cc38 261ba95 d352760 8078ae6 f8b1926 0f28b1a a4bef32 1f75b3b 24a3c0f 5f13124 (하네스 3ccdf53) / 이 항목의 커밋
+
+## 2026-11-10 · T7.15 DONE (태우 "이어서 ㄱㄱ")
+- 한 것: 통제 제보(교수님 멘토링 T-A) — 계약 §8(`POST /crosswalks/nearest` 좌표는 본문만·저장 안 함, `POST /reports` 201/400/429 `too_many_reports`, `GET /reports/recent`), Alembic 0006 reports(기기는 sha256), ReportDesk(STRtree 최근접 100 m, 같은 기기·횡단보도 600초 간격), prediction.blocked_at(라우터 §5 판정 함수 하나 — 라우터도 같이 씀), 현장 체크리스트 CSV·GeoJSON·field 제보 비교(recall·precision → docs/eval), FE 지도 '제보' 버튼 → 교차로명 핀·카드([막혔어요][열렸어요], 기록만 안내, ?mode=field 배지), 통제 근거 "최근 1시간 제보 N건". 기록만 — 경로·확신도에 안 씀
+- 정한 것: 100 m·600초는 가정값(config, 11/14 뒤 수정), 제보 위치는 maximumAge 0·정확도 1000 m 초과면 안 보냄, 제보 버튼은 홈에만, 체크리스트 CSV 는 엑셀용 utf-8-sig·사유 첫 줄, FE 기록은 naru_test 만 쓰는 record_live_events 에(record_naru_api 는 naru DB)
+- 막힌 것 / 태우 대기: 🧑 11/13 전 `sudo systemctl restart naru`(0006 적용). ARCHITECTURE 에 ReportDesk·reports·prediction 줄(DataAsOf 질문과 같이). 막는 장치는 기기·횡단보도 10분 간격뿐(토큰 지우면 새 기기, ?mode=field 누구나). 커밋 20개 미푸시. e2e 11/7 15:00 둘은 데이터 의존 그대로
+- 커밋: 148c41f d3d356e 9a21337 a13153c 73c4a16 8648805 f9d8ea6 c9a9c36 623d34f 8d13d50 79f5127 2605639 742bbc5 b145692 cf3c74d 47482b5 5ecbaab 8f09e9d 057c4ad 80ab834 / 이 항목의 커밋
+
