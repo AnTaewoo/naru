@@ -128,6 +128,7 @@ def main() -> None:
             DATABASE_URL=base.test_database_url,
             internal_token="naru-record",
             vapid_private_key=SecretStr(pem),
+            vapid_subject="mailto:naru-record@example.invalid",
         )
     )
     models = app.extensions["naru"]
@@ -264,6 +265,15 @@ def main() -> None:
             {},
         ),
         ("watch_areas", "GET", "/watch-areas", {}, {"X-Push-Endpoint": sub["endpoint"]}),
+        # T7.9 — 11/6 23:00 기준: r01·r04 가 교보빌딩 500 m 와 겹쳐 둘 줄 선다
+        # (밤이라 발송은 07:00 — 여기선 발송 없음)
+        (
+            "push_dispatch",
+            "POST",
+            "/internal/push/dispatch",
+            {"at": "2026-11-06T23:00:00+09:00"},
+            {"X-Naru-Internal-Token": "naru-record"},
+        ),
     ]
     for name, method, url, body, headers in pushes:
         resp = client.open(url, method=method, json=body or None, headers=headers)

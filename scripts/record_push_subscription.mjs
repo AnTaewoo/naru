@@ -3,7 +3,7 @@
 import { createRequire } from "node:module";
 const require = createRequire(process.cwd() + "/package.json");
 const { chromium } = require("@playwright/test");
-const [pub, origin, profile] = process.argv.slice(2);
+const [pub, origin, profile, mode] = process.argv.slice(2); // mode "gone": 구독하고 바로 해지 — 발송하면 410
 const ctx = await chromium.launchPersistentContext(profile, {
   executablePath: process.env.NARU_CHROME_PATH || undefined,
   headless: true,
@@ -12,13 +12,15 @@ const ctx = await chromium.launchPersistentContext(profile, {
 });
 const page = await ctx.newPage();
 await page.goto(`${origin}/`);
-const sub = await page.evaluate(async (key) => {
+const sub = await page.evaluate(async ([key, mode]) => {
   const reg = await navigator.serviceWorker.ready;
   const pad = "=".repeat((4 - (key.length % 4)) % 4);
   const raw = atob(key.replace(/-/g, "+").replace(/_/g, "/") + pad);
   const bytes = Uint8Array.from(raw, (c) => c.charCodeAt(0));
   const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: bytes });
-  return { subscription: s.toJSON(), userAgent: navigator.userAgent };
-}, pub);
+  const json = s.toJSON();
+  const gone = mode === "gone" ? await s.unsubscribe() : false;
+  return { subscription: json, userAgent: navigator.userAgent, gone };
+}, [pub, mode]).then((r) => r);
 console.log(JSON.stringify(sub));
 await ctx.close();

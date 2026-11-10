@@ -1,6 +1,9 @@
 """실제 브라우저 푸시 구독을 기록한다 (T7.8, ADR-014 C 열린 질문 3 — 가짜 구독 없이 저장·파싱).
 
-    NARU_FE_ORIGIN=http://127.0.0.1:3060 uv run python scripts/record_push_subscription.py
+    NARU_FE_ORIGIN=http://127.0.0.1:3060 uv run python scripts/record_push_subscription.py [--gone]
+
+--gone: 구독하고 브라우저에서 바로 해지한 것을 `<ts>_subscription_gone.json` 에 — 푸시 서비스가
+410 을 돌려주는 실제 endpoint (발송의 '구독 끔' 경로 테스트, T7.9).
 
 헤드리스 Chrome(영속 프로필 `{D}/recorded/push/chrome-profile/`)이 실제 푸시 서비스(FCM)에 구독한다.
 VAPID 키 쌍은 `{D}/recorded/push/vapid_test.pem`(없으면 여기서 만든다 — 테스트 전용, 운영 키는
@@ -36,6 +39,7 @@ def public_key_of(vapid: Vapid) -> str:
 
 def main() -> int:
     origin = os.environ.get("NARU_FE_ORIGIN", "http://127.0.0.1:3000")
+    gone = "--gone" in sys.argv[1:]
     OUT.mkdir(parents=True, exist_ok=True)
     pem = OUT / "vapid_test.pem"
     if not pem.exists():
@@ -51,6 +55,7 @@ def main() -> int:
         pub,
         origin,
         str(OUT / "chrome-profile"),
+        "gone" if gone else "keep",
     ]
     done = subprocess.run(cmd, cwd=FE, capture_output=True, text=True, check=False)
     if done.returncode != 0:
@@ -64,8 +69,10 @@ def main() -> int:
         "user_agent": got["userAgent"],
         "vapid_public_key": pub,
         "subscription": got["subscription"],
+        "gone": bool(got.get("gone")),
     }
-    path = OUT / f"{now.strftime('%Y%m%dT%H%M%S')}_subscription.json"
+    suffix = "_subscription_gone.json" if gone else "_subscription.json"
+    path = OUT / f"{now.strftime('%Y%m%dT%H%M%S')}{suffix}"
     path.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     sub = got["subscription"]
     print(
