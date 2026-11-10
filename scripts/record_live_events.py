@@ -15,6 +15,8 @@ TOPIS 공지 6300(11/7 09:00 에 볼 글)·TOPIS 통제지도 11/9 08:37 목록(
 교보빌딩 점 최근접·서울 밖 없음·제보 201·같은 기기 429·최근 집계(기기 토큰은 파일에 안 남긴다).
 행진 키프레임(T7.16, INTERFACE §3.2) — 11/7 r01 동화면세점 고리(be5f89a4ebf3)·TOPIS 통제지도
 국회대로 행진(ccaa9980c6ac) 통제 시간 전체, r04 갈라진 행진(2e930ec6deeb)은 404 not_modeled.
+공개 피드(T7.17, INTERFACE §3.3) GET /closures/feed?at= — 11/7 13:00(r01 행진 P)·3/15 07:45(마라톤)·
+11/9 13:30(국회대로 통제 중).
 T7.4 에서 PDF·통제지도를 더해 다시 기록 — FE 지금 지도에 확신도 0.7 미만 사건이 있어야 한다.
 """
 
@@ -82,6 +84,12 @@ ROUTES["route_0835"] = {"from": KYOBO, "to": DAEHANMUN, "depart_at": "2026-03-15
 # 세종대로사거리(06-0000023206 — route_0745 가 피하는 1구간 횡단보도) 막힘
 # → 최근 집계는 교보생명·세종대로사거리 각 1
 KYOBO_CW, SEJONG_CW = "06-0000051345", "06-0000023206"
+# T7.17 공개 피드 — 그 시각 걸린 통제 전부 (GeoJSON)
+FEEDS = {
+    "feed_1107_1300": "2026-11-07T13:00:00+09:00",
+    "feed_0315_0745": "2026-03-15T07:45:00+09:00",
+    "feed_1109_1330": "2026-11-09T13:30:00+09:00",
+}
 # T7.16 행진 키프레임 — 사건 id 는 closure_events_catalog_1107_1530 의 값
 MARCHES = {
     "march_be5f89a4ebf3": "be5f89a4ebf3",  # 11/7 r01 동화면세점 앞 → 종로1R → 동화면세점, 50,000명
@@ -230,6 +238,26 @@ def main() -> None:
             len(frames),
             "points/frame max",
             max((sum(len(s) for s in f["samples"]) for f in frames), default=0),
+        )
+    for name, at in FEEDS.items():
+        resp = client.get("/closures/feed", query_string={"at": at})
+        doc = {"method": "GET", "path": "/closures/feed", "query": {"at": at}}
+        doc |= {"status": resp.status_code, "etag": resp.headers.get("ETag")}
+        doc["body"] = resp.get_json()
+        path = out / f"{name}.json"
+        path.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        kinds = [f["properties"]["kind"] for f in doc["body"]["features"]]
+        raw = resp.get_data()
+        print(
+            path.relative_to(ROOT),
+            resp.status_code,
+            f"{len(raw):,}B gzip {len(gzip.compress(raw)):,}B",
+            "crosswalk",
+            kinds.count("crosswalk"),
+            "area",
+            kinds.count("area"),
+            "march_path",
+            kinds.count("march_path"),
         )
     models.repo.truncate()
 
