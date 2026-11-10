@@ -93,5 +93,5 @@
 15. 확신도 0.7 미만 사건 — 지도에만 흐린 점선(요청). **칩 수·목록에서는 뺀다(추천)**.
 
 ## 메모
-- 11/9 태우 README 커밋 둘(40b57d0·5c4d012)에 작업 중 코드가 같이 들어갔다. README 만 올릴 땐 `git commit README.md` 처럼 경로를 붙여 주면 섞이지 않는다.
+- 11/9 태우 README 커밋 둘(1963386·51e93cf)에 작업 중 코드가 같이 들어갔다. README 만 올릴 땐 `git commit README.md` 처럼 경로를 붙여 주면 섞이지 않는다.
 - 승인 뒤: ROADMAP 에 P7(T7.1~T7.10) 블록·기존 P7 → P8, ADR-014 상태 → 승인, CONVENTIONS(FE 레이어·PWA)·ARCHITECTURE 반영 — 하네스 커밋 하나.
