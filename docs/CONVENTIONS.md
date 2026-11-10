@@ -188,7 +188,7 @@ migrations/            # Alembic
 
 ### 5.3 Server / Client 경계
 - 기본은 Server Component. `app/layout.tsx`·`app/page.tsx`는 서버 — HTML 뼈대·메타데이터·푸터만.
-- **`'use client'` 경계는 두 파일뿐**: `app/providers.tsx`(Provider 묶음)와 `components/NaruApp.tsx`(지도 화면 루트). Context·hooks·maplibre를 쓰는 코드는 전부 이 둘 아래.
+- **`'use client'` 경계는 세 파일뿐**: `app/providers.tsx`(Provider 묶음), `components/NaruApp.tsx`(지도 화면 루트), `components/DataAsOf.tsx`(서버 페이지 `/licenses`의 데이터 기준 시각 — layout의 ClosureProvider를 읽는다, T7.13). Context·hooks·maplibre를 쓰는 코드는 전부 이 셋 아래.
 - `MapView`는 `next/dynamic(() => import("../map/MapView"), { ssr: false })` — maplibre는 `window`가 필요하다. `ssr: false`는 클라이언트 컴포넌트 안에서만 쓸 수 있으므로 `NaruApp.tsx`에서 부른다.
 - 서버 컴포넌트에서 BE를 fetch하지 않는다. 지도 데이터는 시각 `t`에 따라 클라이언트가 다시 받는다.
 
@@ -200,6 +200,7 @@ packages/fe/
   src/app/page.tsx               # (server) <NaruApp />
   src/app/providers.tsx          # 'use client' — ApiProvider > TimeProvider > ClosureProvider > RouteProvider
   src/components/NaruApp.tsx     # 'use client' — 화면 루트, MapView dynamic import
+  src/components/DataAsOf.tsx    # 'use client' — /licenses 의 데이터 기준 시각 (T7.13)
   src/components/TimeSlider.tsx  LegList.tsx  EvidencePopover.tsx  Footer.tsx
   src/api/naruApiClient.ts       # fetch("/api/route"), fetch("/api/closures") — 네트워크 만지는 유일한 파일
   src/state/ApiProvider.tsx  TimeProvider.tsx  ClosureProvider.tsx  RouteProvider.tsx

@@ -1,5 +1,6 @@
 // (server) 오픈소스·데이터 고지 — 빌드 때 한 번 만든다. 하단 시트 맨 아래 줄(모바일)·푸터에서 온다 (태우 2026-11-08, T5.12)
 import Link from "next/link";
+import { DataAsOf } from "../../components/DataAsOf";
 import { runtimeNotices } from "./notices";
 import styles from "./page.module.css";
 
@@ -77,6 +78,12 @@ export default function LicensesPage() {
             <pre className={styles.text}>{n.text}</pre>
           </article>
         ))}
+      </section>
+
+      {/* 데이터 기준 시각 (T7.13) — 시트에서 뺀 기준 시각 문구. 서버 페이지라 client 컴포넌트가 사건 응답에서 읽는다 */}
+      <section aria-labelledby="asof">
+        <h2 id="asof">데이터 기준 시각</h2>
+        <DataAsOf />
       </section>
     </main>
   );

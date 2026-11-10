@@ -10,7 +10,7 @@ import styles from "./NaruApp.module.css";
 import { RouteCard } from "./RouteCard";
 import { RoutePanel } from "./RoutePanel";
 
-// 'use client' 경계 2/2 — 화면 루트. maplibre 는 window 가 필요해 ssr: false 로 여기서만 부른다 (§5.3)
+// 'use client' 경계 2/3 — 화면 루트. maplibre 는 window 가 필요해 ssr: false 로 여기서만 부른다 (§5.3)
 const MapView = dynamic(() => import("../map/MapView"), {
   ssr: false,
   loading: () => <div className={styles.mapLoading}>지도 불러오는 중…</div>,
