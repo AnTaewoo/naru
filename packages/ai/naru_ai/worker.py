@@ -206,6 +206,7 @@ class IngestWorker:
             _Source("smpa", settings.smpa_interval_s, self.smpa_round),
             _Source("topis_map", settings.topis_map_interval_s, self.topis_map_round),
             _Source("bus", settings.bus_interval_s, self.bus_round),
+            _Source("push", settings.push_interval_s, self.push_round),  # T7.9 알림 발송
         ]
 
     # --- 배치 ---------------------------------------------------------------------
@@ -463,6 +464,22 @@ class IngestWorker:
         prefix = batch.batch_id.split("-")[0]
         scoped = _batch_id(prefix, [batch.batch_id, self._coverage, INTAKE_VERSION])
         return batch.model_copy(update={"batch_id": scoped})
+
+    def push_round(self, now: datetime) -> list[Response]:
+        """알림 매칭·발송 한 바퀴 — BE 가 한다, 워커는 깨울 뿐 (gunicorn 워커 둘이 겹치지 않게).
+        후보 배치가 아니라 tick 결과엔 안 넣고 로그만 (보낸·거절한 게 있을 때)."""
+        response = self.publisher.dispatch_push()
+        if response.matched or response.sent or response.failed:
+            log.info(
+                "push dispatched",
+                extra={
+                    "matched": response.matched,
+                    "sent": response.sent,
+                    "failed": response.failed,
+                    "deactivated": response.deactivated,
+                },
+            )
+        return []
 
     def bus_round(self, now: datetime) -> list[Response]:
         """창 안 전면 통제·마라톤의 근처 노선 위치를 부른다(원문 기록). 기록만이면(기본) 여기서

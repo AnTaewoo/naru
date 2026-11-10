@@ -80,6 +80,8 @@ class Settings(BaseSettings):
     bus_routes_per_event: int = Field(default=3, validation_alias="NARU_BUS_ROUTES_PER_EVENT")
     # 기록만 — BE 로 버스 위치를 안 보낸다(후보·상태 어디에도). ADR-013 보류(태우 2026-11-09)
     bus_record_only: bool = Field(default=True, validation_alias="NARU_BUS_RECORD_ONLY")
+    # T7.9 알림 발송 — BE 에 60초마다 POST /internal/push/dispatch (ADR-014 C)
+    push_interval_s: int = Field(default=60, validation_alias="NARU_PUSH_INTERVAL_S")
     data_go_kr_key: SecretStr = Field(default=SecretStr(""), validation_alias="DATA_GO_KR_KEY")
     # 노선 경로 getRoutePath(노선정보조회 15000193). 따로 받은 키가 있으면, 없으면 DATA_GO_KR_KEY
     data_go_kr_route_key: SecretStr = Field(

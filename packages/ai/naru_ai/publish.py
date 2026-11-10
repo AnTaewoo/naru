@@ -1,7 +1,7 @@
 """CandidatePublisher — 워커가 BE 와 말하는 곳 (ARCHITECTURE ⑥, CONVENTIONS §3.1).
 
 후보 `POST /internal/candidates`, 버스 위치 `POST /internal/bus-positions`(T6.2), 버스 폴러가 보는
-`GET /closures/events`·`GET /closures`.
+`GET /closures/events`·`GET /closures`, 알림 발송 `POST /internal/push/dispatch`(T7.9).
 
 httpx 로 `POST {NARU_BE_URL}/internal/candidates`, 헤더 X-Naru-Internal-Token. 연결 오류·5xx 는 3회
 재시도, 4xx 는 바로 실패(토큰·스키마 문제는 재시도해도 같다). 단위 테스트하지 않는다 — e2e 에서
@@ -23,6 +23,7 @@ from naru_contracts import (
     CandidateBatchResponse,
     ClosureEventsResponse,
     FeatureCollection,
+    PushDispatchResponse,
 )
 
 log = logging.getLogger(__name__)
@@ -53,6 +54,11 @@ class CandidatePublisher:
         body = self._post("/internal/candidates", batch.model_dump(mode="json"), batch.batch_id)
         return CandidateBatchResponse.model_validate(body)
 
+    def dispatch_push(self) -> PushDispatchResponse:
+        """알림 매칭·발송 한 바퀴 (INTERFACE §9.4, T7.9) — 같은 재시도 규칙. 기준 시각은 BE 지금."""
+        body = self._post("/internal/push/dispatch", {}, "push-dispatch", ok=200)
+        return PushDispatchResponse.model_validate(body)
+
     def publish_bus(self, batch: BusPositionBatch) -> BusPositionBatchResponse:
         """버스 위치 (INTERFACE §1.2, T6.2) — 같은 재시도 규칙."""
         body = self._post("/internal/bus-positions", batch.model_dump(mode="json"), batch.batch_id)
@@ -71,7 +77,9 @@ class CandidatePublisher:
         r.raise_for_status()
         return FeatureCollection.model_validate(r.json())
 
-    def _post(self, path: str, body: dict[str, object], batch_id: str) -> dict[str, object]:
+    def _post(
+        self, path: str, body: dict[str, object], batch_id: str, ok: int = 202
+    ) -> dict[str, object]:
         url = f"{self.base_url}{path}"
         headers = {"X-Naru-Internal-Token": self.token}
         last = "?"
@@ -98,7 +106,7 @@ class CandidatePublisher:
                 last = f"HTTP {r.status_code}"
                 time.sleep(self.backoff_s * attempt)
                 continue
-            if r.status_code != 202:
+            if r.status_code != ok:
                 raise PublishError(f"{batch_id}: HTTP {r.status_code} {r.text[:200]}")
             out: dict[str, object] = r.json()
             return out
