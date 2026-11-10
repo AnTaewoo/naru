@@ -5,7 +5,13 @@ import type {
   FeatureCollection,
   GeocodeReverseResponse,
   GeocodeSearchResponse,
+  NearestCrosswalk,
+  NearestCrosswalkQuery,
+  NearestCrosswalkResponse,
   Place,
+  RecentReportsResponse,
+  ReportRequest,
+  ReportResponse,
   RouteResponse,
 } from "../types/contracts";
 
@@ -52,6 +58,14 @@ export interface GeocodeReverseParams {
   lng: number;
 }
 
+/** 최근 제보 수 (INTERFACE §8.3, T7.15) */
+export interface RecentReportsParams {
+  /** 횡단보도 ID 1~50개 */
+  ids: readonly string[];
+  /** 기본 60 */
+  minutes?: number;
+}
+
 export class NaruApiError extends Error {
   constructor(
     readonly status: number,
@@ -92,6 +106,42 @@ export function geocodeSearchUrl(baseUrl: string, p: GeocodeSearchParams): strin
 export function geocodeReverseUrl(baseUrl: string, p: GeocodeReverseParams): string {
   const q = new URLSearchParams({ lat: String(p.lat), lng: String(p.lng) });
   return `${baseUrl}/geocode/reverse?${q.toString()}`;
+}
+
+// 통제 제보 (INTERFACE §8, T7.15) — 좌표·제보는 주소가 아니라 POST 본문으로 (접근 로그에 안 남게)
+export function nearestUrl(baseUrl: string): string {
+  return `${baseUrl}/crosswalks/nearest`;
+}
+
+export function reportsUrl(baseUrl: string): string {
+  return `${baseUrl}/reports`;
+}
+
+export function recentReportsUrl(baseUrl: string, p: RecentReportsParams): string {
+  const q = new URLSearchParams({ ids: p.ids.join(","), minutes: String(p.minutes ?? 60) });
+  return `${baseUrl}/reports/recent?${q.toString()}`;
+}
+
+export function postInit(
+  body: unknown,
+  signal?: AbortSignal,
+): RequestInit & { headers: Record<string, string> } {
+  return {
+    method: "POST",
+    signal,
+    cache: "no-store",
+    headers: { accept: "application/json", "content-type": "application/json" },
+    body: JSON.stringify(body),
+  };
+}
+
+/** 2xx 가 아니면 §6 본문으로 NaruApiError (429 too_many_reports 도) */
+export function readJson(status: number, json: unknown): unknown {
+  if (status < 200 || status >= 300) {
+    const body = isRecord(json) && isRecord(json.error) ? (json as unknown as ErrorBody) : null;
+    throw new NaruApiError(status, body);
+  }
+  return json;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -179,6 +229,51 @@ export function parseGeocodeSearch(json: unknown): GeocodeSearchResponse {
   return json as unknown as GeocodeSearchResponse;
 }
 
+/** 최근접 횡단보도 좌표 [lng, lat] (생성 타입이 unknown 튜플이라 숫자를 확인한다) */
+export function crosswalkLngLat(c: NearestCrosswalk): [number, number] | null {
+  const [lng, lat] = c.coord;
+  return typeof lng === "number" && typeof lat === "number" ? [lng, lat] : null;
+}
+
+export function parseNearestCrosswalk(json: unknown): NearestCrosswalkResponse {
+  if (!isRecord(json) || !("crosswalk" in json)) throw new NaruApiError(200, null);
+  const c: unknown = json.crosswalk;
+  const ok =
+    c === null ||
+    (isRecord(c) &&
+      typeof c.id === "string" &&
+      typeof c.name === "string" &&
+      typeof c.district === "string" &&
+      typeof c.distance_m === "number" &&
+      Array.isArray(c.coord) &&
+      crosswalkLngLat(c as unknown as NearestCrosswalk) !== null);
+  if (!ok) throw new NaruApiError(200, null);
+  return json as unknown as NearestCrosswalkResponse;
+}
+
+export function parseReportResponse(json: unknown): ReportResponse {
+  const ok =
+    isRecord(json) &&
+    typeof json.id === "number" &&
+    typeof json.crosswalk_id === "string" &&
+    typeof json.reported_at === "string" &&
+    (json.state === "blocked" || json.state === "open");
+  if (!ok) throw new NaruApiError(200, null);
+  return json as unknown as ReportResponse;
+}
+
+export function parseRecentReports(json: unknown): RecentReportsResponse {
+  const counts: unknown = isRecord(json) ? json.counts : null;
+  const ok =
+    isRecord(counts) &&
+    !Array.isArray(counts) &&
+    Object.values(counts).every(
+      (c) => isRecord(c) && typeof c.blocked === "number" && typeof c.open === "number",
+    );
+  if (!ok) throw new NaruApiError(200, null);
+  return json as unknown as RecentReportsResponse;
+}
+
 export function parseGeocodeReverse(json: unknown): GeocodeReverseResponse {
   const label: unknown = isRecord(json) ? json.label : undefined;
   if (label !== null && typeof label !== "string") throw new NaruApiError(200, null);
@@ -193,6 +288,13 @@ export interface NaruApiClient {
   events(p?: EventsParams, signal?: AbortSignal, etag?: string | null): Promise<EventsFetch>;
   geocodeSearch(p: GeocodeSearchParams, signal?: AbortSignal): Promise<GeocodeSearchResponse>;
   geocodeReverse(p: GeocodeReverseParams, signal?: AbortSignal): Promise<GeocodeReverseResponse>;
+  /** 통제 제보 (T7.15) — 좌표는 본문으로 */
+  nearestCrosswalk(
+    p: NearestCrosswalkQuery,
+    signal?: AbortSignal,
+  ): Promise<NearestCrosswalkResponse>;
+  report(body: ReportRequest, signal?: AbortSignal): Promise<ReportResponse>;
+  recentReports(p: RecentReportsParams, signal?: AbortSignal): Promise<RecentReportsResponse>;
 }
 
 async function getJson(
@@ -207,6 +309,17 @@ async function getJson(
     throw new NaruApiError(res.status, body);
   }
   return json;
+}
+
+async function postJson(
+  url: string,
+  body: unknown,
+  fetchImpl: typeof fetch,
+  signal?: AbortSignal,
+): Promise<unknown> {
+  const res = await fetchImpl(url, postInit(body, signal));
+  const json: unknown = await res.json().catch(() => null);
+  return readJson(res.status, json);
 }
 
 export function createNaruApiClient(
@@ -228,5 +341,11 @@ export function createNaruApiClient(
       parseGeocodeSearch(await getJson(geocodeSearchUrl(baseUrl, p), fetchImpl, signal)),
     geocodeReverse: async (p, signal) =>
       parseGeocodeReverse(await getJson(geocodeReverseUrl(baseUrl, p), fetchImpl, signal)),
+    nearestCrosswalk: async (p, signal) =>
+      parseNearestCrosswalk(await postJson(nearestUrl(baseUrl), p, fetchImpl, signal)),
+    report: async (body, signal) =>
+      parseReportResponse(await postJson(reportsUrl(baseUrl), body, fetchImpl, signal)),
+    recentReports: async (p, signal) =>
+      parseRecentReports(await getJson(recentReportsUrl(baseUrl, p), fetchImpl, signal)),
   };
 }

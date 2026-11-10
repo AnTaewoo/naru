@@ -19,6 +19,14 @@ import {
   readEvents,
   eventsInit,
   routeUrl,
+  nearestUrl,
+  parseNearestCrosswalk,
+  parseRecentReports,
+  parseReportResponse,
+  postInit,
+  readJson,
+  recentReportsUrl,
+  reportsUrl,
 } from "./naruApiClient";
 
 describe("naruApiClient", () => {
@@ -193,5 +201,48 @@ describe("naruApiClient", () => {
     const err = recorded("error_geocode_unavailable");
     expect(err.status).toBe(503);
     expect((err.body as ErrorBody).error.code).toBe("geocode_unavailable");
+  });
+
+  it("통제 제보 (INTERFACE §8, T7.15) — 좌표는 POST 본문에만, recorded 응답 파싱, 429 본문", () => {
+    const near = recorded("report_nearest_kyobo");
+    expect(near.method).toBe("POST");
+    expect(nearestUrl("/api")).toBe("/api/crosswalks/nearest"); // 주소에 좌표가 없다
+    const init = postInit(near.json);
+    expect(init).toMatchObject({ method: "POST", cache: "no-store" });
+    expect(init.headers).toMatchObject({ "content-type": "application/json" });
+    expect(JSON.parse(String(init.body))).toEqual({
+      lat: 37.5709686446227,
+      lng: 126.9779039768265,
+    });
+    expect(parseNearestCrosswalk(near.body).crosswalk?.name).toBe("교보생명");
+    expect(parseNearestCrosswalk(recorded("report_nearest_none").body).crosswalk).toBeNull();
+    // 다른 응답(최근 제보 집계)은 최근접 모양이 아니다
+    expect(() => parseNearestCrosswalk(recorded("reports_recent").body)).toThrow(NaruApiError);
+    expect(reportsUrl("/api")).toBe("/api/reports");
+    const sent = recorded("report_sent");
+    expect(sent.status).toBe(201);
+    const saved = parseReportResponse(readJson(sent.status, sent.body));
+    expect([saved.crosswalk_id, saved.state]).toEqual(["06-0000051345", "blocked"]);
+    expect(saved.reported_at).toMatch(/\+09:00$/);
+    const tooMany = recorded("report_too_many");
+    expect(() => readJson(tooMany.status, tooMany.body)).toThrow(NaruApiError);
+    try {
+      readJson(tooMany.status, tooMany.body);
+    } catch (e) {
+      expect(e instanceof NaruApiError && e.body?.error.code).toBe("too_many_reports");
+    }
+    const recent = recorded("reports_recent");
+    const q = new URL(
+      recentReportsUrl("/api", { ids: ["06-0000051345", "06-0000023206"], minutes: 60 }),
+      "http://naru.test",
+    );
+    expect(q.pathname).toBe("/api/reports/recent");
+    expect(q.searchParams.get("ids")).toBe("06-0000051345,06-0000023206");
+    expect(q.searchParams.get("minutes")).toBe("60");
+    expect(parseRecentReports(recent.body).counts["06-0000023206"]).toEqual({
+      blocked: 1,
+      open: 0,
+    });
+    expect(() => parseRecentReports(near.body)).toThrow(NaruApiError);
   });
 });

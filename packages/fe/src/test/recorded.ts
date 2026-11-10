@@ -15,6 +15,8 @@ interface Recorded {
   path: string;
   /** 기록할 때 보낸 질의 (예: route 의 from·to·depart_at) */
   query?: Record<string, string>;
+  /** 기록할 때 POST 로 보낸 본문 (통제 제보 T7.15 — 기기 토큰은 빼고 남겼다) */
+  json?: unknown;
   status: number;
   /** 응답 ETag (사건 v2 기록, scripts/record_live_events.py) */
   etag?: string;
