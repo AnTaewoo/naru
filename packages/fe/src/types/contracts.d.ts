@@ -239,6 +239,29 @@ export type RadiusM = number;
 export type EventId1 = string;
 export type StepS = number;
 export type Keyframes = MarchKeyframe[];
+export type At4 = string | null;
+export type Type6 = "Feature";
+export type Geometry2 = PointGeometry | LineStringGeometry | PolygonGeometry | MultiPolygonGeometry;
+export type Type7 = "LineString";
+/**
+ * @minItems 2
+ */
+export type Coordinates6 = [[unknown, unknown], [unknown, unknown], ...[unknown, unknown][]];
+export type Kind4 = "crosswalk" | "area" | "march_path";
+export type EventId2 = string;
+export type Event = string;
+export type Start1 = string | null;
+export type End1 = string | null;
+export type Confidence4 = number;
+export type Approx5 = boolean;
+export type CrosswalkId5 = string | null;
+export type Name3 = string | null;
+export type P = number | null;
+export type Type8 = "FeatureCollection";
+export type At5 = string;
+export type GeneratedAt = string;
+export type Attribution = string;
+export type Features1 = FeedFeature[];
 export type Code =
   | "invalid_query"
   | "unauthorized"
@@ -248,6 +271,7 @@ export type Code =
   | "geocode_unavailable"
   | "too_many_reports"
   | "not_modeled"
+  | "rate_limited"
   | "internal";
 export type Message = string;
 export type Field = string | null;
@@ -310,6 +334,11 @@ export interface NaruContracts {
   MarchQuery?: MarchQuery;
   MarchKeyframe?: MarchKeyframe;
   MarchResponse?: MarchResponse;
+  FeedQuery?: FeedQuery;
+  FeedFeature?: FeedFeature;
+  FeedProperties?: FeedProperties;
+  LineStringGeometry?: LineStringGeometry;
+  FeedCollection?: FeedCollection;
   ErrorDetail?: ErrorDetail;
   ErrorBody?: ErrorBody;
   [k: string]: unknown;
@@ -639,6 +668,40 @@ export interface CrosswalkPoints {
    * @maxItems 2
    */
   [k: string]: [unknown, unknown];
+}
+export interface FeedQuery {
+  at?: At4;
+}
+export interface FeedFeature {
+  type?: Type6;
+  geometry: Geometry2;
+  properties: FeedProperties;
+}
+export interface LineStringGeometry {
+  type?: Type7;
+  coordinates: Coordinates6;
+}
+export interface FeedProperties {
+  kind: Kind4;
+  event_id: EventId2;
+  event: Event;
+  type: ClosureType | null;
+  source: Source | null;
+  start: Start1;
+  end: End1;
+  status: Status;
+  confidence: Confidence4;
+  approx?: Approx5;
+  crosswalk_id?: CrosswalkId5;
+  name?: Name3;
+  p?: P;
+}
+export interface FeedCollection {
+  type?: Type8;
+  at: At5;
+  generated_at: GeneratedAt;
+  attribution: Attribution;
+  features: Features1;
 }
 export interface ErrorDetail {
   code: Code;

@@ -167,6 +167,21 @@
     "MarchResponse": {
       "$ref": "#/$defs/MarchResponse"
     },
+    "FeedQuery": {
+      "$ref": "#/$defs/FeedQuery"
+    },
+    "FeedFeature": {
+      "$ref": "#/$defs/FeedFeature"
+    },
+    "FeedProperties": {
+      "$ref": "#/$defs/FeedProperties"
+    },
+    "LineStringGeometry": {
+      "$ref": "#/$defs/LineStringGeometry"
+    },
+    "FeedCollection": {
+      "$ref": "#/$defs/FeedCollection"
+    },
     "ErrorDetail": {
       "$ref": "#/$defs/ErrorDetail"
     },
@@ -2251,6 +2266,269 @@
       "title": "MarchResponse",
       "type": "object"
     },
+    "FeedQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At"
+        }
+      },
+      "title": "FeedQuery",
+      "type": "object"
+    },
+    "FeedFeature": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "Feature",
+          "default": "Feature",
+          "title": "Type",
+          "type": "string"
+        },
+        "geometry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PointGeometry"
+            },
+            {
+              "$ref": "#/$defs/LineStringGeometry"
+            },
+            {
+              "$ref": "#/$defs/PolygonGeometry"
+            },
+            {
+              "$ref": "#/$defs/MultiPolygonGeometry"
+            }
+          ],
+          "title": "Geometry"
+        },
+        "properties": {
+          "$ref": "#/$defs/FeedProperties"
+        }
+      },
+      "required": [
+        "geometry",
+        "properties"
+      ],
+      "title": "FeedFeature",
+      "type": "object"
+    },
+    "FeedProperties": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "crosswalk",
+            "area",
+            "march_path"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "event_id": {
+          "pattern": "^[0-9a-f]{12}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "event": {
+          "title": "Event",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClosureType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Source"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "start": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Start"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "End"
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "approx": {
+          "default": false,
+          "title": "Approx",
+          "type": "boolean"
+        },
+        "crosswalk_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Crosswalk Id"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "p": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "P"
+        }
+      },
+      "required": [
+        "kind",
+        "event_id",
+        "event",
+        "type",
+        "source",
+        "start",
+        "end",
+        "status",
+        "confidence"
+      ],
+      "title": "FeedProperties",
+      "type": "object"
+    },
+    "LineStringGeometry": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "LineString",
+          "default": "LineString",
+          "title": "Type",
+          "type": "string"
+        },
+        "coordinates": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "minItems": 2,
+          "title": "Coordinates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "coordinates"
+      ],
+      "title": "LineStringGeometry",
+      "type": "object"
+    },
+    "FeedCollection": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "FeatureCollection",
+          "default": "FeatureCollection",
+          "title": "Type",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "generated_at": {
+          "format": "date-time",
+          "title": "Generated At",
+          "type": "string"
+        },
+        "attribution": {
+          "title": "Attribution",
+          "type": "string"
+        },
+        "features": {
+          "items": {
+            "$ref": "#/$defs/FeedFeature"
+          },
+          "title": "Features",
+          "type": "array"
+        }
+      },
+      "required": [
+        "at",
+        "generated_at",
+        "attribution",
+        "features"
+      ],
+      "title": "FeedCollection",
+      "type": "object"
+    },
     "ErrorDetail": {
       "additionalProperties": false,
       "properties": {
@@ -2264,6 +2542,7 @@
             "geocode_unavailable",
             "too_many_reports",
             "not_modeled",
+            "rate_limited",
             "internal"
           ],
           "title": "Code",
