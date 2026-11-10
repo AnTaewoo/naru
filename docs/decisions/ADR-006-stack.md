@@ -34,3 +34,4 @@
 | MySQL 이미지 | mysql:8.4 (서버 8.4.13, 호스트 포트 3307) | 2026-11-07 (T0.1) |
 | Node / pnpm | 18.20.7 (nvm) / 12.6.0 (corepack shim ~/.local/bin) | 2026-11-08 (T5.0) |
 | Next.js / React / TypeScript / maplibre-gl | 15.5.29 / 19.3.1 / 5.9.3 / 6.17.0 — Node 18 이라 Next 16(>=20.9) 불가, 15.5 고정. eslint 9.39 + typescript-eslint 8.72, vitest 3.2.7 + jsdom 26.1, Playwright 1.56.1 | 2026-11-08 (T5.0) |
+| pywebpush / py-vapid / http-ece / cryptography | 2.5.0 / 1.9.6 / 1.2.1 / 50.0.2 — 알림 발송·VAPID (ADR-014 C·D, T7.8) | 2026-11-10 (T7.8) |

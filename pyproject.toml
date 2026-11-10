@@ -40,6 +40,10 @@ strict = true
 plugins = ["pydantic.mypy"]
 mypy_path = "packages/contracts:packages/ai:packages/be"
 
+[[tool.mypy.overrides]]
+module = ["py_vapid", "py_vapid.*", "pywebpush", "pywebpush.*"]
+ignore_missing_imports = true  # 스텁이 없는 서드파티 (ADR-014 D 알림)
+
 [tool.pytest.ini_options]
 testpaths = ["packages/contracts/tests", "packages/ai/tests", "packages/be/tests"]
 addopts = "-q"
