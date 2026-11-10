@@ -63,7 +63,8 @@ test("권한이 허용돼 있으면 '알림이 허용됐어요' — 데스크톱
   await page.goto("/?t=2026-11-08T12:00:00%2B09:00");
   await expandSheet(page, "서울 통제");
   const box = page.getByRole("region", { name: "통제 알림" });
-  await expect(box.getByRole("status")).toContainText("알림이 허용됐어요");
+  await expect(box).toContainText("알림이 허용됐어요"); // 구독은 아직 — 버튼은 남는다 (T7.10)
+  await expect(box.getByRole("button", { name: "통제 알림 받기" })).toBeVisible();
   await context.close();
 });
 
