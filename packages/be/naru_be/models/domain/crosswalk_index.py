@@ -150,6 +150,11 @@ class CrosswalkIndex:
         c = self._items[int(self._tree.nearest(p))]
         return c, float(shapely.Point(c.x, c.y).distance(p))
 
+    def lng_lat_of(self, crosswalk_id: str) -> LngLat | None:
+        """[lng, lat] — 행진 키프레임 응답의 횡단보도 점 (T7.16). 범위 밖이면 None."""
+        c = self._by_id.get(crosswalk_id)
+        return (c.lng, c.lat) if c is not None else None
+
     def district_of(self, crosswalk_id: str) -> str | None:
         """자치구 (T6.9 통제 불러오기 구 칩). 지금 범위 밖 관리번호면 None."""
         c = self._by_id.get(crosswalk_id)

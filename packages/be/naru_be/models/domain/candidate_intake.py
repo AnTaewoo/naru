@@ -9,11 +9,14 @@ unknown_near_road, ADR-008). 승격해도 confidence 는 그대로라 review_req
 돌발(source incident)과 공지(smpa·topis·news·seoul_press)가 같은 횡단보도·겹치는 시각이면 공지 후보
 전체에 그 돌발의 topis_incident 근거를 붙인다 — 어느 쪽이 먼저 와도 (T6.1, README '실제 근거').
 같은 배치를 다시 받으면 받은 시각만 새로 한다(돌발 수신 시각 = data_as_of).
+행진(T7.16, ADR-015 B): 구간·선 후보의 경로 선을 버리지 않고 사건마다 march_profile 로 모아 사건
+행에 남긴다 — 대상이 아니면 null.
 """
 
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import shapely
@@ -21,8 +24,9 @@ import shapely
 from naru_be.config import Settings
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.closure_events import event_id
-from naru_be.models.domain.crosswalk_index import CrosswalkIndex
+from naru_be.models.domain.crosswalk_index import CrosswalkIndex, road_class_of
 from naru_be.models.domain.event_area import event_area
+from naru_be.models.domain.march import MarchPart, march_profile
 from naru_be.models.domain.road_graph import RoadGraph
 from naru_be.models.domain.types import CandidateMeta, IntakeResult
 from naru_be.models.repositories.closure_repository import ClosureRepository
@@ -68,9 +72,11 @@ class CandidateIntake:
         at = datetime.now(UTC)
         accepted = review = updated = 0
         shapes: dict[tuple[str, datetime | None, datetime | None], list[shapely.Geometry]] = {}
+        grouped: dict[tuple[str, datetime | None, datetime | None], list[ClosureCandidate]] = {}
+        parts: dict[str, MarchPart] = {}
         for raw in batch.candidates:
             candidate = self.promote_unknown(raw)
-            ids, shape = self.selection(candidate)
+            ids, shape, part = self.selection(candidate)
             candidate = self.link_incidents(candidate, ids)
             states = self.engine.apply(candidate, ids, at=at)
             meta = CandidateMeta.of(candidate)
@@ -78,6 +84,9 @@ class CandidateIntake:
             if states and shape is not None:  # 사건 = (reason, 시작, 끝) — 후보의 상태는 다 같다
                 key = (states[0].reason, states[0].window.start, states[0].window.end)
                 shapes.setdefault(key, []).append(shape)
+                grouped.setdefault(key, []).append(candidate)
+                if part is not None:
+                    parts[candidate.candidate_id] = part
             if candidate.source is Source.incident and ids:
                 window, _ = self.engine.effective_window(candidate)
                 linked = self.repo.attach(ids, window, NOTICE_SOURCES, list(candidate.evidence))
@@ -90,9 +99,12 @@ class CandidateIntake:
             review += int(candidate.review_required)
         # 사건 구역 (T7.2) — 한 사건의 후보는 한 배치에서 온다(같은 문장·같은 돌발 묶음):
         # 배치마다 다시 만든다
-        for (reason, start, end), parts in shapes.items():
+        for (reason, start, end), pieces in shapes.items():
             eid = event_id(reason, start, end)
-            self.repo.save_event_area(eid, reason, start, end, event_area(parts))
+            cands = grouped[(reason, start, end)]
+            own = {c.candidate_id: parts[c.candidate_id] for c in cands if c.candidate_id in parts}
+            march = march_profile(cands, own, self.index, self.settings)  # 대상 아니면 None
+            self.repo.save_event_area(eid, reason, start, end, event_area(pieces), march)
         result = IntakeResult(batch.batch_id, accepted, review, updated)
         self.repo.save_batch(result, batch.producer, batch.produced_at)
         log.info(
@@ -111,26 +123,37 @@ class CandidateIntake:
         add = [e for e in found if e.ref not in refs]
         return c.model_copy(update={"evidence": [*c.evidence, *add]}) if add else c
 
-    def selection(self, c: ClosureCandidate) -> tuple[set[str], shapely.Geometry | None]:
-        """후보 → (횡단보도, 고른 모양 EPSG:5179). 모양은 사건 구역(T7.2)이 다시 쓴다 — 경로는
-        한 번만 계산한다."""
+    def selection(
+        self, c: ClosureCandidate
+    ) -> tuple[set[str], shapely.Geometry | None, MarchPart | None]:
+        """후보 → (횡단보도, 고른 모양 EPSG:5179, 경로 선). 모양은 사건 구역(T7.2)이, 선은 행진
+        프로필(T7.16)이 다시 쓴다 — 경로는 한 번만 계산한다."""
         g = c.geometry
+        part: MarchPart | None = None
         if isinstance(g, PointGeom):
             if c.impact is Impact.unknown:
-                return (
-                    set(),
-                    None,
-                )  # 승격 안 된 unknown: 표시만 (zone_scheduled), 횡단보도 상태 없음
+                return set(), None, None  # 승격 안 된 unknown: 표시만, 횡단보도 상태 없음
             shape = self.index.area_of_point(*g.coordinates)
         elif isinstance(g, LineGeom):
-            shape = self.index.area_of_line(g.coordinates)
+            line = self.index.line_of(g.coordinates)
+            shape = line.buffer(self.settings.line_buffer_m)
+            roads = tuple(c.summary.roads) if c.summary else ()
+            part = MarchPart(c.candidate_id, line, frozenset(), roads, None)
         elif isinstance(g, SegmentGeom):
-            shape = self.index.area_of_segment(g)
+            line, path = self.index.line_of_segment(g)
+            shape = line.buffer(self.index.buffer_of_segment(g))
+            cls = g.road_class or road_class_of(g.road)
+            part = MarchPart(
+                c.candidate_id, line, frozenset(), path.roads, cls.value if cls else None
+            )
         else:
             assert isinstance(g, ZoneGeom)
             log.warning("zone candidate skipped", extra={"candidate_id": c.candidate_id})
-            return set(), None
-        return self.index.within(shape), shape
+            return set(), None, None
+        ids = self.index.within(shape)
+        if part is not None:
+            part = replace(part, crosswalk_ids=frozenset(ids))
+        return ids, shape, part
 
     def promote_unknown(self, c: ClosureCandidate) -> ClosureCandidate:
         """impact unknown 인 지점이 도로 링크 30 m 안이면 blocks 로 (ADR-008 §9.2-12)."""
