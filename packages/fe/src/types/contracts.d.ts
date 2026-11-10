@@ -198,8 +198,42 @@ export type Lng2 = number;
 export type Label = string | null;
 export type RoadAddress = string | null;
 export type Address1 = string | null;
+export type Lat3 = number;
+export type Lng3 = number;
+export type Id2 = string;
+export type Name2 = string;
+export type District = string;
+/**
+ * @minItems 2
+ * @maxItems 2
+ */
+export type Coord1 = [unknown, unknown];
+export type DistanceM3 = number;
+export type CrosswalkId3 = string;
+export type State = "blocked" | "open";
+export type AccuracyM = number;
+export type Source1 = "user" | "field";
+export type Device = string;
+export type Id3 = number;
+export type CrosswalkId4 = string;
+export type State1 = "blocked" | "open";
+export type ReportedAt = string;
+/**
+ * @minItems 1
+ */
+export type Ids = [string, ...string[]];
+export type Minutes = number;
+export type Blocked = number;
+export type Open = number;
 export type Code =
-  "invalid_query" | "unauthorized" | "not_found" | "no_route" | "out_of_coverage" | "geocode_unavailable" | "internal";
+  | "invalid_query"
+  | "unauthorized"
+  | "not_found"
+  | "no_route"
+  | "out_of_coverage"
+  | "geocode_unavailable"
+  | "too_many_reports"
+  | "internal";
 export type Message = string;
 export type Field = string | null;
 
@@ -250,6 +284,14 @@ export interface NaruContracts {
   GeocodeSearchResponse?: GeocodeSearchResponse;
   GeocodeReverseQuery?: GeocodeReverseQuery;
   GeocodeReverseResponse?: GeocodeReverseResponse;
+  NearestCrosswalkQuery?: NearestCrosswalkQuery;
+  NearestCrosswalk?: NearestCrosswalk;
+  NearestCrosswalkResponse?: NearestCrosswalkResponse;
+  ReportRequest?: ReportRequest;
+  ReportResponse?: ReportResponse;
+  RecentReportsQuery?: RecentReportsQuery;
+  ReportCounts?: ReportCounts;
+  RecentReportsResponse?: RecentReportsResponse;
   ErrorDetail?: ErrorDetail;
   ErrorBody?: ErrorBody;
   [k: string]: unknown;
@@ -506,6 +548,50 @@ export interface GeocodeReverseResponse {
   label: Label;
   road_address: RoadAddress;
   address: Address1;
+}
+/**
+ * §8.1 요청 본문 — 저장·로그하지 않는다.
+ */
+export interface NearestCrosswalkQuery {
+  lat: Lat3;
+  lng: Lng3;
+}
+export interface NearestCrosswalk {
+  id: Id2;
+  name: Name2;
+  district: District;
+  coord: Coord1;
+  distance_m: DistanceM3;
+}
+export interface NearestCrosswalkResponse {
+  crosswalk: NearestCrosswalk | null;
+}
+export interface ReportRequest {
+  crosswalk_id: CrosswalkId3;
+  state: State;
+  accuracy_m: AccuracyM;
+  source: Source1;
+  device: Device;
+}
+export interface ReportResponse {
+  id: Id3;
+  crosswalk_id: CrosswalkId4;
+  state: State1;
+  reported_at: ReportedAt;
+}
+export interface RecentReportsQuery {
+  ids: Ids;
+  minutes?: Minutes;
+}
+export interface ReportCounts {
+  blocked: Blocked;
+  open: Open;
+}
+export interface RecentReportsResponse {
+  counts: Counts;
+}
+export interface Counts {
+  [k: string]: ReportCounts;
 }
 export interface ErrorDetail {
   code: Code;

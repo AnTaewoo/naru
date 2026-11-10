@@ -134,6 +134,30 @@
     "GeocodeReverseResponse": {
       "$ref": "#/$defs/GeocodeReverseResponse"
     },
+    "NearestCrosswalkQuery": {
+      "$ref": "#/$defs/NearestCrosswalkQuery"
+    },
+    "NearestCrosswalk": {
+      "$ref": "#/$defs/NearestCrosswalk"
+    },
+    "NearestCrosswalkResponse": {
+      "$ref": "#/$defs/NearestCrosswalkResponse"
+    },
+    "ReportRequest": {
+      "$ref": "#/$defs/ReportRequest"
+    },
+    "ReportResponse": {
+      "$ref": "#/$defs/ReportResponse"
+    },
+    "RecentReportsQuery": {
+      "$ref": "#/$defs/RecentReportsQuery"
+    },
+    "ReportCounts": {
+      "$ref": "#/$defs/ReportCounts"
+    },
+    "RecentReportsResponse": {
+      "$ref": "#/$defs/RecentReportsResponse"
+    },
     "ErrorDetail": {
       "$ref": "#/$defs/ErrorDetail"
     },
@@ -1831,6 +1855,236 @@
       "title": "GeocodeReverseResponse",
       "type": "object"
     },
+    "NearestCrosswalkQuery": {
+      "additionalProperties": false,
+      "description": "§8.1 요청 본문 — 저장·로그하지 않는다.",
+      "properties": {
+        "lat": {
+          "maximum": 90,
+          "minimum": -90,
+          "title": "Lat",
+          "type": "number"
+        },
+        "lng": {
+          "maximum": 180,
+          "minimum": -180,
+          "title": "Lng",
+          "type": "number"
+        }
+      },
+      "required": [
+        "lat",
+        "lng"
+      ],
+      "title": "NearestCrosswalkQuery",
+      "type": "object"
+    },
+    "NearestCrosswalk": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "district": {
+          "title": "District",
+          "type": "string"
+        },
+        "coord": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Coord",
+          "type": "array"
+        },
+        "distance_m": {
+          "minimum": 0,
+          "title": "Distance M",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "district",
+        "coord",
+        "distance_m"
+      ],
+      "title": "NearestCrosswalk",
+      "type": "object"
+    },
+    "NearestCrosswalkResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "crosswalk": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NearestCrosswalk"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "crosswalk"
+      ],
+      "title": "NearestCrosswalkResponse",
+      "type": "object"
+    },
+    "ReportRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "crosswalk_id": {
+          "title": "Crosswalk Id",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "blocked",
+            "open"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "accuracy_m": {
+          "maximum": 1000,
+          "minimum": 0,
+          "title": "Accuracy M",
+          "type": "integer"
+        },
+        "source": {
+          "enum": [
+            "user",
+            "field"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "device": {
+          "title": "Device",
+          "type": "string"
+        }
+      },
+      "required": [
+        "crosswalk_id",
+        "state",
+        "accuracy_m",
+        "source",
+        "device"
+      ],
+      "title": "ReportRequest",
+      "type": "object"
+    },
+    "ReportResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "crosswalk_id": {
+          "title": "Crosswalk Id",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "blocked",
+            "open"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "reported_at": {
+          "format": "date-time",
+          "title": "Reported At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "crosswalk_id",
+        "state",
+        "reported_at"
+      ],
+      "title": "ReportResponse",
+      "type": "object"
+    },
+    "RecentReportsQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Ids",
+          "type": "array"
+        },
+        "minutes": {
+          "default": 60,
+          "maximum": 1440,
+          "minimum": 1,
+          "title": "Minutes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ids"
+      ],
+      "title": "RecentReportsQuery",
+      "type": "object"
+    },
+    "ReportCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "blocked": {
+          "minimum": 0,
+          "title": "Blocked",
+          "type": "integer"
+        },
+        "open": {
+          "minimum": 0,
+          "title": "Open",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "blocked",
+        "open"
+      ],
+      "title": "ReportCounts",
+      "type": "object"
+    },
+    "RecentReportsResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "counts": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ReportCounts"
+          },
+          "title": "Counts",
+          "type": "object"
+        }
+      },
+      "required": [
+        "counts"
+      ],
+      "title": "RecentReportsResponse",
+      "type": "object"
+    },
     "ErrorDetail": {
       "additionalProperties": false,
       "properties": {
@@ -1842,6 +2096,7 @@
             "no_route",
             "out_of_coverage",
             "geocode_unavailable",
+            "too_many_reports",
             "internal"
           ],
           "title": "Code",
