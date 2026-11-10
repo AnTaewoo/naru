@@ -3,6 +3,7 @@
 입력은 contracts RouteQuery(from/to 는 "lat,lng", 파싱은 parsing.parse_latlng). 폐쇄는 출발~도착
 bbox 에 여유(route_bbox_pad_m)를 두고, 출발 시각부터 route_horizon_min 안에 시작하는 것까지
 (Repository.active_horizon) — 걷는 동안 시작하는 통제도 라우터가 도착 시각으로 판정해야 하므로.
+avoid(T7.6) 사건은 시각·bbox 와 상관없이 그 상태 전부를 라우터에 넘긴다(무조건 막음).
 Flask 를 모른다. 잘못된 좌표는 InvalidQueryError(INTERFACE §6 invalid_query).
 """
 
@@ -40,8 +41,9 @@ class RoutePlanner:
             raise InvalidQueryError(f"mode: walk 만 지원한다 ({query.mode})", "mode")
         src, dst = parse_latlng(query.from_, "from"), parse_latlng(query.to, "to")
         closures = self.repo.active_horizon(query.depart_at, self._bbox(src, dst))
+        avoid = self.repo.states_of_events(query.avoid)  # T7.6 — 없는 id 는 빈 결과
         return RouteResult(
-            path=self.router.route(src, dst, query.depart_at, closures),
+            path=self.router.route(src, dst, query.depart_at, closures, avoid),
             baseline=self.baseline_router.route(src, dst),
             depart_at=query.depart_at,
             computed_at=datetime.now(UTC),

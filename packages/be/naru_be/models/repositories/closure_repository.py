@@ -8,11 +8,11 @@ upsert 키 = (candidate_id, crosswalk_id): 같은 후보가 다시 오면 덮어
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Collection, Iterable
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -159,6 +159,35 @@ class ClosureRepository:
             .order_by(e.crosswalk_id, e.candidate_id)
         )
         with self._sessions.begin() as s:
+            return [self._state(row) for row in s.scalars(stmt)]
+
+    def states_of_events(self, ids: Collection[str]) -> list[ClosureState]:
+        """사건 id(ADR-014 A)의 상태 전부 — 시각·bbox 와 상관없이 (길찾기 avoid, T7.6).
+
+        id 는 /closures/events 와 같은 규칙(reason·창의 sha1) — 구역이 없는 옛 사건도 찾게
+        closure_events 표가 아니라 상태 묶음에서 계산한다. 없는 id 는 빈 결과.
+        """
+        if not ids:
+            return []
+        e = ClosureStateEntity
+        with self._sessions.begin() as s:
+            keys = s.execute(select(e.reason, e.window_start, e.window_end).distinct()).all()
+            want = [
+                (reason, ws, we)
+                for reason, ws, we in keys
+                if event_id(reason, to_kst(ws), to_kst(we)) in ids
+            ]
+            if not want:
+                return []
+            match = [
+                and_(
+                    e.reason == reason,
+                    e.window_start.is_(None) if ws is None else e.window_start == ws,
+                    e.window_end.is_(None) if we is None else e.window_end == we,
+                )
+                for reason, ws, we in want
+            ]
+            stmt = select(e).where(or_(*match)).order_by(e.crosswalk_id, e.candidate_id)
             return [self._state(row) for row in s.scalars(stmt)]
 
     def events(

@@ -161,3 +161,20 @@ def test_legs_partition_route_with_coord_range(
     assert before.kind is EdgeKind.stairs and before.coord_range[1] == underpass.coord_range[0]
     # 첫 레그는 교보빌딩 → 첫 노드 접근 구간(약 45 m)을 포함한 sidewalk
     assert path.legs[0].kind is EdgeKind.sidewalk and path.legs[0].distance_m > 44
+
+
+def test_avoid_keeps_status_entry_once(
+    world: tuple[TimeDependentRouter, list[ClosureState]],
+) -> None:
+    """T7.6 avoid — 07:45 엔 1구간이 이미 confirmed: 피한 이유는 상태 그대로(한 번만), 길도 같다."""
+    router, states = world
+    at = datetime(2026, 3, 15, 7, 45, tzinfo=KST)
+    seg1 = [s for s in states if s.reason == "marathon 1구간 세종대로 사거리~숭례문 오거리"]
+    assert seg1
+    plain = router.route(KYOBO, DAEHANMUN, at, states)
+    forced = router.route(KYOBO, DAEHANMUN, at, states, avoid=seg1)
+    assert forced.coords == plain.coords
+    assert [(a.crosswalk_id, a.status) for a in forced.avoided] == [
+        (a.crosswalk_id, a.status) for a in plain.avoided
+    ]
+    assert len({a.crosswalk_id for a in forced.avoided}) == len(forced.avoided)

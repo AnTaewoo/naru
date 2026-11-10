@@ -11,6 +11,8 @@ BaselineRouter 는 같은 그래프에서 통제를 보지 않는다 (INTERFACE 
 간선 도착 시각 = 출발 시각 + 지금까지 거리 / walk_speed. 폐쇄 판정은 ClosureEngine.status_of_state.
 avoided = 통제가 없었다면 지났을(기준 경로) 횡단보도 중 도착 시각에 confirmed 이거나 scheduled 라서
 피한 것.
+avoid(T7.6, INTERFACE §2 v0.14) = 길찾기에서 고른 사건의 상태 — 그 횡단보도는 시각·확신도와 상관없이
+간선 제외(§5 규칙보다 앞). 기준 경로가 지나면 avoided 에 그 시각 실제 상태로 넣는다.
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ from __future__ import annotations
 import heapq
 import itertools
 import math
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from datetime import UTC, datetime, timedelta
 
 from naru_be.config import Settings
@@ -62,7 +64,15 @@ class _AStarRouter:
         }.get(edge.kind, 0.0)
         return edge.length_m + penalty
 
-    def _search(self, a: str, b: str, t: datetime, by_crosswalk: ByCrosswalk) -> list[str]:
+    def _search(
+        self,
+        a: str,
+        b: str,
+        t: datetime,
+        by_crosswalk: ByCrosswalk,
+        blocked: Collection[str] = frozenset(),
+    ) -> list[str]:
+        """blocked = 시각과 상관없이 막는 횡단보도(avoid, T7.6)"""
         g = self.ped.graph
         bx, by = g.nodes[b]["x"], g.nodes[b]["y"]
 
@@ -88,6 +98,8 @@ class _AStarRouter:
                 if v in done:
                     continue
                 edge: PedEdge = data["edge"]
+                if blocked and any(cid in blocked for cid in edge.crosswalk_ids):
+                    continue
                 extra = self._closure_cost(edge, at, by_crosswalk)
                 if extra is None:
                     continue
@@ -191,15 +203,22 @@ class TimeDependentRouter(_AStarRouter):
         self.engine = engine
 
     def route(
-        self, src: LngLat, dst: LngLat, t: datetime, closures: Sequence[ClosureState]
+        self,
+        src: LngLat,
+        dst: LngLat,
+        t: datetime,
+        closures: Sequence[ClosureState],
+        avoid: Sequence[ClosureState] = (),
     ) -> Path:
+        """avoid = 길찾기에서 피할 사건의 상태(T7.6) — 시각·확신도와 상관없이 막는다"""
         if t.tzinfo is None:
             raise ValueError("t 는 tz-aware 여야 한다")
         by_crosswalk = self._by_crosswalk(closures)
+        forced = self._by_crosswalk(avoid)
         a, b, snap_in, snap_out = self._snap(src, dst)
         baseline = self._search(a, b, t, {})
-        path = self._search(a, b, t, by_crosswalk)
-        avoided = self._avoided(baseline, path, t, by_crosswalk)
+        path = self._search(a, b, t, by_crosswalk, forced.keys())
+        avoided = self._avoided(baseline, path, t, by_crosswalk, forced)
         return self._build(path, src, dst, snap_in, snap_out, avoided)
 
     @staticmethod
@@ -237,7 +256,9 @@ class TimeDependentRouter(_AStarRouter):
         path: list[str],
         t: datetime,
         by_crosswalk: ByCrosswalk,
+        forced: ByCrosswalk,
     ) -> tuple[AvoidedCrosswalk, ...]:
+        """상태로 피한 것 먼저(confirmed·창 안 예정), 그 밖에 avoid 로 막은 것은 그 시각 상태로"""
         g = self.ped.graph
         used = {cid for u, v in itertools.pairwise(path) for cid in g[u][v]["edge"].crosswalk_ids}
         out: list[AvoidedCrosswalk] = []
@@ -254,15 +275,21 @@ class TimeDependentRouter(_AStarRouter):
                     status = self.engine.status_of_state(state, at)
                     if status is Status.confirmed or self._penalized(state, status, at):
                         seen.add(cid)
-                        out.append(
-                            AvoidedCrosswalk(
-                                cid,
-                                status,
-                                state.reason,
-                                state.window.end,
-                                tuple(state.evidence),
-                                state.approx,
-                            )
-                        )
+                        out.append(self._entry(cid, state, status))
                         break
+                if cid not in seen and cid in forced:
+                    state = forced[cid][0]
+                    seen.add(cid)
+                    out.append(self._entry(cid, state, self.engine.status_of_state(state, at)))
         return tuple(out)
+
+    @staticmethod
+    def _entry(cid: str, state: ClosureState, status: Status) -> AvoidedCrosswalk:
+        return AvoidedCrosswalk(
+            cid,
+            status,
+            state.reason,
+            state.window.end,
+            tuple(state.evidence),
+            state.approx,
+        )

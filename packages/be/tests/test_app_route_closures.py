@@ -121,6 +121,11 @@ def test_errors_follow_interface_section_6(client: FlaskClient) -> None:
     resp = client.get("/route", query_string=route_q("2026-03-15T07:45:00+09:00", src="37.57"))
     assert resp.status_code == 400
     assert ErrorBody.model_validate(resp.get_json()).error.field == "from"
+    # avoid 사건 id 형식 틀림 → 400 field avoid (v0.14, T7.6)
+    bad = {**route_q("2026-03-15T07:45:00+09:00"), "avoid": "nope"}
+    resp = client.get("/route", query_string=bad)
+    assert resp.status_code == 400
+    assert ErrorBody.model_validate(resp.get_json()).error.field == "avoid"
     # 필수 파라미터 없음 → 400, bbox 원소 수 틀림 → 400 field bbox
     assert client.get("/route").status_code == 400
     resp = client.get("/closures", query_string=closures_q("2026-03-15T07:45:00+09:00", "1,2,3"))

@@ -4,6 +4,7 @@
 나머지 scheduled). 기대 거리는 T3.1 과 같다 (기준 808.3 m, 지하보도 우회 839.6 m, 2026-11-07).
 """
 
+import itertools
 import json
 import subprocess
 import sys
@@ -20,6 +21,7 @@ from naru_be.config import Settings
 from naru_be.db import make_engine, make_sessions
 from naru_be.errors import InvalidQueryError
 from naru_be.models.domain.closure_engine import ClosureEngine
+from naru_be.models.domain.closure_events import event_id
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
 from naru_be.models.domain.ped_graph import EdgeKind, PedGraph
 from naru_be.models.domain.route_planner import RoutePlanner, parse_latlng
@@ -122,6 +124,46 @@ def test_horizon_catches_closure_starting_after_departure(planner: RoutePlanner)
     }
     assert result.path.coords != result.baseline.coords
     assert EdgeKind.underpass not in {leg.kind for leg in result.path.legs}
+
+
+SEG1 = "marathon 1구간 세종대로 사거리~숭례문 오거리"
+
+
+def avoid_query(depart_at: datetime, avoid: str) -> RouteQuery:
+    return RouteQuery.model_validate(
+        {"from": KYOBO, "to": DAEHANMUN, "depart_at": depart_at, "avoid": avoid}
+    )
+
+
+def test_avoid_blocks_event_regardless_of_time(planner: RoutePlanner) -> None:
+    """T7.6 avoid (ADR-014 A) — 통제가 다 끝난 13:30 에도 1구간 사건(07:20~08:08)을 막는다.
+
+    사건 id 는 /closures/events 와 같은 규칙(closure_events.event_id = adaea2f4cc02,
+    FE 사건 v2 기록의 1구간과 같다). 기준 경로의 세종대로사거리 23206 은 1구간 횡단보도라
+    막히고(그 시각 상태 released 그대로), 다른 횡단보도로 건넌다 — 2026-11-10 이 데이터로
+    돌려 816.1 m(기준 808.3 m).
+    """
+    depart = datetime(2026, 3, 15, 13, 30, tzinfo=KST)
+    seg1 = event_id(
+        SEG1, datetime(2026, 3, 15, 7, 20, tzinfo=KST), datetime(2026, 3, 15, 8, 8, tzinfo=KST)
+    )
+    assert seg1 == "adaea2f4cc02"
+    result = planner.plan(avoid_query(depart, seg1))
+    assert result.path.coords != result.baseline.coords
+    assert 815 < result.path.distance_m < 818  # 816.1 m
+    graph = planner.router.ped.graph
+    nodes = result.path.node_ids
+    used = {cid for u, v in itertools.pairwise(nodes) for cid in graph[u][v]["edge"].crosswalk_ids}
+    blocked = {st.crosswalk_id for st in planner.repo.states_of_events([seg1])}
+    assert "06-0000023206" in blocked and not (used & blocked)
+    avoided = {a.crosswalk_id: a for a in result.path.avoided}
+    assert set(avoided) == {"06-0000023206"}
+    assert avoided["06-0000023206"].status is Status.released
+    assert avoided["06-0000023206"].reason == SEG1
+    assert avoided["06-0000023206"].until == datetime(2026, 3, 15, 8, 8, tzinfo=KST)
+    # 없는 id(지난 공유 링크)는 무시 — 원래 길 그대로
+    ghost = planner.plan(avoid_query(depart, "000000000000"))
+    assert ghost.path.coords == ghost.baseline.coords and ghost.path.avoided == ()
 
 
 def test_invalid_query_and_no_flask() -> None:
