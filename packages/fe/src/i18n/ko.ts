@@ -312,6 +312,16 @@ export function routeNoteKo(p: {
   return `횡단보도 ${ruled}곳이 ${until}막혀 있어 ${via ?? "돌아가는"} 길을 골랐어요.`;
 }
 
+/** 검색한 장소 카드 (T7.14) — 버튼, 홈 검색칸이 비었을 때 저장한 장소 머리 */
+export const PLACE_KO = {
+  from: "출발",
+  to: "도착",
+  save: "☆ 저장",
+  saved: "★ 저장됨",
+  close: "장소 닫기",
+  savedHead: "저장한 장소",
+} as const;
+
 /** 이 구역 피해서 길찾기 (T7.6) — 사건 카드 버튼, 길찾기 시트 맨 위 줄 */
 export const AVOID_KO = { button: "이 구역 피해서 길찾기", remove: "빼기" } as const;
 
