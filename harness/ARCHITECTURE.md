@@ -61,6 +61,7 @@
 |---|---|---|---|
 | `route_controller` | `GET /route` | `RoutePlanner.plan(query)` | `route_view.render` |
 | `closure_controller` | `GET /closures` | `ClosureRepository.active_horizon(t, bbox)` → `ClosureEngine.restate(states, t)` | `closure_view.render` |
+| `closure_controller` | `GET /closures/events/{id}/march` | `ClosureRepository.march_of(id)` → `march.march_result(…)` (키프레임, ADR-015 F, T7.16) | `march_view.render` (ETag) |
 | `candidate_controller` | `POST /internal/candidates` | `CandidateIntake.accept(batch)` | 202 + 처리 건수 |
 | `bus_controller` | `POST /internal/bus-positions` | `BusIntake.accept(batch)` | 202 (ADR-013, T6.2) |
 
@@ -70,13 +71,14 @@
 | `CrosswalkIndex` | `from_point(pt, radius_m=30)` · `from_line(line, buffer_m)` · `from_segment(seg)` → `set[str]` | geometry → crosswalk_ids. STRtree, EPSG:5179. **`from_segment`**: `RoadGraph.shortest_path(from, via, to, road)` → LineString → 버퍼(`road_class`: 대로 25 / 로 15 / 길 8 m) → `from_line` |
 | `RoadGraph` | `shortest_path(points, road=None) -> LineString` | 표준노드링크(또는 도보망) NetworkX. road가 있으면 그 도로명 링크만 |
 | `ClosureEngine` | `apply(candidate, crosswalk_ids) -> list[ClosureState]` · `transition(prev, evidence)` | 상태기계 |
+| `march` (`MarchProfile`·`march_profile`·`p_at`·`keyframes`) | `march_profile(candidates, parts, index, settings) -> MarchProfile \| None` · `p_at(profile, start, end, crosswalk_id, t, settings) -> float \| None` · `keyframes(…)` | 행진 확률 모델 (ADR-015, T7.16). 대상 = 행진·창·이어진 경로 하나. 접수 때 경로 선·길이·행렬·횡단보도별 s 를 사건 행 JSON `closure_events.march` 에. P(t, s) 하나를 라우터(비용 = P × 예정 비용, P ≥ 0.8 제외)·키프레임 API·현장 도구(`prediction.blocked_at`)가 같이 쓴다 |
 | `CandidateIntake` | `accept(batch) -> IntakeResult` | 후보 → CrosswalkIndex → ClosureEngine → Repository. 돌발 ↔ 공지가 같은 횡단보도·겹치는 시각이면 공지 후보 전체에 topis_incident 근거(어느 쪽이 먼저 와도). 같은 배치 재수신은 받은 시각만 새로(= data_as_of 돌발) (T6.1) |
 | `BusIntake` | `accept(batch) -> int` | 버스 위치 적재(`bus_positions`)만 — 워커가 `NARU_BUS_RECORD_ONLY=0` 일 때. 보정 계열(`bus_corrections`)은 만들지 않는다 (ADR-013 보류) |
 | `RoutePath` | `passes(points)` · `near_measures(x, y)` · `distance_m(x, y)` | 노선 경로(getRoutePath)를 노선 위 거리로 — 11/9 평가(`scripts/eval_bus_20261109.py`)·2027 마라톤 정류소 건너뜀 분석용. 보정 순수 함수는 뺐다 (ADR-013 보류) |
 | `ClosureStateEntity` | SQLAlchemy ORM, 테이블 `closure_states` | crosswalk_id, status, confidence, window_start/end(UTC), evidence(JSON), lng/lat |
 | `ClosureRepository` | `upsert(state)` · `active_at(t, bbox)` · `active_horizon(t, bbox)`(t~t+60분 안 시작 포함, `/route`·`/closures` 공통) `-> list[ClosureState]` | DB 접근은 여기만 |
 | `PedGraph` | `edge.kind ∈ {sidewalk, crosswalk, underpass, overpass, stairs, elevator, station}` | NetworkX 인메모리. 서울 25개 구(T6.9, 2026-11-09 측정): 노드 217,782 · 엣지 282,006 · 횡단보도 21,775(도로 그래프 46,273 · 63,341), 적재 약 13초, gunicorn 워커당 RSS 약 1.5 GB(워커 2개 ≈ 3 GB) |
-| `TimeDependentRouter` | `route(src, dst, t, closures) -> Path` | A*. cost = dist + vertical + degraded. closed(t) → 제외 |
+| `TimeDependentRouter` | `route(src, dst, t, closures, avoid, marches) -> Path` | A*. cost = dist + vertical + degraded. closed(t) → 제외. 행진 프로필이 있는 사건은 P(t, s) (ADR-015 E) |
 | `BaselineRouter` | `route(src, dst) -> Path` | 같은 PedGraph, closures 미적용 |
 | `RoutePlanner` | `plan(query: RouteQuery) -> RouteResult` | 활성 폐쇄 조회 → 두 라우터 → 도메인 결과 |
 
@@ -86,6 +88,7 @@
 | `route_view` | `RouteResult` → `RouteResponse`(contracts) → JSON (INTERFACE §2) |
 | `closure_view` | `list[ClosureState]` + zones → GeoJSON FeatureCollection (INTERFACE §3) |
 | `error_view` | 도메인 예외·검증 오류 → `ErrorBody` (INTERFACE §6) |
+| `march_view` | `MarchResult` → `MarchResponse`(INTERFACE §3.2) → JSON + ETag (T7.16) |
 
 ### FE — `packages/fe` · Next.js App Router
 | 파일 | 종류 | 역할 |

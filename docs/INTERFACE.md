@@ -1,4 +1,4 @@
-# INTERFACE.md — 파트 간 계약 v0.14
+# INTERFACE.md — 파트 간 계약 v0.15
 
 파트 경계의 단일 기준. 스키마를 바꾸면 **이 파일 먼저** 고치고, 하위호환이 깨지면 버전을 올린다. 변경은 ADR + 태우 승인.
 코드 구현은 `packages/contracts`(`naru_contracts`, pydantic v2) 하나뿐이다. 테스트가 이 문서의 예시 JSON 블록을 그대로 파싱하므로, 예시를 고치면 코드도 고쳐야 한다. FE 타입은 `make schema`로 생성한다.
@@ -207,6 +207,31 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 - `districts` (v0.13 보충, T6.9) — 사건 횡단보도들이 있는 자치구(OA-23081 자치구 이름 그대로, 가나다순). 빈 목록이 기본이라 이전 응답·클라이언트는 그대로. FE 통제 불러오기의 구 필터 칩(지도 화면 안의 구 먼저).
 - `data_as_of` (v0.12, ADR-011 C·ADR-012) **필수** — 출처마다 그 출처로 저장된 통제의 가장 늦은 근거 시각, 없으면 null: 공지(`smpa`, `topis_notice` = source `topis`)는 공지 게시 시각, `course` 는 시각표 게시 시각(상태 전이 근거는 뺀다), `topis_incident`(= source `incident`)는 돌발 배치를 마지막으로 받은 시각(범위 안 돌발이 없는 빈 배치·같은 배치 재전송 포함, T6.1). 예시는 2026-11-08 개발 DB(서울경찰청 11/6 18:00 공지 · 서울마라톤 3/12 16:07 시각표). FE 는 기준 시각을 `/licenses` 맨 아래 "데이터 기준 시각"에 쓰고(시트에는 없다, T7.12·T7.13), 시트에는 `topis_incident` 가 30분보다 오래면 슬라이더 위 한 줄 "통제 정보가 N분째 갱신되지 않았어요"(받은 적 없음 = null 이면 경고 없음).
 
+### §3.2 BE → FE: `GET /closures/events/{id}/march?from=&to=` (v0.15, ADR-015 F)
+행진 확률 모델(ADR-015)의 예상 위치 키프레임. 대상 = type `march`, 창 시작·끝, 순서 있는 경로 하나(공지 구간 seg1..N 이 이어지거나 TOPIS 통제지도 사슬 하나). 대상이 아니면(갈라진 행진·집회·마라톤·없는 id) 404 `not_modeled`. `ClosureEvent`(§3.1) 스키마는 그대로 — FE 는 `type` 이 `march` 일 때만 부르고 404 면 정지 표시.
+- `from`·`to`(ISO 8601 + 오프셋, 선택): 키프레임 범위. 기본 통제 창 전체. `[from, to] ∩ [start, end]` 를 `step_s`(60) 간격으로.
+```json
+{
+  "event_id": "be5f89a4ebf3",
+  "window": {"start": "2026-11-07T12:00:00+09:00", "end": "2026-11-07T16:00:00+09:00"},
+  "step_s": 60,
+  "crosswalk_points": {"06-0000036391": [126.97690673127867, 37.57012839904125],
+                       "06-0000023206": [126.97713080460589, 37.57005044939709],
+                       "06-0000002104": [126.97953158269354, 37.570204808084355]},
+  "keyframes": [
+    {"t": "2026-11-07T12:00:00+09:00",
+     "samples": [[[126.975854, 37.569443]], [[126.975854, 37.569443]]],
+     "center": [126.975854, 37.569443], "radius_m": 0.0,
+     "crosswalks": {"06-0000036391": 1.0, "06-0000023206": 1.0, "06-0000002104": 0.2}}
+  ]
+}
+```
+- 2026-11-10 기록 `naru_api/march_be5f89a4ebf3.json`(11/7 r01 동화면세점 앞 → 종로1R → 동화면세점 앞, 50,000명, 12:00~16:00)의 첫 키프레임 — 표본 21개 중 2개, 횡단보도 13곳 중 3곳만 남긴 것. 시작 시각이라 머리가 출발점에 있고(점 하나씩, 반경 0), 출발점에서 300 m(`march_lead_m`) 안의 세종대로사거리 둘은 P 1.0, 1 km 뒤 종로구청입구는 하한 0.2.
+- `keyframes[]`: `t` 시각(시각 순) · `samples` 표본(속도)별 머리~꼬리 점 `[lng, lat]`(경로 위 `march_point_step_m` 25 m 간격, 키프레임당 `march_points_max` 600 상한 — 넘으면 간격을 넓힌다) · `center` 그 점들의 가운데 · `radius_m` 그 점들이 퍼진 반경(표시용) · `crosswalks` 경로 위 횡단보도 id → 그 시각 막혀 있을 확률 0~1(창 안 하한 `march_p_floor` 0.2, 라우터가 쓰는 값과 같다).
+- `crosswalk_points`: 경로 위 횡단보도 id → `[lng, lat]`. FE 가 P 색을 칠할 점.
+- FE 문구는 "공지 일정 기준 예상 위치" — 실제 추적처럼 보이는 말은 쓰지 않는다. 두 키프레임 사이는 FE 가 보간한다.
+- `ETag`(본문 sha1)·`If-None-Match` → 304, `Cache-Control: no-cache` (§3.1 과 같다).
+
 ## §4 enum
 | 필드 | 코드값 | FE 라벨 |
 |---|---|---|
@@ -222,15 +247,17 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 ## §5 상태별 라우팅 반응 (엔진·라우터·FE 공통 규칙)
 ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, 예정 +300초, 30분, 붙임 150 m)은 `naru_be/config.py` 상수. 바꾸면 이 문서와 ARCHITECTURE 표도 같이.
 - (v0.9, ADR-011 A) `scheduled`(확신도 ≥ 0.7)는 횡단보도에 닿는 시각이 공지 창 안일 때만 그 횡단보도마다 +300초(`scheduled_penalty_s`) — 하드 차단이 아니라 페널티. 창 밖(시작 전·끝난 뒤)은 보통. `confirmed`는 차단. FE 는 `avoided[].status` 로 confirmed "통제 중" / scheduled "공지상 통제 시간 · 현장 확인 전"을 나눈다.
+- (v0.15, ADR-015 E) 행진 확률 모델 대상 사건(§3.2)의 경로 위 횡단보도는 `scheduled`든 `confirmed`든 창 전체 대신 그 시각 P(t, s): 비용 = P × 300초, P ≥ 0.8(`march_p_block`)이면 차단, 창 밖은 P 0. 비용이 붙은 횡단보도도 `avoided` 에 그 시각 상태로.
 
 ## §6 오류 응답 (Flask)
 ```json
 {"error": {"code": "invalid_query", "message": "depart_at: 오프셋 없는 시각", "field": "depart_at"}}
 ```
-- `code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, geocode_unavailable, too_many_reports, internal}`. HTTP 400 / 401 / 404 / 422(`no_route`·`out_of_coverage`) / 429(`too_many_reports`) / 503(`geocode_unavailable`) / 500. Flask `error_view`(View 계층)가 만든다.
+- `code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, geocode_unavailable, too_many_reports, not_modeled, internal}`. HTTP 400 / 401 / 404(`not_found`·`not_modeled`) / 422(`no_route`·`out_of_coverage`) / 429(`too_many_reports`) / 503(`geocode_unavailable`) / 500. Flask `error_view`(View 계층)가 만든다.
 - `out_of_coverage` (v0.9, ADR-011): 출발·도착을 보행망 노드에 붙일 거리가 150 m(`max_snap_m`)를 넘는다. `field` = `from` 또는 `to`.
 - `geocode_unavailable` (v0.11, ADR-011 B): 카카오 로컬을 못 불렀다 — 서버 키 없음·카카오 오류·시간 초과(재생 모드면 기록 없음). FE 는 검색이면 "검색을 못 했어요", 주소면 "선택한 위치".
 - `too_many_reports` (v0.14 보충, T7.15): 같은 기기가 같은 횡단보도를 600초(`report_min_interval_s`) 안에 다시 제보했다(§8.2). `field` = `crosswalk_id`.
+- `not_modeled` (v0.15, ADR-015 F): 행진 확률 모델 대상이 아닌 사건 — 없거나, 방향을 모르거나 갈라진 행진, 집회·마라톤(§3.2). `field` = `event_id`.
 
 ## §7 BE → FE: 지오코딩 (v0.11, ADR-011 B)
 BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKAO_REST_KEY` 에만 — 브라우저·응답·로그에 없다. FE 는 `/api/geocode/*` 로만 부른다.
@@ -303,3 +330,4 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 | 2026-11-10 | v0.14 (보충) | §3.1 `data_as_of` FE 표시 설명만 — 기준 시각은 `/licenses`, 시트는 TOPIS 돌발 30분 멈춤 경고만(null 은 경고 없음, T7.12·T7.13). 스키마 그대로 | 태우 (11/10) |
 | 2026-11-10 | v0.14 (보충) | §2 `GET /route` 에 `avoid`(사건 id 쉼표, 10개까지) — 그 사건 횡단보도를 시각·확신도와 상관없이 막음, 없는 id 는 무시, 응답 스키마 그대로 (ADR-014 A, T7.6) | 태우 승인 (ADR-014) |
 | 2026-11-10 | v0.14 (보충) | §8 통제 제보 `POST /crosswalks/nearest`·`POST /reports`·`GET /reports/recent` 추가 — 기록만(경로·확신도·상태에 안 씀), 좌표는 본문으로만·저장 안 함, 기기는 해시. §6 `too_many_reports`(429) | 태우 지시 (11/10, T7.15) |
+| 2026-11-10 | v0.15 | §3.2 `GET /closures/events/{id}/march` 행진 예상 위치 키프레임(표본 점·중심·반경·횡단보도별 P, 1분), §5 행진 예정 비용 = P × 예정 비용(P ≥ 0.8 제외, scheduled·confirmed 모두), §6 `not_modeled`(404) (ADR-015) | 태우 승인 (ADR-015) |
