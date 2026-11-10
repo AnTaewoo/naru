@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { NaruApiError } from "../api/naruApiClient";
-import type { ClosureEvent, DataAsOf, FeatureCollection } from "../types/contracts";
+import type { ClosureEvent, DataAsOf, FeatureCollection, MarchResponse } from "../types/contracts";
 import { useNaruApi } from "./ApiProvider";
 import { kstIso, useTime } from "./TimeProvider";
 
@@ -52,6 +52,10 @@ export interface ClosureState {
   picked: string[] | null;
   /** 지도 맞춤 요청 (T7.11 예시로 보기) — 같은 범위를 다시 눌러도 맞추도록 순번을 올린다 */
   frame: { bbox: Bbox4; seq: number } | null;
+  /** 고른 행진 사건의 예상 위치 키프레임 (T7.16). 받은 사건 id 와 응답(대상 아니면 null) */
+  march: { id: string; body: MarchResponse | null } | null;
+  /** 예상 위치 재생 중인 시각(ms) — 네트워크 없이 지도·카드만 이 시각으로. null = 재생 아님 */
+  playMs: number | null;
 }
 
 /** [minLng, minLat, maxLng, maxLat] */
@@ -95,7 +99,9 @@ export type ClosureAction =
   | { type: "select"; id: string | null }
   | { type: "pick"; ids: string[] }
   | { type: "unpick" }
-  | { type: "frame"; bbox: Bbox4 };
+  | { type: "frame"; bbox: Bbox4 }
+  | { type: "receiveMarch"; id: string; body: MarchResponse | null }
+  | { type: "play"; ms: number | null };
 
 export const EMPTY_CLOSURES: FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -161,6 +167,8 @@ export function initialClosureState(partial: Partial<ClosureState> = {}): Closur
     selected: null,
     picked: null,
     frame: null,
+    march: null,
+    playMs: null,
     ...partial,
   };
 }
@@ -200,7 +208,13 @@ export function closureReducer(state: ClosureState, action: ClosureAction): Clos
     case "failEvents":
       return { ...state, eventsError: action.error };
     case "select":
-      return state.selected === action.id ? state : { ...state, selected: action.id };
+      if (state.selected === action.id) return state;
+      // 다른 사건을 열면 예상 위치·재생은 그 사건 것이 아니다
+      return { ...state, selected: action.id, playMs: null, march: action.id ? state.march : null };
+    case "receiveMarch":
+      return action.id === state.selected ? { ...state, march: action } : state;
+    case "play":
+      return state.playMs === action.ms ? state : { ...state, playMs: action.ms };
     case "pick": {
       const [only, ...more] = action.ids;
       if (only === undefined) return state;
@@ -321,6 +335,28 @@ export function ClosureProvider({
         .catch(() => undefined); // 목록은 지도 사건 실패 문구(eventsError)로 충분 — 받아 둔 것을 쓴다
     }, pollMs);
   }, [api, t, ready, fetchEnabled, pollMs]);
+
+  // 행진 예상 위치 (T7.16) — 고른 사건이 행진이면 키프레임을 한 번 받는다(404 면 null = 정지 표시)
+  const selectedEvent = useMemo(() => {
+    const id = state.selected;
+    if (!id) return null;
+    return (
+      state.events?.find((e) => e.id === id) ?? state.catalog?.find((e) => e.id === id) ?? null
+    );
+  }, [state.selected, state.events, state.catalog]);
+  const marchId = selectedEvent?.type === "march" ? selectedEvent.id : null;
+  const marchHave = state.march?.id ?? null;
+  useEffect(() => {
+    if (!fetchEnabled || !marchId || marchHave === marchId) return;
+    const controller = new AbortController();
+    api
+      .march(marchId, {}, controller.signal)
+      .then((body) => dispatch({ type: "receiveMarch", id: marchId, body }))
+      .catch(() => {
+        if (!controller.signal.aborted) dispatch({ type: "receiveMarch", id: marchId, body: null });
+      });
+    return () => controller.abort();
+  }, [api, marchId, marchHave, fetchEnabled]);
 
   const value = useMemo(() => state, [state]);
   return (
