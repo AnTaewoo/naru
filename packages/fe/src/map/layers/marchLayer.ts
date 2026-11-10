@@ -1,0 +1,245 @@
+// 순수 함수: 행진 키프레임(/closures/events/{id}/march, INTERFACE §3.2) → 그 시각의 예상 위치(두 키프레임
+// 사이 보간) → MapLibre 소스·레이어 (ADR-015 G, T7.16). heatmap(표본이 겹칠수록 진하게), 중심 원(테두리 + 옅은
+// 채움), 경로 위 횡단보도 P 6단계 색. 공간 연산은 원 폴리곤(표시용)뿐 — 값은 BE 키프레임 그대로
+import type {
+  ExpressionSpecification,
+  GeoJSONSourceSpecification,
+  LayerSpecification,
+} from "maplibre-gl";
+import type { MarchKeyframe, MarchResponse } from "../../types/contracts";
+import { COLORS } from "../colors";
+
+export const MARCH_HEAT_SOURCE_ID = "naru-march-heat";
+export const MARCH_CIRCLE_SOURCE_ID = "naru-march-circle";
+export const MARCH_CROSSWALK_SOURCE_ID = "naru-march-crosswalks";
+export const MARCH_LAYER_IDS = {
+  heat: "naru-march-heat",
+  circleFill: "naru-march-circle-fill",
+  circleLine: "naru-march-circle-line",
+  crosswalk: "naru-march-crosswalk",
+} as const;
+
+export type LngLat = [number, number];
+
+/** 그 시각의 예상 위치 — 점은 가까운 키프레임 것, 중심·반경·P 는 두 키프레임 사이 선형 보간 */
+export interface MarchFrame {
+  points: LngLat[];
+  center: LngLat;
+  radiusM: number;
+  /** 경로 위 횡단보도 id → 막혀 있을 확률 */
+  p: Record<string, number>;
+}
+
+function pair(xs: readonly unknown[]): LngLat | null {
+  const [a, b] = xs;
+  return typeof a === "number" && typeof b === "number" ? [a, b] : null;
+}
+
+function flat(kf: MarchKeyframe): LngLat[] {
+  const out: LngLat[] = [];
+  for (const sample of kf.samples)
+    for (const pt of sample) {
+      const p = pair(pt);
+      if (p) out.push(p);
+    }
+  return out;
+}
+
+function lerp(a: number, b: number, f: number): number {
+  return a + (b - a) * f;
+}
+
+/** t(ms)의 프레임. 키프레임 범위 밖(통제 시간 밖)이면 null */
+export function frameAt(body: MarchResponse, tMs: number): MarchFrame | null {
+  const kfs = body.keyframes;
+  const first = kfs[0];
+  const last = kfs[kfs.length - 1];
+  if (!first || !last) return null;
+  const t0 = Date.parse(first.t);
+  const t1 = Date.parse(last.t);
+  if (tMs < t0 || tMs > t1) return null;
+  // 간격이 일정(step_s)하니 인덱스로 바로
+  const stepMs = body.step_s * 1000;
+  const i = Math.min(kfs.length - 1, Math.floor((tMs - t0) / stepMs));
+  const a = kfs[i];
+  if (!a) return null;
+  const b = kfs[i + 1] ?? a;
+  const f = b === a ? 0 : Math.min(1, Math.max(0, (tMs - Date.parse(a.t)) / stepMs));
+  const ca = pair(a.center);
+  const cb = pair(b.center);
+  if (!ca || !cb) return null;
+  const p: Record<string, number> = {};
+  for (const [id, pa] of Object.entries(a.crosswalks)) p[id] = lerp(pa, b.crosswalks[id] ?? pa, f);
+  return {
+    points: flat(f < 0.5 ? a : b),
+    center: [lerp(ca[0], cb[0], f), lerp(ca[1], cb[1], f)],
+    radiusM: lerp(a.radius_m, b.radius_m, f),
+    p,
+  };
+}
+
+/** 카드의 "이 시각 막혀 있을 확률" — 누른 횡단보도가 있으면 그것, 없으면 경로 위 가장 높은 P. 창 밖은 0 */
+export function probabilityAt(
+  body: MarchResponse,
+  tMs: number,
+  crosswalkId: string | null = null,
+): number {
+  const frame = frameAt(body, tMs);
+  if (!frame) return 0;
+  if (crosswalkId !== null && crosswalkId in frame.p) return frame.p[crosswalkId] ?? 0;
+  return Math.max(0, ...Object.values(frame.p));
+}
+
+const EMPTY = { type: "FeatureCollection" as const, features: [] };
+
+interface PointCollection {
+  type: "FeatureCollection";
+  features: {
+    type: "Feature";
+    geometry: { type: "Point"; coordinates: LngLat };
+    properties: Record<string, unknown>;
+  }[];
+}
+
+export function marchHeatPoints(frame: MarchFrame | null): PointCollection {
+  if (!frame) return EMPTY;
+  return {
+    type: "FeatureCollection",
+    features: frame.points.map((c) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: c },
+      properties: {},
+    })),
+  };
+}
+
+const M_PER_DEG_LAT = 111_320;
+
+/** 중심 원 폴리곤(64 꼭짓점) — 표시용. 반경이 0 이면 그리지 않는다 */
+export function marchCircle(frame: MarchFrame | null): {
+  type: "FeatureCollection";
+  features: {
+    type: "Feature";
+    geometry: { type: "Polygon"; coordinates: LngLat[][] };
+    properties: Record<string, never>;
+  }[];
+} {
+  if (!frame || frame.radiusM <= 0) return EMPTY;
+  const [lng, lat] = frame.center;
+  const dLat = frame.radiusM / M_PER_DEG_LAT;
+  const dLng = frame.radiusM / (M_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
+  const ring: LngLat[] = [];
+  for (let k = 0; k <= 64; k += 1) {
+    const a = (k / 64) * 2 * Math.PI;
+    ring.push([lng + dLng * Math.cos(a), lat + dLat * Math.sin(a)]);
+  }
+  return {
+    type: "FeatureCollection",
+    features: [
+      { type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties: {} },
+    ],
+  };
+}
+
+/** P 6단계 — 0.2 미만(하한, 옅은 회색) · 0.35 · 0.5 · 0.65 · 0.8 미만 · 0.8 이상(차단, 빨강) */
+export const P_STEPS = [0.2, 0.35, 0.5, 0.65, 0.8] as const;
+export const P_COLORS = [
+  "#b8bcc4",
+  "#f5d58a",
+  "#f5a300",
+  "#f07f1f",
+  "#ef6c00",
+  COLORS.stop,
+] as const;
+
+export function pColor(p: number): string {
+  let i = 0;
+  while (i < P_STEPS.length && p >= (P_STEPS[i] ?? 1)) i += 1;
+  return P_COLORS[i] ?? COLORS.stop;
+}
+
+/** 경로 위 횡단보도 점 — 그 시각 P 와 색 */
+export function marchCrosswalkPoints(
+  body: MarchResponse,
+  frame: MarchFrame | null,
+): PointCollection {
+  if (!frame) return EMPTY;
+  const features: PointCollection["features"] = [];
+  for (const [id, coord] of Object.entries(body.crosswalk_points)) {
+    const c = pair(coord);
+    const p = frame.p[id];
+    if (!c || p === undefined) continue;
+    features.push({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: c },
+      properties: { id, p, color: pColor(p) },
+    });
+  }
+  return { type: "FeatureCollection", features };
+}
+
+export function marchSource(
+  data: PointCollection | ReturnType<typeof marchCircle>,
+): GeoJSONSourceSpecification {
+  return { type: "geojson", data };
+}
+
+const HEAT_RAMP: ExpressionSpecification = [
+  "interpolate",
+  ["linear"],
+  ["heatmap-density"],
+  0,
+  "rgba(239, 108, 0, 0)",
+  0.2,
+  "rgba(245, 213, 138, 0.55)",
+  0.4,
+  "rgba(245, 163, 0, 0.7)",
+  0.6,
+  "rgba(240, 127, 31, 0.8)",
+  0.8,
+  "rgba(239, 108, 0, 0.9)",
+  1,
+  "rgba(229, 50, 45, 0.95)",
+];
+
+/** 레이어 4장 — heatmap, 중심 원 채움·테두리, 횡단보도 P 점 (고른 행진 사건에만 데이터가 있다) */
+export function marchLayers(): LayerSpecification[] {
+  return [
+    {
+      id: MARCH_LAYER_IDS.heat,
+      type: "heatmap",
+      source: MARCH_HEAT_SOURCE_ID,
+      paint: {
+        "heatmap-weight": 1,
+        "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 11, 0.6, 16, 1.4],
+        "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 11, 8, 16, 22],
+        "heatmap-color": HEAT_RAMP,
+        "heatmap-opacity": 0.85,
+      },
+    },
+    {
+      id: MARCH_LAYER_IDS.circleFill,
+      type: "fill",
+      source: MARCH_CIRCLE_SOURCE_ID,
+      paint: { "fill-color": COLORS.soon, "fill-opacity": 0.08 },
+    },
+    {
+      id: MARCH_LAYER_IDS.circleLine,
+      type: "line",
+      source: MARCH_CIRCLE_SOURCE_ID,
+      paint: { "line-color": COLORS.soon, "line-width": 2, "line-dasharray": [2, 2] },
+    },
+    {
+      id: MARCH_LAYER_IDS.crosswalk,
+      type: "circle",
+      source: MARCH_CROSSWALK_SOURCE_ID,
+      paint: {
+        "circle-color": ["get", "color"],
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 4, 16, 8],
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 1.5,
+        "circle-opacity": 0.95,
+      },
+    },
+  ];
+}
