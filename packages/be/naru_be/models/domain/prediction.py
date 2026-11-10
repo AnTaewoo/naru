@@ -4,6 +4,7 @@
   confirmed(그 시각 다시 판정) → 막힘 (라우터는 간선 제외)
   scheduled · 확신도 ≥ review_confidence(0.7) · 그 시각이 공지 창 안 → 막힘 (라우터는 +300초)
   그 밖(창 밖·0.7 미만·zone_scheduled·released) → 열림
+  행진 프로필(march, ADR-015)이 있고 경로 위 횡단보도면 위 두 경우에 P(t, s) ≥ march_p_block 일 때만
 현장 체크리스트(scripts/field_checklist.py)와 field 제보 비교(scripts/field_compare.py)가 쓴다.
 """
 
@@ -18,6 +19,7 @@ from naru_be.config import Settings
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.closure_events import event_id, worst
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
+from naru_be.models.domain.march import MarchProfile, p_at
 from naru_be.models.repositories.report_repository import ReportRow
 from naru_contracts import ClosureState, Status
 
@@ -33,10 +35,21 @@ def penalized(state: ClosureState, status: Status, at: datetime, settings: Setti
 
 
 def blocked_at(
-    state: ClosureState, at: datetime, engine: ClosureEngine, settings: Settings
+    state: ClosureState,
+    at: datetime,
+    engine: ClosureEngine,
+    settings: Settings,
+    march: MarchProfile | None = None,
 ) -> Status | None:
     """막힘으로 보면 그 상태(confirmed | scheduled), 아니면 None."""
     status = engine.status_of_state(state, at)
+    start, end = state.window.start, state.window.end
+    if march is not None and state.crosswalk_id in march.s and start and end:
+        counted = status is Status.confirmed or (
+            status is Status.scheduled and state.confidence >= settings.review_confidence
+        )
+        p = p_at(march, start, end, state.crosswalk_id, at, settings) if counted else None
+        return status if p is not None and p >= settings.march_p_block else None
     if status is Status.confirmed or penalized(state, status, at, settings):
         return status
     return None

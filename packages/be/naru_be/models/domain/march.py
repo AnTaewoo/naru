@@ -170,3 +170,101 @@ def march_profile(
         for lng, lat in (_5179_TO_4326.transform(x, y) for x, y in coords)
     )
     return MarchProfile(path, round(length, 1), round(queue, 1), width, s)
+
+
+def _speeds(
+    profile: MarchProfile, start: datetime, end: datetime, settings: Settings
+) -> list[float]:
+    """표본별 속도 m/s — v(1 + w·u_i), u 는 [-1, 1] 등간격 K개."""
+    seconds = (end - start).total_seconds()
+    v = profile.length_m / seconds if seconds > 0 else math.inf
+    k, w = settings.march_samples, settings.march_speed_spread
+    return [v * (1 + w * (-1 + 2 * i / (k - 1))) for i in range(k)]
+
+
+def _blocked(profile: MarchProfile, s: float, head: float, settings: Settings) -> bool:
+    return s - settings.march_lead_m <= head < s + profile.queue_m
+
+
+def p_at(
+    profile: MarchProfile,
+    start: datetime,
+    end: datetime,
+    crosswalk_id: str,
+    t: datetime,
+    settings: Settings,
+) -> float | None:
+    """그 시각 이 횡단보도가 막혀 있을 확률. 경로 밖 횡단보도면 None, 창 밖이면 0, 창 안은
+    하한 이상."""
+    s = profile.s.get(crosswalk_id)
+    if s is None:
+        return None
+    if t < start or t > end:
+        return 0.0
+    dt = (t - start).total_seconds()
+    speeds = _speeds(profile, start, end, settings)
+    blocked = sum(1 for v in speeds if _blocked(profile, s, v * dt, settings))
+    return max(blocked / len(speeds), settings.march_p_floor)
+
+
+def _sample_points(profile: MarchProfile, head: float, step_m: float) -> tuple[LngLat, ...]:
+    """표본 하나의 머리~꼬리를 경로 위 step_m 간격으로 (경로 밖은 자른다)."""
+    a, b = max(0.0, head - profile.queue_m), min(profile.length_m, head)
+    if head < 0 or a > profile.length_m or a > b:
+        return ()
+    n = int((b - a) // step_m)
+    positions = [a + i * step_m for i in range(n + 1)]
+    if positions[-1] < b - 1e-6:
+        positions.append(b)
+    out = []
+    for pos in positions:
+        pt = profile.line.interpolate(pos)
+        lng, lat = _5179_TO_4326.transform(pt.x, pt.y)
+        out.append((round(lng, 6), round(lat, 6)))
+    return tuple(out)
+
+
+def keyframe_at(
+    profile: MarchProfile, start: datetime, end: datetime, t: datetime, settings: Settings
+) -> Keyframe:
+    dt = (t - start).total_seconds()
+    heads = [v * dt for v in _speeds(profile, start, end, settings)]
+    step = settings.march_point_step_m
+    samples = tuple(_sample_points(profile, h, step) for h in heads)
+    total = sum(len(s) for s in samples)
+    if total > settings.march_points_max:  # 상한 — 간격을 넓혀 다시
+        step *= math.ceil(total / settings.march_points_max)
+        samples = tuple(_sample_points(profile, h, step) for h in heads)
+    flat = [p for s in samples for p in s]
+    if flat:
+        xy = [_4326_TO_5179.transform(lng, lat) for lng, lat in flat]
+        cx, cy = sum(x for x, _ in xy) / len(xy), sum(y for _, y in xy) / len(xy)
+        radius = max(math.hypot(x - cx, y - cy) for x, y in xy)
+        lng, lat = _5179_TO_4326.transform(cx, cy)
+        center: LngLat = (round(lng, 6), round(lat, 6))
+    else:  # 창 안에선 늘 점이 있지만, 혹시 없으면 경로 시작
+        center, radius = profile.path[0], 0.0
+    crosswalks = {
+        cid: round(p, 3)
+        for cid in profile.s
+        if (p := p_at(profile, start, end, cid, t, settings)) is not None
+    }
+    return Keyframe(t, samples, center, round(radius, 1), crosswalks)
+
+
+def keyframes(
+    profile: MarchProfile,
+    start: datetime,
+    end: datetime,
+    t0: datetime | None,
+    t1: datetime | None,
+    settings: Settings,
+) -> list[Keyframe]:
+    """[t0, t1] ∩ [시작, 끝] 을 march_keyframe_s 간격으로 (F)."""
+    lo, hi = max(start, t0 or start), min(end, t1 or end)
+    out: list[Keyframe] = []
+    t = lo
+    while t <= hi:
+        out.append(keyframe_at(profile, start, end, t, settings))
+        t += timedelta(seconds=settings.march_keyframe_s)
+    return out
