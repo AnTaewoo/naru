@@ -62,6 +62,17 @@ def test_html_lines_keeps_inline_text_together() -> None:
     assert html_lines(body) == ["1. 집회일시 :'26.11.7.(토) 16:00 ~ 19:30", "- 의사당대로 통제"]
 
 
+TOPIS_RECORDED = Path(__file__).resolve().parents[3] / "data" / "recorded" / "topis_notice"
+
+
+def test_topis_empty_response_has_no_sentences() -> None:
+    """NoticeList 가 200 에 빈 본문 — 2026-11-10 15:24 운영 워커 기록. 그 호출엔 공지가 없다."""
+    rec = json.loads((TOPIS_RECORDED / "20261110T152442_NoticeList.json").read_text("utf-8"))
+    assert rec["status"] == 200 and rec["raw"] == ""
+    called_at = datetime.fromisoformat(rec["called_at"])
+    assert TopisNoticeSource([(rec["raw"], called_at)]).sentences() == []
+
+
 def test_topis_recorded_to_sentences(topis_recorded: list[tuple[str, datetime]]) -> None:
     sentences = TopisNoticeSource(topis_recorded, categories=("통제안내", "버스안내")).sentences()
     assert sentences, "기록된 공지에 통제안내·버스안내가 없다"

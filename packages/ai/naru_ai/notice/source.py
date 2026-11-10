@@ -154,6 +154,8 @@ class TopisNoticeSource:
         out: list[NoticeSentence] = []
         seen: set[str] = set()
         for xml_text, called_at in self.responses:
+            if not xml_text.strip():  # 200 에 빈 본문(11/10 15:24 운영 기록) — 공지 없음
+                continue
             root = ET.fromstring(xml_text)
             code = root.findtext("RESULT/CODE")
             if code != "INFO-000":
