@@ -178,6 +178,24 @@ naru/
 └── harness/         개발 진행 기록 (Claude Code)
 ```
 
+## 데이터 피드
+
+나루가 판단한 통제를 누구나 GeoJSON 으로 받을 수 있습니다. 인증 없음, CORS 열림, 1분 캐시, IP 당 1분에 60번까지.
+
+```
+curl "https://naru.antaewoo.com/api/closures/feed?at=2026-11-07T13:00:00%2B09:00"
+```
+
+`at` 을 빼면 지금 기준입니다. 응답은 FeatureCollection 이고, `features[].properties.kind` 로 셋을 나눕니다.
+
+| kind | geometry | 뜻 |
+| --- | --- | --- |
+| `crosswalk` | Point | 그 사건이 막는 횡단보도. `crosswalk_id`(서울시 관리번호), `name`(교차로명), `status`(`confirmed` 통제 중 · `scheduled` 예정 · `released` 해제), `confidence`(0~1), 행진 확률 모델 사건이면 `p`(그 시각 막혀 있을 확률) |
+| `area` | Polygon · MultiPolygon | 사건 통제 구역 |
+| `march_path` | LineString | 행진 경로 (방향을 아는 행진만) |
+
+세 종류 다 사건 칸이 같습니다: `event_id`, `event`(이름), `type`(`marathon` · `march` · `rally` · `event`), `source`(`course` · `smpa` · `topis` · `incident` …), `start`, `end`. 맨 위 `at`(기준 시각)·`generated_at`·`attribution`(출처 표시 — 꼭 함께 쓰세요)도 있습니다. 필드 정의는 `docs/INTERFACE.md` §3.3 에 있습니다. 공지를 읽어 만든 추정값이라 실제 통제와 다를 수 있습니다.
+
 ## 한계
 
 - 서울 전체만 지원합니다.

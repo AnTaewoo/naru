@@ -232,6 +232,33 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 - FE 문구는 "공지 일정 기준 예상 위치" — 실제 추적처럼 보이는 말은 쓰지 않는다. 두 키프레임 사이는 FE 가 보간한다.
 - `ETag`(본문 sha1)·`If-None-Match` → 304, `Cache-Control: no-cache` (§3.1 과 같다).
 
+### §3.3 누구나: `GET /closures/feed?at=` — 통제 데이터 GeoJSON 피드 (v0.15 보충, T7.17 — 교수님 멘토링 T-C)
+그 시각(`at`, ISO 8601 + 오프셋, 없으면 서버 지금, 분 단위로 내림)에 걸린 통제를 GeoJSON FeatureCollection 으로. 판정은 `/closures`·`/closures/events`·`/route` 와 같다(상태는 `at` 기준, 행진 확률 모델 사건은 §3.2 의 P). 인증 없음, CORS `*`, `Cache-Control: public, max-age=60`, ETag·304. IP 당 분당 60회(`feed_rate_per_min`)를 넘으면 429 `rate_limited`(§6).
+```json
+{
+  "type": "FeatureCollection",
+  "at": "2026-11-07T13:00:00+09:00",
+  "generated_at": "2026-11-10T20:11:59.431205+09:00",
+  "attribution": "나루(naru.antaewoo.com) — 서울 열린데이터광장(횡단보도 OA-23081, TOPIS 돌발 OA-13315, 공공누리 1유형)·서울경찰청 집회 공지·TOPIS 통제 공지·서울마라톤 공지를 읽어 만든 추정값. 실제 통제와 다를 수 있다",
+  "features": [
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [126.9769067, 37.5701284]},
+     "properties": {"kind": "crosswalk", "crosswalk_id": "06-0000036391", "name": "세종대로사거리", "p": 1.0,
+                    "event_id": "be5f89a4ebf3", "event": "12:00~16:00 동화면세점 앞 → 종로1R → 동화면세점 앞 <세종대로 등> 50,000명 종로, 남대문",
+                    "type": "march", "source": "smpa", "start": "2026-11-07T12:00:00+09:00", "end": "2026-11-07T16:00:00+09:00",
+                    "status": "scheduled", "confidence": 0.85, "approx": false}},
+    {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[126.975854, 37.569443], [126.975823, 37.569522]]},
+     "properties": {"kind": "march_path", "crosswalk_id": null, "name": null, "p": null,
+                    "event_id": "be5f89a4ebf3", "event": "12:00~16:00 동화면세점 앞 → 종로1R → 동화면세점 앞 <세종대로 등> 50,000명 종로, 남대문",
+                    "type": "march", "source": "smpa", "start": "2026-11-07T12:00:00+09:00", "end": "2026-11-07T16:00:00+09:00",
+                    "status": "scheduled", "confidence": 0.85, "approx": false}}
+  ]
+}
+```
+- 2026-11-10 기록 `naru_api/feed_1107_1300.json`(11/7 13:00 — 횡단보도 37·구역 7·행진 경로 1)에서 11/7 r01 사건의 횡단보도 하나와 경로(점 39개 중 앞 둘)만 남긴 것.
+- `features[].properties.kind`: `crosswalk`(Point — 그 사건이 막는 횡단보도, `crosswalk_id`·`name` 교차로명·`status` 그 시각 상태·`confidence`·행진 모델 사건이면 `p`) · `area`(Polygon·MultiPolygon — 사건 통제 구역, §3.1 `area` 와 같다) · `march_path`(LineString — 행진 모델 사건의 경로). 사건 칸은 셋이 같다: `event_id`(§3.1 id)·`event`(이름 = reason)·`type`·`source`(§4)·`start`·`end`·`approx`.
+- 같은 사건·같은 횡단보도는 하나(후보 여럿이 골라도) — 가장 심한 상태. `p` 는 창 밖이면 0, 경로 밖·행진 모델 아님이면 null.
+- `at`·`generated_at`·`attribution` 은 GeoJSON 여분 멤버(RFC 7946 §6.1). `attribution` 을 붙여 쓴다 — 공공누리 1유형(출처 표시), 추정값임을 밝힌다.
+
 ## §4 enum
 | 필드 | 코드값 | FE 라벨 |
 |---|---|---|
@@ -253,11 +280,12 @@ ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, �
 ```json
 {"error": {"code": "invalid_query", "message": "depart_at: 오프셋 없는 시각", "field": "depart_at"}}
 ```
-- `code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, geocode_unavailable, too_many_reports, not_modeled, internal}`. HTTP 400 / 401 / 404(`not_found`·`not_modeled`) / 422(`no_route`·`out_of_coverage`) / 429(`too_many_reports`) / 503(`geocode_unavailable`) / 500. Flask `error_view`(View 계층)가 만든다.
+- `code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, geocode_unavailable, too_many_reports, not_modeled, rate_limited, internal}`. HTTP 400 / 401 / 404(`not_found`·`not_modeled`) / 422(`no_route`·`out_of_coverage`) / 429(`too_many_reports`·`rate_limited`) / 503(`geocode_unavailable`) / 500. Flask `error_view`(View 계층)가 만든다.
 - `out_of_coverage` (v0.9, ADR-011): 출발·도착을 보행망 노드에 붙일 거리가 150 m(`max_snap_m`)를 넘는다. `field` = `from` 또는 `to`.
 - `geocode_unavailable` (v0.11, ADR-011 B): 카카오 로컬을 못 불렀다 — 서버 키 없음·카카오 오류·시간 초과(재생 모드면 기록 없음). FE 는 검색이면 "검색을 못 했어요", 주소면 "선택한 위치".
 - `too_many_reports` (v0.14 보충, T7.15): 같은 기기가 같은 횡단보도를 600초(`report_min_interval_s`) 안에 다시 제보했다(§8.2). `field` = `crosswalk_id`.
 - `not_modeled` (v0.15, ADR-015 F): 행진 확률 모델 대상이 아닌 사건 — 없거나, 방향을 모르거나 갈라진 행진, 집회·마라톤(§3.2). `field` = `event_id`.
+- `rate_limited` (v0.15 보충, T7.17): 공개 피드(§3.3) IP 당 분당 60회를 넘었다. `field` 없음.
 
 ## §7 BE → FE: 지오코딩 (v0.11, ADR-011 B)
 BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKAO_REST_KEY` 에만 — 브라우저·응답·로그에 없다. FE 는 `/api/geocode/*` 로만 부른다.
@@ -331,3 +359,4 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 | 2026-11-10 | v0.14 (보충) | §2 `GET /route` 에 `avoid`(사건 id 쉼표, 10개까지) — 그 사건 횡단보도를 시각·확신도와 상관없이 막음, 없는 id 는 무시, 응답 스키마 그대로 (ADR-014 A, T7.6) | 태우 승인 (ADR-014) |
 | 2026-11-10 | v0.14 (보충) | §8 통제 제보 `POST /crosswalks/nearest`·`POST /reports`·`GET /reports/recent` 추가 — 기록만(경로·확신도·상태에 안 씀), 좌표는 본문으로만·저장 안 함, 기기는 해시. §6 `too_many_reports`(429) | 태우 지시 (11/10, T7.15) |
 | 2026-11-10 | v0.15 | §3.2 `GET /closures/events/{id}/march` 행진 예상 위치 키프레임(표본 점·중심·반경·횡단보도별 P, 1분), §5 행진 예정 비용 = P × 예정 비용(P ≥ 0.8 제외, scheduled·confirmed 모두), §6 `not_modeled`(404) (ADR-015) | 태우 승인 (ADR-015) |
+| 2026-11-10 | v0.15 (보충) | §3.3 `GET /closures/feed?at=` 공개 GeoJSON 피드(횡단보도·사건 구역·행진 경로, 사건 칸·상태·확신도·P, 분 캐시·IP 분당 60회), §6 `rate_limited`(429) | 태우 지시 (11/10, T7.17 — 이력만) |
