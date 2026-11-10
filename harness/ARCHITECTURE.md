@@ -61,6 +61,7 @@
 |---|---|---|---|
 | `route_controller` | `GET /route` | `RoutePlanner.plan(query)` | `route_view.render` |
 | `closure_controller` | `GET /closures` | `ClosureRepository.active_horizon(t, bbox)` → `ClosureEngine.restate(states, t)` | `closure_view.render` |
+| `push_controller` | `GET /push/vapid-public-key` · `POST·DELETE /push/subscribe` · `GET·POST /watch-areas` · `DELETE /watch-areas/{id}` | `PushDesk.public_key / subscribe / unsubscribe / areas / add_area / remove_area` (ADR-014 C, T7.8). GET·DELETE 의 endpoint 는 헤더 `X-Push-Endpoint` | `push_view` |
 | `feed_controller` | `GET /closures/feed` | 요청 제한(`FeedDesk.limiter`, IP 분당 60) → `FeedDesk.collection_at(at)` (분 캐시, T7.17) | `feed_view.render` (ETag·public max-age·CORS) |
 | `closure_controller` | `GET /closures/events/{id}/march` | `ClosureRepository.march_of(id)` → `march.march_result(…)` (키프레임, ADR-015 F, T7.16) | `march_view.render` (ETag) |
 | `candidate_controller` | `POST /internal/candidates` | `CandidateIntake.accept(batch)` | 202 + 처리 건수 |
@@ -73,6 +74,7 @@
 | `RoadGraph` | `shortest_path(points, road=None) -> LineString` | 표준노드링크(또는 도보망) NetworkX. road가 있으면 그 도로명 링크만 |
 | `ClosureEngine` | `apply(candidate, crosswalk_ids) -> list[ClosureState]` · `transition(prev, evidence)` | 상태기계 |
 | `march` (`MarchProfile`·`march_profile`·`p_at`·`keyframes`) | `march_profile(candidates, parts, index, settings) -> MarchProfile \| None` · `p_at(profile, start, end, crosswalk_id, t, settings) -> float \| None` · `keyframes(…)` | 행진 확률 모델 (ADR-015, T7.16). 대상 = 행진·창·이어진 경로 하나. 접수 때 경로 선·길이·행렬·횡단보도별 s 를 사건 행 JSON `closure_events.march` 에. P(t, s) 하나를 라우터(비용 = P × 예정 비용, P ≥ 0.8 제외)·키프레임 API·현장 도구(`prediction.blocked_at`)가 같이 쓴다 |
+| `PushDesk` | `public_key() -> str` · `subscribe(sub, now)` · `areas(endpoint, now)` · `add_area(req, now)` · `remove_area(endpoint, id)` | 알림 구독·관심 지역 (T7.8). VAPID 공개키는 .env 개인키에서(없으면 503). last_seen 은 150 m 격자·3시간, saved 는 구독당 10. 표 `push_subscriptions`·`watch_areas`·`push_sends`(0008). 매칭·발송은 T7.9 |
 | `FeedDesk` | `collection_at(at) -> FeedResult` · `limiter: RateLimiter` | 공개 피드 Model (T7.17) — events(창 = 그 시각)·states_of_events·restate·marches_of·p_at 를 모아 (사건, 횡단보도) 하나씩, 분 단위 캐시(워커마다). Flask 모름 |
 | `CandidateIntake` | `accept(batch) -> IntakeResult` | 후보 → CrosswalkIndex → ClosureEngine → Repository. 돌발 ↔ 공지가 같은 횡단보도·겹치는 시각이면 공지 후보 전체에 topis_incident 근거(어느 쪽이 먼저 와도). 같은 배치 재수신은 받은 시각만 새로(= data_as_of 돌발) (T6.1) |
 | `BusIntake` | `accept(batch) -> int` | 버스 위치 적재(`bus_positions`)만 — 워커가 `NARU_BUS_RECORD_ONLY=0` 일 때. 보정 계열(`bus_corrections`)은 만들지 않는다 (ADR-013 보류) |
@@ -92,6 +94,7 @@
 | `error_view` | 도메인 예외·검증 오류 → `ErrorBody` (INTERFACE §6) |
 | `march_view` | `MarchResult` → `MarchResponse`(INTERFACE §3.2) → JSON + ETag (T7.16) |
 | `feed_view` | `FeedResult` → GeoJSON `FeedCollection`(INTERFACE §3.3) + ETag·Cache-Control·CORS (T7.17) |
+| `push_view` | 구독·관심 지역 행 → `SubscribeResponse`·`WatchArea`·`WatchAreasResponse`·`VapidPublicKey`(INTERFACE §9), 204 (T7.8) |
 
 ### FE — `packages/fe` · Next.js App Router
 | 파일 | 종류 | 역할 |

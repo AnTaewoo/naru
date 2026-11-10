@@ -280,12 +280,13 @@ ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, �
 ```json
 {"error": {"code": "invalid_query", "message": "depart_at: 오프셋 없는 시각", "field": "depart_at"}}
 ```
-- `code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, geocode_unavailable, too_many_reports, not_modeled, rate_limited, internal}`. HTTP 400 / 401 / 404(`not_found`·`not_modeled`) / 422(`no_route`·`out_of_coverage`) / 429(`too_many_reports`·`rate_limited`) / 503(`geocode_unavailable`) / 500. Flask `error_view`(View 계층)가 만든다.
+- `code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, geocode_unavailable, too_many_reports, not_modeled, rate_limited, push_unavailable, internal}`. HTTP 400 / 401 / 404(`not_found`·`not_modeled`) / 422(`no_route`·`out_of_coverage`) / 429(`too_many_reports`·`rate_limited`) / 503(`geocode_unavailable`·`push_unavailable`) / 500. Flask `error_view`(View 계층)가 만든다.
 - `out_of_coverage` (v0.9, ADR-011): 출발·도착을 보행망 노드에 붙일 거리가 150 m(`max_snap_m`)를 넘는다. `field` = `from` 또는 `to`.
 - `geocode_unavailable` (v0.11, ADR-011 B): 카카오 로컬을 못 불렀다 — 서버 키 없음·카카오 오류·시간 초과(재생 모드면 기록 없음). FE 는 검색이면 "검색을 못 했어요", 주소면 "선택한 위치".
 - `too_many_reports` (v0.14 보충, T7.15): 같은 기기가 같은 횡단보도를 600초(`report_min_interval_s`) 안에 다시 제보했다(§8.2). `field` = `crosswalk_id`.
 - `not_modeled` (v0.15, ADR-015 F): 행진 확률 모델 대상이 아닌 사건 — 없거나, 방향을 모르거나 갈라진 행진, 집회·마라톤(§3.2). `field` = `event_id`.
 - `rate_limited` (v0.15 보충, T7.17): 공개 피드(§3.3) IP 당 분당 60회를 넘었다. `field` 없음.
+- `push_unavailable` (v0.15 보충, T7.8): 서버에 VAPID 키가 없어 알림을 켤 수 없다(§9.1). `field` 없음.
 
 ## §7 BE → FE: 지오코딩 (v0.11, ADR-011 B)
 BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKAO_REST_KEY` 에만 — 브라우저·응답·로그에 없다. FE 는 `/api/geocode/*` 로만 부른다.
@@ -333,6 +334,43 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 - `ids` 횡단보도 ID 쉼표(1~50개, 겹치면 하나), `minutes` 1~1440(기본 60)
 - 200 `{"counts": {"<id>": {"blocked": n, "open": n}}}` — 그 시간 안에 제보가 있는 ID 만. FE 통제 근거(§2 `avoided` 사유별) "최근 1시간 제보 N건"
 
+## §9 BE ↔ FE: 알림 구독·관심 지역 (v0.15 보충, ADR-014 C, T7.8)
+계정 없이 브라우저 푸시 구독의 `endpoint`(푸시 서비스 URL)가 손잡이다. `GET`·`DELETE` 는 endpoint 를 헤더 `X-Push-Endpoint` 로(주소·접근 로그에 안 남게), `POST` 는 본문으로. 발송·매칭(사건이 생기거나 통제 중이 되면 관심 지역 원과 겹치는 구독에)은 §9.4 `POST /internal/push/dispatch`(T7.9).
+
+### §9.1 `GET /push/vapid-public-key`
+```json
+{"public_key": "BPatrg0it8SWycuEWQGoEJN_7LZsRxMIJnO4DpkecT4Wf_1boywwi1kVibqOodUPf7zgEyq7-vTplVxmFG_YR14"}
+```
+- 브라우저 `pushManager.subscribe({applicationServerKey})` 에 쓰는 base64url 공개점. 서버 `.env` 의 `NARU_VAPID_PRIVATE_KEY`(PEM 또는 raw)에서 뽑는다 — 없으면 503 `push_unavailable`(§6). 예시는 2026-11-10 기록 `naru_api/push_vapid_public_key.json`(테스트 키 — 운영 키는 다르다).
+
+### §9.2 `POST /push/subscribe` · `DELETE /push/subscribe`
+- 본문 = 브라우저 `PushSubscription.toJSON()` 그대로: `endpoint`(https, 512자 안), `keys.p256dh`(base64url 87자)·`keys.auth`(22자), `expirationTime`(선택, null)
+```json
+{"endpoint": "https://jmt17.google.com/fcm/send/etuemq5faKo:AP…",
+ "expirationTime": null,
+ "keys": {"p256dh": "BE2NEQ-MshAZWoG3fBaTW_pTSsFj_qSFCinMgKRPoBf5eBHtznzvZdRcPL7jO9cZVkoQ30FSwkKWvT1YucKKrCM",
+          "auth": "5Q9ZOCY1W5zaWrmDDrnWdA"}}
+```
+- 201 `{"id": 10, "active": true, "created_at": "2026-11-11T00:01:09+09:00"}`. 같은 endpoint 를 다시 보내면 키를 새로 하고 다시 켠다(id 그대로). 예시는 헤드리스 Chrome 이 실제 푸시 서비스(FCM)에 만든 구독(2026-11-10 기록 `naru_api/push_subscribe.json`) — endpoint 토큰은 줄였다.
+- `DELETE /push/subscribe` 본문 `{"endpoint": …}` → 204 (`active` false — 관심 지역은 남지만 안 보이고 발송도 없다). 없는 endpoint 도 204.
+
+### §9.3 `GET /watch-areas` · `POST /watch-areas` · `DELETE /watch-areas/{id}`
+- `POST` 본문 `{endpoint, kind, lng, lat, radius_m}` — `kind` ∈ {`saved`(☆ 저장, 구독당 10개까지), `last_seen`(마지막 위치 — 구독당 하나, 150 m 격자(`watch_last_seen_grid_m`)의 가운데로 반올림, 3시간 뒤 삭제)}, `radius_m` ∈ {300, 500, 1000}(기본 500). 201 `WatchArea`
+- `GET` 헤더 `X-Push-Endpoint` → 그 구독의 관심 지역(만료된 last_seen 은 지우고). 모르는·꺼진 구독은 404 `not_found`
+```json
+{"areas": [
+  {"id": 37, "kind": "saved", "lng": 126.977904, "lat": 37.5709686, "radius_m": 500,
+   "created_at": "2026-11-11T00:01:09+09:00", "expires_at": null},
+  {"id": 38, "kind": "last_seen", "lng": 126.976581, "lat": 37.565078, "radius_m": 500,
+   "created_at": "2026-11-11T00:01:09+09:00", "expires_at": "2026-11-11T03:01:09+09:00"}
+]}
+```
+- 2026-11-10 기록 `naru_api/watch_areas.json` — 광화문교보빌딩(카카오 점 그대로) 저장 500 m, 덕수궁 대한문(126.976543, 37.565042)을 마지막 위치로 보낸 것이 150 m 격자 가운데(126.976581, 37.565078)로.
+- `DELETE /watch-areas/{id}` 헤더 `X-Push-Endpoint` → 204. 내 것이 아니거나 없으면 404.
+- 오류: 본문·헤더 형식 400 `invalid_query`(field = 그 이름 — 반경이면 `radius_m`, 헤더 없음은 `endpoint`), 저장 10개 초과 400(field `kind`).
+
+### §9.4 `POST /internal/push/dispatch` (워커, 토큰) — T7.9 에서
+
 ## 변경 이력
 | 날짜 | 버전 | 변경 | 누가 |
 |---|---|---|---|
@@ -360,3 +398,4 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 | 2026-11-10 | v0.14 (보충) | §8 통제 제보 `POST /crosswalks/nearest`·`POST /reports`·`GET /reports/recent` 추가 — 기록만(경로·확신도·상태에 안 씀), 좌표는 본문으로만·저장 안 함, 기기는 해시. §6 `too_many_reports`(429) | 태우 지시 (11/10, T7.15) |
 | 2026-11-10 | v0.15 | §3.2 `GET /closures/events/{id}/march` 행진 예상 위치 키프레임(표본 점·중심·반경·횡단보도별 P, 1분), §5 행진 예정 비용 = P × 예정 비용(P ≥ 0.8 제외, scheduled·confirmed 모두), §6 `not_modeled`(404) (ADR-015) | 태우 승인 (ADR-015) |
 | 2026-11-10 | v0.15 (보충) | §3.3 `GET /closures/feed?at=` 공개 GeoJSON 피드(횡단보도·사건 구역·행진 경로, 사건 칸·상태·확신도·P, 분 캐시·IP 분당 60회), §6 `rate_limited`(429) | 태우 지시 (11/10, T7.17 — 이력만) |
+| 2026-11-10 | v0.15 (보충) | §9 알림 구독·관심 지역 `GET /push/vapid-public-key`·`POST·DELETE /push/subscribe`·`GET·POST /watch-areas`·`DELETE /watch-areas/{id}`(endpoint 는 헤더 X-Push-Endpoint, last_seen 150 m 격자·3시간, saved 10개), §6 `push_unavailable`(503). 표 0008 | 태우 승인 (ADR-014 C) |
