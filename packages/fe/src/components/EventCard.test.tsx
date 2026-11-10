@@ -2,12 +2,15 @@
 // 기대값은 기록을 열어 확인한 창·출처·확신도·횡단보도 수
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { eventById, recordedLive } from "../test/recorded";
+import { eventById, recorded, recordedLive } from "../test/recorded";
+import type { MarchResponse } from "../types/contracts";
 import { EventCard } from "./EventCard";
 
 const n = recordedLive("closure_events_live_1109_1330");
 const a = recordedLive("closure_events_live_1107_1530");
 const m = recordedLive("closure_events_live_0315_0745");
+// 행진 예상 위치 (T7.16) — 11/7 r01 동화면세점 고리의 키프레임 기록
+const march = recorded("march_be5f89a4ebf3").body as MarchResponse;
 
 describe("EventCard", () => {
   it("11/9 13:30 국회대로 지도 행진 — 통제 중·행진, 짧은 제목과 지나는 곳 전부, 해제 예정·출처·확신도·75곳", () => {
@@ -91,5 +94,54 @@ describe("EventCard", () => {
     );
     expect(screen.getByText("08:38까지 정리 중")).toBeDefined();
     expect(screen.getByText("해제 예정 시각 뒤 30분은 현장 정리로 막힌 걸로 봐요")).toBeDefined();
+  });
+
+  it("행진 확률 모델 사건(T7.16) — 13:00 '이 시각 막혀 있을 확률 100%'(세종대로사거리), 재생 버튼, 재생 중 문구", () => {
+    const event = eventById(
+      recordedLive("closure_events_catalog_1107_1530").body.events,
+      "be5f89a4ebf3",
+    );
+    let plays = 0;
+    const at = Date.parse("2026-11-07T13:00:00+09:00");
+    const { rerender } = render(
+      <EventCard
+        event={event}
+        atMs={at}
+        onClose={() => undefined}
+        march={march}
+        onPlay={() => (plays += 1)}
+      />,
+    );
+    expect(screen.getByText("이 시각 막혀 있을 확률 100%")).toBeDefined();
+    expect(screen.getByText("공지 일정 기준 예상 위치")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "예상 위치 재생" }));
+    expect(plays).toBe(1);
+    // 재생 중 — 12:00 시각(출발점)으로: 종로구청입구 등은 0.2 지만 가장 높은 P 는 1.0, 버튼은 정지
+    rerender(
+      <EventCard
+        event={event}
+        atMs={at}
+        onClose={() => undefined}
+        march={march}
+        playMs={Date.parse("2026-11-07T12:00:00+09:00")}
+        onPlay={() => undefined}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "정지" })).toBeDefined();
+    expect(screen.getByText(/통제 시간 전체를 12초에/)).toBeDefined();
+    // 창 밖(11:00)은 0%
+    rerender(
+      <EventCard
+        event={event}
+        atMs={Date.parse("2026-11-07T11:00:00+09:00")}
+        onClose={() => undefined}
+        march={march}
+      />,
+    );
+    expect(screen.getByText("이 시각 막혀 있을 확률 0%")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "예상 위치 재생" })).toBeNull(); // onPlay 없음
+    // 대상이 아닌 사건(march null)은 줄이 없다
+    rerender(<EventCard event={event} atMs={at} onClose={() => undefined} march={null} />);
+    expect(screen.queryByText(/막혀 있을 확률/)).toBeNull();
   });
 });

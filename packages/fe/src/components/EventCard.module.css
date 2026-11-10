@@ -147,3 +147,42 @@
   font-size: 13px;
   color: #777;
 }
+
+/* 행진 예상 위치 (T7.16) — 확률(색은 P 6단계)·근거 문구·재생 */
+.march {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff5dc;
+}
+
+.probability {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.basis {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: #777;
+}
+
+.play {
+  margin-top: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid #ef6c00;
+  border-radius: 17px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ef6c00;
+  cursor: pointer;
+}
+
+.play[aria-pressed="true"] {
+  background: #ef6c00;
+  color: #fff;
+}
