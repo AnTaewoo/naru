@@ -26,3 +26,5 @@ class ClosureEventEntity(Base):
     centroid_lng: Mapped[Decimal] = mapped_column(Numeric(10, 7))
     centroid_lat: Mapped[Decimal] = mapped_column(Numeric(10, 7))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False))  # UTC
+    # 행진 확률 모델 프로필 (T7.16, ADR-015 B) — 대상 행진만, 아니면 NULL
+    march: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)

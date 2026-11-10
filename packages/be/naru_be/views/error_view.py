@@ -45,4 +45,6 @@ def _code(code: str) -> ErrorCode:
         return "geocode_unavailable"
     if code == "too_many_reports":
         return "too_many_reports"
+    if code == "not_modeled":
+        return "not_modeled"
     return "internal"

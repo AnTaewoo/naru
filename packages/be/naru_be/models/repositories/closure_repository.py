@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from naru_be.config import Settings
 from naru_be.models.domain.closure_events import EventWindow, event_id, overlaps, worst
 from naru_be.models.domain.event_area import EventArea
+from naru_be.models.domain.march import MarchProfile, StoredMarch
 from naru_be.models.domain.types import CandidateMeta, IntakeResult
 from naru_be.models.entities.candidate_batch import CandidateBatchEntity
 from naru_be.models.entities.closure_event import ClosureEventEntity
@@ -357,8 +358,9 @@ class ClosureRepository:
         start: datetime | None,
         end: datetime | None,
         area: EventArea,
+        march: MarchProfile | None = None,
     ) -> None:
-        """사건 구역 저장 (T7.2) — 같은 id 면 덮는다."""
+        """사건 구역(T7.2)·행진 프로필(T7.16) 저장 — 같은 id 면 덮는다."""
         row = {
             "event_id": event_id,
             "reason": reason,
@@ -368,11 +370,37 @@ class ClosureRepository:
             "centroid_lng": Decimal(f"{area.centroid[0]:.7f}"),
             "centroid_lat": Decimal(f"{area.centroid[1]:.7f}"),
             "updated_at": datetime.now(UTC).replace(tzinfo=None, microsecond=0),
+            "march": march.to_json() if march else None,
         }
         stmt = insert(ClosureEventEntity).values(row)
         stmt = stmt.on_duplicate_key_update({k: stmt.inserted[k] for k in row if k != "event_id"})
         with self._sessions.begin() as s:
             s.execute(stmt)
+
+    def marches_of(self, keys: Collection[EventKey]) -> dict[EventKey, MarchProfile]:
+        """사건 (reason, 시작, 끝) → 행진 프로필 (T7.16). 프로필이 없는 사건은 빠진다."""
+        by_id = {event_id(reason, start, end): (reason, start, end) for reason, start, end in keys}
+        if not by_id:
+            return {}
+        e = ClosureEventEntity
+        stmt = select(e).where(e.event_id.in_(list(by_id))).where(e.march.is_not(None))
+        with self._sessions.begin() as s:
+            return {
+                by_id[row.event_id]: MarchProfile.from_json(row.march)
+                for row in s.scalars(stmt)
+                if row.march is not None
+            }
+
+    def march_of(self, event_id: str) -> StoredMarch | None:
+        """사건 id 의 행진 프로필과 창 (키프레임 API, T7.16). 없거나 대상이 아니면 None."""
+        with self._sessions.begin() as s:
+            row = s.get(ClosureEventEntity, event_id)
+            if row is None or row.march is None:
+                return None
+            start, end = to_kst(row.window_start), to_kst(row.window_end)
+            if start is None or end is None:
+                return None
+            return StoredMarch(event_id, start, end, MarchProfile.from_json(row.march))
 
     @staticmethod
     def _row(

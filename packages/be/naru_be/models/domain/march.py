@@ -16,7 +16,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
@@ -25,6 +25,7 @@ import shapely
 from pyproj import Transformer
 
 from naru_be.config import Settings
+from naru_be.errors import NotModeledError
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex, road_class_of
 from naru_contracts import ClosureCandidate, ClosureType, LineGeom, SegmentGeom
 
@@ -91,6 +92,28 @@ class Keyframe:
     center: LngLat
     radius_m: float
     crosswalks: dict[str, float]  # 횡단보도 id → P
+
+
+@dataclass(frozen=True)
+class StoredMarch:
+    """저장된 사건의 행진 프로필과 창 (Repository.march_of)."""
+
+    event_id: str
+    start: datetime
+    end: datetime
+    profile: MarchProfile
+
+
+@dataclass(frozen=True)
+class MarchResult:
+    """키프레임 API 의 Model 결과 (INTERFACE §3.2). View 가 MarchResponse 로 바꾼다."""
+
+    event_id: str
+    start: datetime
+    end: datetime
+    step_s: int
+    crosswalk_points: dict[str, LngLat]
+    keyframes: list[Keyframe]
 
 
 def march_part(index: CrosswalkIndex, c: ClosureCandidate) -> MarchPart | None:
@@ -207,7 +230,7 @@ def p_at(
     return max(blocked / len(speeds), settings.march_p_floor)
 
 
-def _sample_points(profile: MarchProfile, head: float, step_m: float) -> tuple[LngLat, ...]:
+def _head_tail_points(profile: MarchProfile, head: float, step_m: float) -> tuple[LngLat, ...]:
     """표본 하나의 머리~꼬리를 경로 위 step_m 간격으로 (경로 밖은 자른다)."""
     a, b = max(0.0, head - profile.queue_m), min(profile.length_m, head)
     if head < 0 or a > profile.length_m or a > b:
@@ -230,11 +253,11 @@ def keyframe_at(
     dt = (t - start).total_seconds()
     heads = [v * dt for v in _speeds(profile, start, end, settings)]
     step = settings.march_point_step_m
-    samples = tuple(_sample_points(profile, h, step) for h in heads)
+    samples = tuple(_head_tail_points(profile, h, step) for h in heads)
     total = sum(len(s) for s in samples)
     if total > settings.march_points_max:  # 상한 — 간격을 넓혀 다시
         step *= math.ceil(total / settings.march_points_max)
-        samples = tuple(_sample_points(profile, h, step) for h in heads)
+        samples = tuple(_head_tail_points(profile, h, step) for h in heads)
     flat = [p for s in samples for p in s]
     if flat:
         xy = [_4326_TO_5179.transform(lng, lat) for lng, lat in flat]
@@ -268,3 +291,20 @@ def keyframes(
         out.append(keyframe_at(profile, start, end, t, settings))
         t += timedelta(seconds=settings.march_keyframe_s)
     return out
+
+
+def march_result(
+    stored: StoredMarch | None,
+    t0: datetime | None,
+    t1: datetime | None,
+    points_of: Callable[[str], LngLat | None],
+    settings: Settings,
+) -> MarchResult:
+    """GET /closures/events/{id}/march 의 Model — 대상이 아니면 NotModeledError(404)."""
+    if stored is None:
+        raise NotModeledError("행진 확률 모델 대상 사건이 아니다", "event_id")
+    frames = keyframes(stored.profile, stored.start, stored.end, t0, t1, settings)
+    points = {cid: pt for cid in stored.profile.s if (pt := points_of(cid)) is not None}
+    return MarchResult(
+        stored.event_id, stored.start, stored.end, settings.march_keyframe_s, points, frames
+    )

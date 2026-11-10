@@ -1,7 +1,7 @@
 """BE 도메인 예외 — INTERFACE §6 오류 코드와 1:1. Model 이 던지고 error_view 가 응답으로 만든다.
 
 code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, geocode_unavailable,
-too_many_reports, internal}.
+too_many_reports, not_modeled, internal}.
 Flask 를 모른다.
 """
 
@@ -47,3 +47,10 @@ class TooManyReportsError(NaruError):
 
     code = "too_many_reports"
     http_status = 429
+
+
+class NotModeledError(NaruError):
+    """행진 확률 모델 대상이 아닌 사건 — 없거나, 방향을 모르거나 갈라진 행진 (ADR-015 F, T7.16)."""
+
+    code = "not_modeled"
+    http_status = 404
