@@ -56,6 +56,13 @@ from naru_contracts.enums import ClosureType
 from naru_contracts.errors import ErrorCode
 from naru_contracts.feed_api import FeedCollection, FeedQuery
 from naru_contracts.march_api import MarchKeyframe, MarchQuery, MarchResponse
+from naru_contracts.push_api import (
+    PushSubscription,
+    UnsubscribeRequest,
+    VapidPublicKey,
+    WatchAreaRequest,
+    WatchAreasResponse,
+)
 from naru_contracts.reports_api import (
     NearestCrosswalkQuery,
     NearestCrosswalkResponse,
@@ -86,11 +93,11 @@ def _json(i: int) -> dict[str, Any]:
     return data
 
 
-def test_document_has_fourteen_json_blocks() -> None:
-    # §1.1·§1.2·§3.1·§3.2·§3.3·§7.1·§7.2·§8.1 은 ### 소제목이라 상위 § 로 잡힌다
+def test_document_has_seventeen_json_blocks() -> None:
+    # §1.1·§1.2·§3.1·§3.2·§3.3·§7.1·§7.2·§8.1·§9.1~9.3 은 ### 소제목이라 상위 § 로 잡힌다
     assert [s for s, _ in BLOCKS] == [
         *("§1", "§1", "§1", "§1", "§1"),
-        *("§2", "§3", "§3", "§3", "§3", "§6", "§7", "§7", "§8"),
+        *("§2", "§3", "§3", "§3", "§3", "§6", "§7", "§7", "§8", "§9", "§9", "§9"),
     ]
 
 
@@ -177,6 +184,7 @@ def test_error_body_example() -> None:  # §6
         "too_many_reports",  # v0.14 보충, T7.15 — 같은 기기·횡단보도 600초 안 다시 제보 (429)
         "not_modeled",  # v0.15, ADR-015 F — 행진 확률 모델 대상이 아닌 사건 (404)
         "rate_limited",  # v0.15 보충, T7.17 — 공개 피드 IP 당 분당 상한 (429)
+        "push_unavailable",  # v0.15 보충, T7.8 — 서버에 VAPID 키 없음 (503)
         "internal",
     }
 
@@ -763,3 +771,51 @@ def test_feed_rules() -> None:  # §3.3 v0.15 보충 (T7.17) — 질의·피처 
                 ],
             }
         )
+
+
+def test_push_examples() -> (
+    None
+):  # §9 v0.15 보충 (ADR-014 C, T7.8) — 2026-11-10 기록(실제 브라우저 구독)
+    key = VapidPublicKey.model_validate(_json(14)).public_key
+    assert len(key) == 87 and key.startswith("B")  # P-256 공개점(04 …)의 base64url
+    sub = PushSubscription.model_validate(_json(15))
+    assert (
+        sub.endpoint.startswith("https://jmt17.google.com/fcm/send/")
+        and sub.expiration_time is None
+    )
+    assert len(sub.keys.p256dh) == 87 and len(sub.keys.auth) == 22
+    assert PushSubscription.model_validate(sub.model_dump(mode="json", by_alias=True)) == sub
+    areas = WatchAreasResponse.model_validate(_json(16)).areas
+    assert [a.kind for a in areas] == ["saved", "last_seen"]
+    assert areas[0].expires_at is None and areas[1].expires_at is not None
+    assert areas[1].expires_at - areas[1].created_at == timedelta(hours=3)
+    assert (areas[1].lng, areas[1].lat) == (126.976581, 37.565078)  # 대한문을 150 m 격자 가운데로
+
+
+def test_push_rules() -> None:  # §9 — endpoint https·512자, 키 길이, 반경 300·500·1000, kind 둘
+    sub = _json(15)
+    for bad in (
+        {"endpoint": "http://example.invalid/x"},
+        {"endpoint": "https://" + "x" * 510},
+        {"keys": {"p256dh": "short", "auth": sub["keys"]["auth"]}},
+        {"keys": {"p256dh": sub["keys"]["p256dh"], "auth": "not base64url!"}},
+        {"extra": 1},
+    ):
+        with pytest.raises(ValidationError):
+            PushSubscription.model_validate({**sub, **bad})
+    with pytest.raises(ValidationError, match="https"):
+        UnsubscribeRequest.model_validate({"endpoint": "ftp://x"})
+    base = {
+        "endpoint": sub["endpoint"],
+        "kind": "saved",
+        "lng": 126.9779039768265,
+        "lat": 37.5709686446227,
+    }
+    assert WatchAreaRequest.model_validate(base).radius_m == 500
+    assert (
+        WatchAreaRequest.model_validate({**base, "kind": "last_seen", "radius_m": 1000}).radius_m
+        == 1000
+    )
+    for bad in ({"radius_m": 400}, {"kind": "home"}, {"lat": 91}, {"lng": "nan"}):
+        with pytest.raises(ValidationError):
+            WatchAreaRequest.model_validate({**base, **bad})

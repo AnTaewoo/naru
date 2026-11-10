@@ -37,12 +37,19 @@ from naru_contracts import (
     MarchResponse,
     NearestCrosswalkQuery,
     NearestCrosswalkResponse,
+    PushSubscription,
     RecentReportsQuery,
     RecentReportsResponse,
     ReportRequest,
     ReportResponse,
     RouteQuery,
     RouteResponse,
+    SubscribeResponse,
+    UnsubscribeRequest,
+    VapidPublicKey,
+    WatchArea,
+    WatchAreaRequest,
+    WatchAreasResponse,
 )
 
 MODELS = (
@@ -70,6 +77,13 @@ MODELS = (
     MarchResponse,
     FeedQuery,
     FeedCollection,
+    PushSubscription,
+    SubscribeResponse,
+    UnsubscribeRequest,
+    VapidPublicKey,
+    WatchAreaRequest,
+    WatchArea,
+    WatchAreasResponse,
     ErrorBody,
 )
 OUT_DIR = Path("packages/fe/src/types")
