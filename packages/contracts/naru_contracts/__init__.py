@@ -41,6 +41,13 @@ from naru_contracts.enums import (
     Status,
 )
 from naru_contracts.errors import ErrorBody
+from naru_contracts.feed_api import (
+    FeedCollection,
+    FeedFeature,
+    FeedProperties,
+    FeedQuery,
+    LineStringGeometry,
+)
 from naru_contracts.geocode_api import (
     GeocodeReverseQuery,
     GeocodeReverseResponse,
@@ -82,6 +89,10 @@ __all__ = [
     "Evidence",
     "EvidenceKind",
     "FeatureCollection",
+    "FeedCollection",
+    "FeedFeature",
+    "FeedProperties",
+    "FeedQuery",
     "GeocodeReverseQuery",
     "GeocodeReverseResponse",
     "GeocodeSearchQuery",
@@ -92,6 +103,7 @@ __all__ = [
     "Leg",
     "LegKind",
     "LineGeom",
+    "LineStringGeometry",
     "MarchKeyframe",
     "MarchQuery",
     "MarchResponse",

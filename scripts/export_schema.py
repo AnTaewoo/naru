@@ -27,6 +27,8 @@ from naru_contracts import (
     ClosureState,
     ErrorBody,
     FeatureCollection,
+    FeedCollection,
+    FeedQuery,
     GeocodeReverseQuery,
     GeocodeReverseResponse,
     GeocodeSearchQuery,
@@ -66,6 +68,8 @@ MODELS = (
     RecentReportsResponse,
     MarchQuery,
     MarchResponse,
+    FeedQuery,
+    FeedCollection,
     ErrorBody,
 )
 OUT_DIR = Path("packages/fe/src/types")
