@@ -16,7 +16,8 @@ TOPIS 공지 6300(11/7 09:00 에 볼 글)·TOPIS 통제지도 11/9 08:37 목록(
 행진 키프레임(T7.16, INTERFACE §3.2) — 11/7 r01 동화면세점 고리(be5f89a4ebf3)·TOPIS 통제지도
 국회대로 행진(ccaa9980c6ac) 통제 시간 전체, r04 갈라진 행진(2e930ec6deeb)은 404 not_modeled.
 공개 피드(T7.17, INTERFACE §3.3) GET /closures/feed?at= — 11/7 13:00(r01 행진 P)·3/15 07:45(마라톤)·
-11/9 13:30(국회대로 통제 중).
+11/9 13:30(국회대로 통제 중). 알림(T7.8, §9) — 기록된 실제 브라우저 구독(recorded/push, VAPID 테스트
+키)으로 공개키·구독·관심 지역(교보빌딩 saved 500·대한문 last_seen)·목록.
 T7.4 에서 PDF·통제지도를 더해 다시 기록 — FE 지금 지도에 확신도 0.7 미만 사건이 있어야 한다.
 """
 
@@ -31,6 +32,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
+from pydantic import SecretStr
 
 from naru_ai.config import Settings as AISettings
 from naru_ai.publish import CandidatePublisher
@@ -119,7 +121,15 @@ def main() -> None:
     base = Settings()
     if not base.test_database_url.endswith("/naru_test"):
         raise SystemExit("naru_test 가 아니다 — 운영 DB 를 쓰지 않는다")
-    app = create_app(Settings(DATABASE_URL=base.test_database_url, internal_token="naru-record"))
+    push_dir = RECORDED / "push"
+    pem = (push_dir / "vapid_test.pem").read_text("utf-8")
+    app = create_app(
+        Settings(
+            DATABASE_URL=base.test_database_url,
+            internal_token="naru-record",
+            vapid_private_key=SecretStr(pem),
+        )
+    )
     models = app.extensions["naru"]
     models.repo.truncate()
     http = httpx.Client(transport=httpx.WSGITransport(app=app), base_url="http://naru.record")
@@ -221,6 +231,50 @@ def main() -> None:
     path.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(path.relative_to(ROOT), resp.status_code, doc["body"])
     models.report_desk.repo.truncate()
+    # T7.8 알림 — 실제 브라우저 구독 기록(record_push_subscription.py 최신)으로
+    subs = sorted(push_dir.glob("*_subscription.json"))
+    sub = json.loads(subs[-1].read_text("utf-8"))["subscription"]
+    models.push.repo.truncate()
+    pushes: list[tuple[str, str, str, dict[str, object], dict[str, str]]] = [
+        ("push_vapid_public_key", "GET", "/push/vapid-public-key", {}, {}),
+        ("push_subscribe", "POST", "/push/subscribe", sub, {}),
+        (
+            "watch_area_saved",
+            "POST",
+            "/watch-areas",
+            {
+                "endpoint": sub["endpoint"],
+                "kind": "saved",
+                "lng": 126.9779039768265,
+                "lat": 37.5709686446227,
+                "radius_m": 500,
+            },
+            {},
+        ),
+        (
+            "watch_area_last_seen",
+            "POST",
+            "/watch-areas",
+            {
+                "endpoint": sub["endpoint"],
+                "kind": "last_seen",
+                "lng": 126.976542945622,
+                "lat": 37.5650416322942,
+            },
+            {},
+        ),
+        ("watch_areas", "GET", "/watch-areas", {}, {"X-Push-Endpoint": sub["endpoint"]}),
+    ]
+    for name, method, url, body, headers in pushes:
+        resp = client.open(url, method=method, json=body or None, headers=headers)
+        doc = {"method": method, "path": url, "status": resp.status_code}
+        if body:  # 구독 키·endpoint 는 기록에 남긴다 — 폴더가 git 밖이라 (MANIFEST 는 sha256 만)
+            doc["json"] = body
+        doc["body"] = resp.get_json()
+        path = out / f"{name}.json"
+        path.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print(path.relative_to(ROOT), resp.status_code)
+    models.push.repo.truncate()
     for name, event_id in MARCHES.items():
         resp = client.get(f"/closures/events/{event_id}/march")
         doc = {"method": "GET", "path": f"/closures/events/{event_id}/march"}
