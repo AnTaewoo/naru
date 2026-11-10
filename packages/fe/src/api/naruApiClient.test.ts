@@ -19,8 +19,15 @@ import {
   readEvents,
   eventsInit,
   routeUrl,
+  endpointInit,
   marchOrNull,
   marchUrl,
+  parseSubscribeResponse,
+  parseVapidPublicKey,
+  parseWatchArea,
+  parseWatchAreas,
+  pushUrl,
+  watchAreasUrl,
   nearestUrl,
   parseMarch,
   parseNearestCrosswalk,
@@ -267,5 +274,29 @@ describe("naruApiClient", () => {
     expect(none.status).toBe(404);
     expect(marchOrNull(new NaruApiError(none.status, none.body as ErrorBody))).toBeNull();
     expect(() => marchOrNull(new NaruApiError(500, null))).toThrow(NaruApiError);
+  });
+
+  it("알림 구독·관심 지역 (INTERFACE §9, T7.10) — 주소, 헤더 X-Push-Endpoint, recorded 응답 파싱", () => {
+    expect(pushUrl("/api", "vapid-public-key")).toBe("/api/push/vapid-public-key");
+    expect(pushUrl("/api", "subscribe")).toBe("/api/push/subscribe");
+    expect(watchAreasUrl("/api")).toBe("/api/watch-areas");
+    expect(watchAreasUrl("/api", 55)).toBe("/api/watch-areas/55");
+    const init = endpointInit("GET", "https://push.example/abc");
+    expect(init.method).toBe("GET");
+    expect(init.headers["X-Push-Endpoint"]).toBe("https://push.example/abc");
+    expect("body" in init).toBe(false);
+    const del = endpointInit("DELETE", "https://push.example/abc", {
+      endpoint: "https://push.example/abc",
+    });
+    expect(JSON.parse(String(del.body))).toEqual({ endpoint: "https://push.example/abc" });
+    expect(parseVapidPublicKey(recorded("push_vapid_public_key").body).public_key).toHaveLength(87);
+    const sub = recorded("push_subscribe");
+    expect(sub.status).toBe(201);
+    expect(parseSubscribeResponse(sub.body).active).toBe(true);
+    const areas = parseWatchAreas(recorded("watch_areas").body).areas;
+    expect(areas.map((a) => a.kind)).toEqual(["saved", "last_seen"]);
+    expect(parseWatchArea(recorded("watch_area_last_seen").body).expires_at).not.toBeNull();
+    expect(() => parseWatchAreas(recorded("push_subscribe").body)).toThrow(NaruApiError);
+    expect(() => parseVapidPublicKey(recorded("watch_areas").body)).toThrow(NaruApiError);
   });
 });

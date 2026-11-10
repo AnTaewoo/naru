@@ -7,6 +7,12 @@ import type {
   GeocodeSearchResponse,
   MarchResponse,
   NearestCrosswalk,
+  PushSubscription as PushSubscriptionBody,
+  SubscribeResponse,
+  VapidPublicKey,
+  WatchArea,
+  WatchAreaRequest,
+  WatchAreasResponse,
   NearestCrosswalkQuery,
   NearestCrosswalkResponse,
   Place,
@@ -72,6 +78,9 @@ export interface RecentReportsParams {
   /** 기본 60 */
   minutes?: number;
 }
+
+/** 구독 endpoint 를 헤더로 (INTERFACE §9 — 주소·접근 로그에 안 남게) */
+export const PUSH_ENDPOINT_HEADER = "X-Push-Endpoint";
 
 export class NaruApiError extends Error {
   constructor(
@@ -148,6 +157,34 @@ export function postInit(
     cache: "no-store",
     headers: { accept: "application/json", "content-type": "application/json" },
     body: JSON.stringify(body),
+  };
+}
+
+export function pushUrl(baseUrl: string, path: "vapid-public-key" | "subscribe"): string {
+  return `${baseUrl}/push/${path}`;
+}
+
+export function watchAreasUrl(baseUrl: string, id?: number): string {
+  return id === undefined ? `${baseUrl}/watch-areas` : `${baseUrl}/watch-areas/${id}`;
+}
+
+/** GET·DELETE 에 구독 endpoint 헤더 (본문이 있으면 JSON 으로) */
+export function endpointInit(
+  method: "GET" | "DELETE",
+  endpoint: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): RequestInit & { headers: Record<string, string> } {
+  return {
+    method,
+    signal,
+    cache: "no-store",
+    headers: {
+      accept: "application/json",
+      [PUSH_ENDPOINT_HEADER]: endpoint,
+      ...(body === undefined ? {} : { "content-type": "application/json" }),
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   };
 }
 
@@ -317,6 +354,44 @@ export function marchOrNull(e: unknown): null {
   throw e;
 }
 
+export function parseVapidPublicKey(json: unknown): VapidPublicKey {
+  const ok = isRecord(json) && typeof json.public_key === "string" && json.public_key.length >= 87;
+  if (!ok) throw new NaruApiError(200, null);
+  return json as unknown as VapidPublicKey;
+}
+
+export function parseSubscribeResponse(json: unknown): SubscribeResponse {
+  const ok =
+    isRecord(json) &&
+    typeof json.id === "number" &&
+    typeof json.active === "boolean" &&
+    typeof json.created_at === "string";
+  if (!ok) throw new NaruApiError(200, null);
+  return json as unknown as SubscribeResponse;
+}
+
+function isWatchArea(a: unknown): boolean {
+  return (
+    isRecord(a) &&
+    typeof a.id === "number" &&
+    (a.kind === "saved" || a.kind === "last_seen") &&
+    typeof a.lng === "number" &&
+    typeof a.lat === "number" &&
+    typeof a.radius_m === "number"
+  );
+}
+
+export function parseWatchArea(json: unknown): WatchArea {
+  if (!isWatchArea(json)) throw new NaruApiError(200, null);
+  return json as unknown as WatchArea;
+}
+
+export function parseWatchAreas(json: unknown): WatchAreasResponse {
+  const areas: unknown = isRecord(json) ? json.areas : null;
+  if (!Array.isArray(areas) || !areas.every(isWatchArea)) throw new NaruApiError(200, null);
+  return json as unknown as WatchAreasResponse;
+}
+
 export function parseGeocodeReverse(json: unknown): GeocodeReverseResponse {
   const label: unknown = isRecord(json) ? json.label : undefined;
   if (label !== null && typeof label !== "string") throw new NaruApiError(200, null);
@@ -333,6 +408,13 @@ export interface NaruApiClient {
   geocodeReverse(p: GeocodeReverseParams, signal?: AbortSignal): Promise<GeocodeReverseResponse>;
   /** 행진 예상 위치 키프레임 (T7.16) — 대상이 아닌 사건(404 not_modeled)은 null */
   march(eventId: string, p?: MarchParams, signal?: AbortSignal): Promise<MarchResponse | null>;
+  /** 알림 구독·관심 지역 (INTERFACE §9, T7.10). endpoint 는 구독의 손잡이 */
+  vapidPublicKey(signal?: AbortSignal): Promise<VapidPublicKey>;
+  pushSubscribe(sub: PushSubscriptionBody, signal?: AbortSignal): Promise<SubscribeResponse>;
+  pushUnsubscribe(endpoint: string, signal?: AbortSignal): Promise<void>;
+  watchAreas(endpoint: string, signal?: AbortSignal): Promise<WatchAreasResponse>;
+  addWatchArea(body: WatchAreaRequest, signal?: AbortSignal): Promise<WatchArea>;
+  removeWatchArea(id: number, endpoint: string, signal?: AbortSignal): Promise<void>;
   /** 통제 제보 (T7.15) — 좌표는 본문으로 */
   nearestCrosswalk(
     p: NearestCrosswalkQuery,
@@ -388,6 +470,27 @@ export function createNaruApiClient(
       parseGeocodeReverse(await getJson(geocodeReverseUrl(baseUrl, p), fetchImpl, signal)),
     march: async (eventId, p = {}, signal) =>
       getJson(marchUrl(baseUrl, eventId, p), fetchImpl, signal).then(parseMarch, marchOrNull),
+    vapidPublicKey: async (signal) =>
+      parseVapidPublicKey(await getJson(pushUrl(baseUrl, "vapid-public-key"), fetchImpl, signal)),
+    pushSubscribe: async (sub, signal) =>
+      parseSubscribeResponse(await postJson(pushUrl(baseUrl, "subscribe"), sub, fetchImpl, signal)),
+    pushUnsubscribe: async (endpoint, signal) => {
+      const init = endpointInit("DELETE", endpoint, { endpoint }, signal);
+      const res = await fetchImpl(pushUrl(baseUrl, "subscribe"), init);
+      if (!res.ok) readJson(res.status, await res.json().catch(() => null));
+    },
+    watchAreas: async (endpoint, signal) => {
+      const init = endpointInit("GET", endpoint, undefined, signal);
+      const res = await fetchImpl(watchAreasUrl(baseUrl), init);
+      return parseWatchAreas(readJson(res.status, await res.json().catch(() => null)));
+    },
+    addWatchArea: async (body, signal) =>
+      parseWatchArea(await postJson(watchAreasUrl(baseUrl), body, fetchImpl, signal)),
+    removeWatchArea: async (id, endpoint, signal) => {
+      const init = endpointInit("DELETE", endpoint, undefined, signal);
+      const res = await fetchImpl(watchAreasUrl(baseUrl, id), init);
+      if (!res.ok) readJson(res.status, await res.json().catch(() => null));
+    },
     nearestCrosswalk: async (p, signal) =>
       parseNearestCrosswalk(await postJson(nearestUrl(baseUrl), p, fetchImpl, signal)),
     report: async (body, signal) =>
