@@ -420,6 +420,18 @@ export function marchProbabilityKo(p: number): string {
   return `이 시각 막혀 있을 확률 ${Math.round(p * 100)}%`;
 }
 
+/** 알림 켜기 (T7.7, ADR-014 C) — 구독·관심 지역은 T7.8~T7.10, 그때까지는 허용만 */
+export const PUSH_KO = {
+  title: "통제 알림",
+  why: "관심 지역 근처에 통제가 생기면 알려 드려요",
+  enable: "통제 알림 받기",
+  granted: "알림이 허용됐어요. 관심 지역 등록은 다음 업데이트에서 열려요",
+  denied: "알림이 꺼져 있어요. 브라우저 설정에서 이 사이트의 알림을 허용하면 받을 수 있어요",
+  iosInstall:
+    "iPhone·iPad 는 홈 화면에 추가한 뒤에 알림을 켤 수 있어요 — 공유 버튼 → '홈 화면에 추가' (iOS 16.4 이상)",
+  unsupported: "이 브라우저는 알림을 지원하지 않아요",
+} as const;
+
 /** 통제 제보 (T7.15, INTERFACE §8) — 기록만, 길찾기에는 아직 안 쓴다 */
 export const REPORT_KO = {
   button: "통제 제보",

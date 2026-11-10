@@ -35,6 +35,7 @@ import { ClosureTimeline } from "./ClosureTimeline";
 import { EventCard } from "./EventCard";
 import styles from "./LiveSheet.module.css";
 import { PlaceCard } from "./PlaceCard";
+import { PushSetup } from "./PushSetup";
 import { ReportCard } from "./ReportCard";
 import { StaleWarning } from "./StaleWarning";
 import { TimeSlider } from "./TimeSlider";
@@ -307,6 +308,8 @@ export function LiveSheet() {
                 )}
               </section>
             )}
+            {/* 알림 켜기 (T7.7) — 목록 맨 아래 한 칸 */}
+            <PushSetup />
           </div>
         </>
       )}
