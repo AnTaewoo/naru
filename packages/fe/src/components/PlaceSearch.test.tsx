@@ -4,7 +4,6 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { parseGeocodeSearch } from "../api/naruApiClient";
 import { DEFAULT_BBOX } from "../state/ClosureProvider";
-import type { OdField } from "../state/RouteProvider";
 import { recorded } from "../test/recorded";
 import { PlaceList, nearOf } from "./PlaceSearch";
 
@@ -16,26 +15,30 @@ describe("장소 검색 (T5.8)", () => {
     expect(nearOf("1,2,3")).toBeUndefined();
   });
 
-  it("홈 결과 — 장소마다 이름·주소와 '출발'·'도착'", () => {
-    const calls: [string, OdField][] = [];
-    render(<PlaceList places={kyobo} which={null} onChoose={(p, w) => calls.push([p.name, w])} />);
+  it("결과 줄 — 이름·주소·지도 가운데부터 거리, 줄을 누르면 그 장소 (T7.14 — 출발·도착은 장소 카드에서)", () => {
+    const calls: string[] = [];
+    // 기본 화면 가운데(기록 near) — 광화문교보빌딩 387m(측지선 386.6 m) · 교보재단빌딩 630m
+    render(
+      <PlaceList
+        places={kyobo}
+        center={[126.9775, 37.5675]}
+        onChoose={(p) => calls.push(p.name)}
+      />,
+    );
     const rows = within(screen.getByRole("list", { name: "검색 결과" })).getAllByRole("listitem");
     expect(rows).toHaveLength(10);
     expect(rows[0]?.textContent).toContain("광화문교보빌딩");
     expect(rows[0]?.textContent).toContain("서울 종로구 종로 1");
-    fireEvent.click(screen.getByRole("button", { name: "광화문교보빌딩 도착" }));
-    fireEvent.click(screen.getByRole("button", { name: "교보재단빌딩 출발" }));
-    expect(calls).toEqual([
-      ["광화문교보빌딩", "to"],
-      ["교보재단빌딩", "from"],
-    ]);
+    expect(rows[0]?.textContent).toContain("387m");
+    expect(rows[1]?.textContent).toContain("630m");
+    fireEvent.click(screen.getByRole("button", { name: "광화문교보빌딩 서울 종로구 종로 1" }));
+    expect(calls).toEqual(["광화문교보빌딩"]);
+    expect(screen.queryByRole("button", { name: "광화문교보빌딩 도착" })).toBeNull();
   });
 
-  it("칸 결과 — 줄을 누르면 그 칸에", () => {
-    const calls: [string, OdField][] = [];
-    render(<PlaceList places={kyobo} which="from" onChoose={(p, w) => calls.push([p.name, w])} />);
-    fireEvent.click(screen.getByRole("button", { name: "광화문교보빌딩 서울 종로구 종로 1" }));
-    expect(calls).toEqual([["광화문교보빌딩", "from"]]);
-    expect(screen.queryByRole("button", { name: "광화문교보빌딩 도착" })).toBeNull();
+  it("지도 가운데를 모르면 거리는 안 쓴다", () => {
+    render(<PlaceList places={kyobo} center={null} onChoose={() => undefined} />);
+    const rows = within(screen.getByRole("list", { name: "검색 결과" })).getAllByRole("listitem");
+    expect(rows[0]?.textContent).not.toMatch(/\d+m$/);
   });
 });

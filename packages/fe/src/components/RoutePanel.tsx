@@ -10,9 +10,18 @@ import {
   locateButtonKo,
   odHintKo,
 } from "../i18n/ko";
+import { bboxCenter } from "../map/geo";
 import type { LngLat } from "../map/layers/routeLayer";
-import { useRoute, useRouteDispatch, type OdField, type PlaceName } from "../state/RouteProvider";
-import { SearchResults } from "./PlaceSearch";
+import { useClosures } from "../state/ClosureProvider";
+import {
+  useRoute,
+  useRouteDispatch,
+  type OdField,
+  type PlaceName,
+  type PlacePick,
+} from "../state/RouteProvider";
+import { readSaved } from "../state/savedPlaces";
+import { SavedList, SearchResults } from "./PlaceSearch";
 import styles from "./RoutePanel.module.css";
 
 // 시안 01 검색창 → 홈은 장소 검색(결과마다 출발·도착) + 길찾기 버튼. 길찾기를 켜면 시안 02 rpanel
@@ -117,10 +126,19 @@ function LocateButton({ which, busy }: { which: OdField; busy: boolean }) {
   );
 }
 
-/** 홈 — 장소·주소 검색(결과마다 출발·도착) + 길찾기 */
+/** 홈 — 장소·주소 검색(줄을 누르면 그 장소: 지도 이동·핀·장소 카드, T7.14) + 길찾기. 칸이 비었는데 누르고
+ * 있으면 저장한 장소 */
 function HomeSearch() {
   const dispatch = useRouteDispatch();
+  const { place } = useRoute();
+  const center = bboxCenter(useClosures().bbox);
   const [query, setQuery] = useState("");
+  const [saved, setSaved] = useState<PlacePick[] | null>(null);
+  // 다른 곳을 검색하면 검색한 장소(핀·카드)는 사라진다
+  const type = (q: string) => {
+    setQuery(q);
+    if (place && q.trim() !== "") dispatch({ type: "place", place: null });
+  };
   return (
     <div className={styles.home}>
       <div className={styles.entry}>
@@ -132,10 +150,12 @@ function HomeSearch() {
           value={query}
           autoComplete="off"
           enterKeyHint="search"
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => type(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Escape") setQuery("");
           }}
+          onFocus={() => setSaved(readSaved(window.localStorage))}
+          onBlur={() => setSaved(null)}
         />
         <button
           type="button"
@@ -158,6 +178,16 @@ function HomeSearch() {
       </div>
       {query.trim() !== "" && (
         <SearchResults query={query} which={null} onClose={() => setQuery("")} />
+      )}
+      {query.trim() === "" && saved && saved.length > 0 && (
+        <SavedList
+          saved={saved}
+          center={center}
+          onChoose={(p) => {
+            dispatch({ type: "place", place: p });
+            setSaved(null);
+          }}
+        />
       )}
     </div>
   );
