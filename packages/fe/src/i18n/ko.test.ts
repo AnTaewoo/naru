@@ -1,9 +1,17 @@
 // 통제 목록 문구 (T5.9, ADR-012) — 제목·둘째 줄·인원·기준 시각은 FE 템플릿. 입력은 recorded
 // naru_api/closure_events.json(v0.12 재기록): 공지 r04·r01 의 summary, 코스는 summary 없음, data_as_of
 import { describe, expect, it } from "vitest";
-import { eventById, recorded, recordedEvents, recordedLive } from "../test/recorded";
+import {
+  eventById,
+  recorded,
+  recordedCandidate,
+  recordedEvents,
+  recordedLive,
+  recordedNoticeItems,
+} from "../test/recorded";
 import type { ClosureEvent } from "../types/contracts";
 import {
+  CONFIDENCE_KO,
   confidenceKo,
   dataAsOfKo,
   bannerKo,
@@ -107,6 +115,24 @@ describe("사건 카드 문구 (T7.5)", () => {
     expect(sourceKo(ev(n, "ccaa9980c6ac"))).toBe("TOPIS 통제지도"); // notice_id topismap-1109233
     expect(sourceKo(ev(a, "159e13bfe71a"))).toBe("TOPIS 돌발");
     expect(sourceKo(ev(m, "adaea2f4cc02"))).toBe("마라톤 시간표");
+  });
+
+  it("확신도 문구 (T7.14) — 3/15 마라톤 높음 · 11/9 국회대로 TOPIS 돌발 높음 · 11/9 하나증권 행진(공지 0.75) 보통 · 교보빌딩 정문 앞(unknown 0.45) 낮음", () => {
+    expect(CONFIDENCE_KO).toEqual({ high: "높음", mid: "보통", low: "낮음" });
+    expect(confidenceKo(ev(m, "adaea2f4cc02").confidence)).toBe("높음"); // 1구간 시각표 0.9
+    expect(confidenceKo(ev(n, "37d5497077a4").confidence)).toBe("높음"); // 돌발 국회대로 0.9, 통제 중
+    // 후보 배치 candidates/notice/20261108T162420 — 문장 공지 11/9 r01(PDF 로 읽으면 0.85)
+    const hana = recordedCandidate("notice/20261108T162420", "smpa-20261109-r01-i1-seg1");
+    expect([hana.confidence, hana.impact, hana.status_hint]).toEqual([0.75, "blocks", "scheduled"]);
+    expect(confidenceKo(hana.confidence)).toBe("보통");
+    // 파서 기록 11/8 3행 — 점유 표현 없는 지점 집회. 리졸버가 '교보빌딩'을 종로에서 못 찾아 후보가 안 된다
+    const [kyobo] = recordedNoticeItems("smpa-20261108-r03-u202611061800");
+    expect([kyobo?.confidence, kyobo?.impact, kyobo?.points[0]?.name]).toEqual([
+      0.45,
+      "unknown",
+      "교보빌딩 정문 앞",
+    ]);
+    expect(confidenceKo(kyobo?.confidence ?? 1)).toBe("낮음");
   });
 
   it("확신도 3단계 — 0.8 이상 높음, 0.7 이상 보통, 그 아래 낮음", () => {

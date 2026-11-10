@@ -10,7 +10,14 @@ import type {
   Status,
   SummarySegment,
 } from "../types/contracts";
-import { RELEASE_GRACE_MS, eventKind, kstDay, type ChipKind } from "../map/eventKinds";
+import {
+  RELEASE_GRACE_MS,
+  confidenceLevel,
+  eventKind,
+  kstDay,
+  type ChipKind,
+  type ConfidenceLevel,
+} from "../map/eventKinds";
 import type { ExampleKey } from "../map/examples";
 
 export const STATUS_KO: Record<Status, string> = {
@@ -244,10 +251,16 @@ export function sourceKo(e: Pick<ClosureEvent, "source" | "notice">): string {
   return e.source ? SOURCE_KO[e.source] : "출처 미상";
 }
 
-/** 확신도 3단계 (P7 계획) — 0.8 이상 높음, 0.7 이상 보통, 그 아래 낮음 */
+/** 확신도 3단계 문구 (P7 계획) — 카드·통제 근거가 같은 말. 판정은 eventKinds.confidenceLevel 하나 (T7.14) */
+export const CONFIDENCE_KO: Record<ConfidenceLevel, string> = {
+  high: "높음",
+  mid: "보통",
+  low: "낮음",
+};
+
+/** 0.8 이상 높음, 0.7 이상 보통, 그 아래 낮음 */
 export function confidenceKo(c: number): string {
-  if (c >= 0.8) return "높음";
-  return c >= 0.7 ? "보통" : "낮음";
+  return CONFIDENCE_KO[confidenceLevel(c)];
 }
 
 /** 거리: 1 km 아래는 m 반올림("840m"), 넘으면 km 소수 한 자리("1.7km") */

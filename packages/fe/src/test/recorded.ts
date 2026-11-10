@@ -52,3 +52,47 @@ export function eventById(events: readonly ClosureEvent[], id: string): ClosureE
   if (!e) throw new Error(`기록에 사건 ${id} 가 없다`);
   return e;
 }
+
+const RECORDED_ROOT = path.dirname(RECORDED_DIR);
+
+/** AI 후보 하나 — candidates/<출처>/<파일>.json (워커가 BE 로 보낸 배치 그대로, T7.14 확신도 문구 입력) */
+export interface RecordedCandidate {
+  candidate_id: string;
+  confidence: number;
+  impact: string;
+  status_hint: string;
+  type: string;
+}
+
+export function recordedCandidate(file: string, candidateId: string): RecordedCandidate {
+  const raw = readFileSync(path.join(RECORDED_ROOT, "candidates", `${file}.json`), "utf-8");
+  const batch = JSON.parse(raw) as { candidates: RecordedCandidate[] };
+  const found = batch.candidates.find((c) => c.candidate_id === candidateId);
+  if (!found) throw new Error(`후보 없음: ${file} ${candidateId}`);
+  return found;
+}
+
+/** 공지 파서 응답(llm/anthropic/claude-haiku-5-5@api/notice_v2/<이름>.json)의 항목 — 후보가 되기 전 값 */
+export interface RecordedNoticeItem {
+  confidence: number;
+  impact: string;
+  kind: string;
+  points: { name: string }[];
+}
+
+export function recordedNoticeItems(name: string): RecordedNoticeItem[] {
+  const file = path.join(
+    RECORDED_ROOT,
+    "llm",
+    "anthropic",
+    "claude-haiku-5-5@api",
+    "notice_v2",
+    `${name}.json`,
+  );
+  const doc = JSON.parse(readFileSync(file, "utf-8")) as {
+    response: { content: { type: string; input?: { items: RecordedNoticeItem[] } }[] };
+  };
+  const tool = doc.response.content.find((b) => b.type === "tool_use");
+  if (!tool?.input) throw new Error(`tool_use 없음: ${name}`);
+  return tool.input.items;
+}

@@ -50,8 +50,20 @@ export function chipOf(kind: EventKind): ChipKind | null {
   return kind;
 }
 
+/** 이 이상이면 확신도 높음 — BE confirmed_confidence(근거가 붙으면 통제 중이 되는 선)와 같다 */
+export const HIGH_CONFIDENCE = 0.8;
+
+/** 확신도 3단계 (P7 계획) — 판정은 여기 하나만(T7.14). 문구는 ko.ts CONFIDENCE_KO */
+export type ConfidenceLevel = "high" | "mid" | "low";
+
+export function confidenceLevel(c: number): ConfidenceLevel {
+  if (c >= HIGH_CONFIDENCE) return "high";
+  return c >= LOW_CONFIDENCE ? "mid" : "low";
+}
+
+/** 흐린 사건 — 확신도 낮음(지도 회색 점선, 칩·목록에서 뺀다) */
 export function isLow(e: ClosureEvent): boolean {
-  return e.confidence < LOW_CONFIDENCE;
+  return confidenceLevel(e.confidence) === "low";
 }
 
 /** 칩 수 — 해제·확신도 0.7 미만은 안 센다 */

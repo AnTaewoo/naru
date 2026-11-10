@@ -288,7 +288,9 @@ describe("RouteCard 렌더", () => {
     expect(ev.textContent).not.toContain("해제 예정");
     expect(ev.textContent).not.toContain("→");
     expect(ev.textContent).toContain("확신도");
-    expect(ev.textContent).toContain("0.90");
+    // 숫자 대신 카드와 같은 말(T7.14) — 사유 둘 다 0.9 → 높음, 숫자는 맨 아래 작은 회색으로만
+    expect(within(ev).getAllByText("높음")).toHaveLength(2);
+    expect(within(ev).getAllByText("확신도 0.90")).toHaveLength(2);
     expect(screen.queryByRole("list", { name: "경로 상세" })).toBeNull(); // 한 번에 하나
   });
 

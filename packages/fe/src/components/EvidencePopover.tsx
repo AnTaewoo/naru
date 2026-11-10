@@ -9,6 +9,7 @@ import {
   reasonKo,
   reasonType,
   GRACE_NOTE_KO,
+  confidenceKo,
   inGrace,
   untilKo,
 } from "../i18n/ko";
@@ -25,7 +26,8 @@ import type {
 } from "../types/contracts";
 import styles from "./EvidencePopover.module.css";
 
-// 통제 근거 (시안 03 구조) — 이 경로가 피한 통제를 사유별로: 상태·종류, 해제 시각, 확신도.
+// 통제 근거 (시안 03 구조) — 이 경로가 피한 통제를 사유별로: 상태·종류, 해제 시각, 확신도(카드와 같은 3단계 말,
+// 숫자는 맨 아래 작은 회색 — T7.14).
 // 원본 출처(공지 게시 시각·"서울경찰청 집회 공지"·[공지]/[시각표] 칸)는 쓰지 않는다 (태우 2026-11-08).
 // 확신도는 /route 의 avoided 에 없어서 같은 시각 /closures 의 같은 횡단보도 값을 쓴다 (없으면 숨김)
 
@@ -115,9 +117,13 @@ export function EvidencePopover({ route }: { route: RouteResponse }) {
               </div>
               <div className={styles.confLbl}>
                 <span>확신도</span>
-                <span>{g.confidence.toFixed(2)}</span>
+                <span>{confidenceKo(g.confidence)}</span>
               </div>
             </>
+          )}
+          {/* 숫자는 심사·디버깅용으로 맨 아래 작은 회색만 (T7.14) */}
+          {g.confidence !== null && (
+            <small className={styles.raw}>확신도 {g.confidence.toFixed(2)}</small>
           )}
         </article>
       ))}

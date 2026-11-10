@@ -8,8 +8,10 @@ import {
   byDistrict,
   chipCounts,
   chipStatuses,
+  confidenceLevel,
   districtChips,
   eventKind,
+  isLow,
   listedEvents,
   sheetSections,
   zoomBand,
@@ -41,6 +43,19 @@ describe("eventKind·chipCounts", () => {
     const { body, atMs } = recordedLive("closure_events_live_1109_1330");
     expect(eventKind(eventById(body.events, "1deaa20a0218"), atMs)).toBe("released");
     expect(chipCounts(body.events, atMs)).toEqual({ confirmed: 2, scheduled: 2, zone: 0 });
+  });
+});
+
+describe("확신도 단계 (T7.14)", () => {
+  it("판정은 confidenceLevel 하나 — 높음 ≥ 0.8 · 보통 ≥ 0.7 · 낮음, isLow(흐림·목록 제외) = 낮음", () => {
+    const { body } = recordedLive("closure_events_live_1107_1530");
+    // 경찰청 r01 0.85 · r04 0.75 · r05 0.65 (사건 v2 기록)
+    const xs = ["be5f89a4ebf3", "2e930ec6deeb", "3f036e3f24e0"].map((id) =>
+      eventById(body.events, id),
+    );
+    expect(xs.map((e) => e.confidence)).toEqual([0.85, 0.75, 0.65]);
+    expect(xs.map((e) => confidenceLevel(e.confidence))).toEqual(["high", "mid", "low"]);
+    expect(xs.map(isLow)).toEqual([false, false, true]);
   });
 });
 
