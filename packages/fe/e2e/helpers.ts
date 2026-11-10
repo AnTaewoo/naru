@@ -4,7 +4,9 @@ import { expect, type Browser, type CDPSession, type Page } from "@playwright/te
 export function consoleErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on("console", (m) => {
-    if (m.type() === "error") errors.push(m.text());
+    // 리소스 오류("Failed to load resource …")는 글에 주소가 없다 — 어느 요청인지 보이게 붙인다
+    const url = m.location().url;
+    if (m.type() === "error") errors.push(url ? `${m.text()} [${url}]` : m.text());
   });
   page.on("pageerror", (e) => errors.push(e.message));
   return errors;
@@ -13,11 +15,15 @@ export function consoleErrors(page: Page): string[] {
 /**
  * 배경 타일 서버 오류(외부)와 지오코딩 503 을 뺀다. e2e 의 BE 는 카카오 기록 재생이라 기록에 없는 점
  * (지도를 누른 곳)의 주소는 503 이고 화면은 "선택한 위치"로 넘어간다 — INTERFACE §6 에서 503 은
- * geocode_unavailable 뿐이다 (T5.8)
+ * geocode_unavailable 뿐이다 (T5.8). 행진 키프레임의 404 not_modeled(대상이 아닌 행진, INTERFACE §3.2)도
+ * 계약상 정상 응답이라 뺀다 (T7.16)
  */
 export function ownErrors(errors: string[]): string[] {
   return errors.filter(
-    (e) => !/tile\.openstreetmap|api\.vworld/i.test(e) && !/status of 503/.test(e),
+    (e) =>
+      !/tile\.openstreetmap|api\.vworld/i.test(e) &&
+      !/status of 503/.test(e) &&
+      !(/status of 404/.test(e) && /\/march\b/.test(e)),
   );
 }
 
