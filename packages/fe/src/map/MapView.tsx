@@ -9,11 +9,12 @@ import {
   NavigationControl,
   setWorkerUrl,
   type FilterSpecification,
+  type IControl,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { SHEET_COLLAPSED_PX, stageHeight } from "../components/BottomSheet";
-import { MAP_LOCALE_KO, MAP_OUTSIDE_KO } from "../i18n/ko";
+import { MAP_LOCALE_KO, MAP_OUTSIDE_KO, REPORT_KO } from "../i18n/ko";
 import {
   eventBbox,
   inBbox,
@@ -21,6 +22,7 @@ import {
   useClosures,
   type Bbox4,
 } from "../state/ClosureProvider";
+import { fieldModeFromLocation } from "../state/report";
 import { POSITION_OPTIONS, useRoute, useRouteDispatch } from "../state/RouteProvider";
 import type { ClosureEvent, FeatureCollection, RouteResponse, Status } from "../types/contracts";
 import {
@@ -223,10 +225,10 @@ function fitRoute(map: MapLibreMap, route: RouteResponse | null, fitted: RefObje
 /** 검색으로 고른 곳으로 갈 때 줌 (T7.14, 네이버지도·카카오맵 장소처럼) */
 const FOCUS_ZOOM = 17;
 
-/** 검색한 장소 핀 (T7.14) — 출발·도착 핀과 같은 말풍선, 글은 장소 이름 */
-function placePinElement(name: string): HTMLElement {
+/** 검색한 장소 핀 (T7.14) — 출발·도착 핀과 같은 말풍선, 글은 장소 이름. 제보 횡단보도(T7.15)도 같은 모양 */
+function placePinElement(name: string, kind: "place" | "report" = "place"): HTMLElement {
   const el = document.createElement("div");
-  el.className = `${styles.pin} ${styles.pinPlace}`;
+  el.className = `${styles.pin} ${kind === "place" ? styles.pinPlace : styles.pinReport}`;
   el.setAttribute("role", "img");
   el.setAttribute("aria-label", `${name} 위치`);
   const label = document.createElement("span");
@@ -251,6 +253,30 @@ function pinElement(kind: "from" | "to"): HTMLElement {
   dot.className = styles.pinDot ?? "";
   el.append(label, dot);
   return el;
+}
+
+/** 통제 제보 버튼 (T7.15) — 오른쪽 위 컨트롤 묶음(내 위치 찾기 아래). 길찾기 화면에선 숨긴다(NaruApp CSS) */
+function reportControl(onClick: () => void): IControl {
+  let box: HTMLDivElement | null = null;
+  return {
+    onAdd() {
+      box = document.createElement("div");
+      box.className = `maplibregl-ctrl maplibregl-ctrl-group naru-report-ctrl`;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = styles.reportBtn ?? "";
+      button.setAttribute("aria-label", REPORT_KO.button);
+      button.title = REPORT_KO.button;
+      button.textContent = REPORT_KO.control;
+      button.addEventListener("click", onClick);
+      box.append(button);
+      return box;
+    },
+    onRemove() {
+      box?.remove();
+      box = null;
+    },
+  };
 }
 
 function syncPin(
@@ -285,7 +311,7 @@ export function MapView({ visible }: MapViewProps) {
   const loaded = useRef(false);
   const { closures, bbox, coverage, events, eventsAt, selected, frame, catalog } = useClosures();
   const dispatch = useClosureDispatch();
-  const { route, from, to, active, view, place, focus } = useRoute();
+  const { route, from, to, active, view, place, focus, report } = useRoute();
   // 원래 길 카드를 골랐나 (T5.11) — 피한 통제가 없으면 원래 길도 없다
   const original = view === "original" && (route?.avoided.length ?? 0) > 0;
   const originalRef = useRef(original);
@@ -294,6 +320,7 @@ export function MapView({ visible }: MapViewProps) {
   const selectedRef = useRef(selected);
   const fromPin = useRef<Marker | null>(null);
   const placePin = useRef<Marker | null>(null);
+  const reportPin = useRef<Marker | null>(null);
   const toPin = useRef<Marker | null>(null);
   const fitted = useRef<string | null>(null);
   // 지도 load 전에는 회색 대신 로딩 표시 (T5.6)
@@ -342,6 +369,13 @@ export function MapView({ visible }: MapViewProps) {
       setNotice(outside ? MAP_OUTSIDE_KO : null);
     });
     map.addControl(geolocate, "top-right");
+    // 통제 제보 (T7.15) — 주소에 ?mode=field 면 현장 검증 제보
+    const startReport = () =>
+      routeDispatch({
+        type: "report",
+        event: { type: "start", field: fieldModeFromLocation(window.location.search) },
+      });
+    map.addControl(reportControl(startReport), "top-right");
     // 출처 표기는 타일 출처 한 줄만, 늘 펼쳐 두고 위쪽에 — 아래 모서리는 하단 시트가 덮는다. OSM 타일은
     // 숨기거나 ⓘ로 접을 수 없다(OSMF 타일 정책 §2). 고지 링크는 시트 맨 아래 줄·푸터 (T5.12)
     map.addControl(new AttributionControl({ compact: false }), "top-right");
@@ -442,7 +476,7 @@ export function MapView({ visible }: MapViewProps) {
     mapRef.current = map;
     return () => {
       loaded.current = false;
-      for (const pin of [fromPin, toPin, placePin]) {
+      for (const pin of [fromPin, toPin, placePin, reportPin]) {
         pin.current?.remove();
         pin.current = null;
       }
@@ -515,6 +549,23 @@ export function MapView({ visible }: MapViewProps) {
           .addTo(map)
       : null;
   }, [place]);
+
+  // 통제 제보 횡단보도 핀 (T7.15) — 찾으면 교차로명 말풍선, 카드를 닫으면 사라진다
+  const reportCw = report?.crosswalk ?? null;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    reportPin.current?.remove();
+    reportPin.current = reportCw
+      ? new Marker({
+          element: placePinElement(reportCw.name, "report"),
+          anchor: "bottom",
+          offset: [0, 5],
+        })
+          .setLngLat(reportCw.point)
+          .addTo(map)
+      : null;
+  }, [reportCw]);
 
   // 사건·칩이 바뀌면 사건 소스만 갱신 (T7.4)
   useEffect(() => {
