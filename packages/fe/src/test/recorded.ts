@@ -18,6 +18,8 @@ interface Recorded {
   status: number;
   /** 응답 ETag (사건 v2 기록, scripts/record_live_events.py) */
   etag?: string;
+  /** 받은 시각 (운영 기록, scripts/record_prod_events.py) */
+  fetched_at?: string;
   body: unknown;
 }
 

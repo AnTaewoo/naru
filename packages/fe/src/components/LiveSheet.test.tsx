@@ -135,6 +135,29 @@ describe("LiveSheet — 세 묶음 (T7.12)", () => {
   });
 });
 
+describe("LiveSheet — 멈춤 경고 (T7.13)", () => {
+  it("TOPIS 돌발 수신이 30분 넘게 멈추면 한 줄 — 운영 기록 11/9 19:24:45 수신은 지금 기준 오래됐다", () => {
+    const stale = recordedEvents("closure_events_prod_1107_1530").data_as_of;
+    render(
+      <Providers live={live1107} catalog={catalog1107} state={{ dataAsOf: stale }}>
+        <LiveSheet />
+      </Providers>,
+    );
+    expect(screen.getByRole("status").textContent).toMatch(
+      /^통제 정보가 \d+(분|시간|일)째 갱신되지 않았어요$/,
+    );
+  });
+
+  it("받은 적 없으면(null) 경고 없음 — 평소엔 아무 줄도 없다", () => {
+    render(
+      <Providers live={live1107} catalog={catalog1107}>
+        <LiveSheet />
+      </Providers>,
+    );
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+});
+
 describe("LiveSheet — 행·카드·구 칩·묶음 (T7.5)", () => {
   it("3/15 07:45 — 목록을 아직 못 받으면 지도 사건으로, 부제·행 배지는 남은 시간", () => {
     render(

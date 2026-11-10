@@ -470,7 +470,24 @@ function monthDayKo(iso: string): string {
 }
 
 /**
- * 목록 위 기준 시각 — "TOPIS 13:25 · 경찰청 11/6 공지 · 마라톤 3/12 시각표 기준".
+ * 통제 정보 멈춤 경고 (T7.13, 태우 11/10) — TOPIS 돌발 배치를 마지막으로 받은 시각(data_as_of.topis_incident, 빈 배치
+ * 포함)이 30분보다 오래면 "통제 정보가 N분째 갱신되지 않았어요"(시간·일 단위로 올림 없이). 받은 적 없음(null)은 경고 없음
+ */
+export function staleWarningKo(a: DataAsOf | null | undefined, nowMs: number): string | null {
+  const at = a?.topis_incident ? Date.parse(a.topis_incident) : Number.NaN;
+  if (Number.isNaN(at) || nowMs - at <= DATA_STALE_MIN * 60_000) return null;
+  const min = Math.floor((nowMs - at) / 60_000);
+  const span =
+    min < 60
+      ? `${min}분`
+      : min < 24 * 60
+        ? `${Math.floor(min / 60)}시간`
+        : `${Math.floor(min / (24 * 60))}일`;
+  return `통제 정보가 ${span}째 갱신되지 않았어요`;
+}
+
+/**
+ * /licenses 데이터 기준 시각(T7.13 — T5.9 땐 목록 위) — "TOPIS 13:25 · 경찰청 11/6 공지 · 마라톤 3/12 시각표 기준".
  * 실시간 돌발(TOPIS)이 없거나 30분 넘게 안 바뀌었으면 회색 경고 한 줄
  */
 export function dataAsOfKo(a: DataAsOf, nowMs: number): { text: string; warning: string | null } {

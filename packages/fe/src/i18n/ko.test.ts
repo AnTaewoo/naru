@@ -1,7 +1,7 @@
 // 통제 목록 문구 (T5.9, ADR-012) — 제목·둘째 줄·인원·기준 시각은 FE 템플릿. 입력은 recorded
 // naru_api/closure_events.json(v0.12 재기록): 공지 r04·r01 의 summary, 코스는 summary 없음, data_as_of
 import { describe, expect, it } from "vitest";
-import { eventById, recordedEvents, recordedLive } from "../test/recorded";
+import { eventById, recorded, recordedEvents, recordedLive } from "../test/recorded";
 import type { ClosureEvent } from "../types/contracts";
 import {
   confidenceKo,
@@ -20,6 +20,7 @@ import {
   peopleKo,
   remainKo,
   sourceKo,
+  staleWarningKo,
 } from "./ko";
 
 const res = recordedEvents();
@@ -47,6 +48,23 @@ describe("통제 목록 문구 (T5.9)", () => {
     expect(eventDetailKo(seg1)).toBe("");
     // 기록된 공지 후보의 reported_people: 50,000(11/7 r01·r04) · 5,000(r06) · 200·400(11/9)
     expect([50000, 5000, 200, 400].map(peopleKo)).toEqual(["5만 명", "5,000명", "200명", "400명"]);
+  });
+
+  it("멈춤 경고 (T7.13) — 운영 기록의 TOPIS 돌발 수신 19:24:45: 기록 때(2분 뒤)·30분 정각은 없음, 넘으면 'N분째·시간째·일째', 받은 적 없으면 없음", () => {
+    const prod = recorded("closure_events_prod_1107_1530"); // 운영 GET 2026-11-09 19:27:07
+    const asOf = recordedEvents("closure_events_prod_1107_1530").data_as_of;
+    const at = Date.parse(asOf.topis_incident ?? ""); // 2026-11-09T19:24:45+09:00
+    expect(staleWarningKo(asOf, Date.parse(prod.fetched_at ?? ""))).toBeNull();
+    expect(staleWarningKo(asOf, at + 30 * 60_000)).toBeNull();
+    expect(staleWarningKo(asOf, at + 30 * 60_000 + 1_000)).toBe(
+      "통제 정보가 30분째 갱신되지 않았어요",
+    );
+    expect(staleWarningKo(asOf, at + 125 * 60_000)).toBe("통제 정보가 2시간째 갱신되지 않았어요");
+    expect(staleWarningKo(asOf, at + 3 * 24 * 60 * 60_000)).toBe(
+      "통제 정보가 3일째 갱신되지 않았어요",
+    );
+    expect(staleWarningKo(recordedEvents().data_as_of, at)).toBeNull(); // topis_incident null
+    expect(staleWarningKo(null, at)).toBeNull(); // 사건 응답 전
   });
 
   it("목록 위 기준 시각 — 경찰청 11/6 공지 · 마라톤 3/12 시각표, 실시간 돌발이 없으면 회색 경고", () => {

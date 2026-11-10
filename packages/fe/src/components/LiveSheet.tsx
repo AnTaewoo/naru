@@ -33,6 +33,7 @@ import { BottomSheet, type SheetStage } from "./BottomSheet";
 import { ClosureTimeline } from "./ClosureTimeline";
 import { EventCard } from "./EventCard";
 import styles from "./LiveSheet.module.css";
+import { StaleWarning } from "./StaleWarning";
 import { TimeSlider } from "./TimeSlider";
 
 /** 지난 통제는 처음에 이만큼, 나머지는 "더 보기" (태우 11/10) */
@@ -158,6 +159,7 @@ export function LiveSheet() {
               {eventsError && <span className={styles.error}> · {eventsError}</span>}
               {truncated && <span className={styles.loading}> · 가까운 300건만</span>}
             </div>
+            <StaleWarning className={styles.stale} />
           </div>
           <ClosureTimeline />
           <TimeSlider nowButton={false} />

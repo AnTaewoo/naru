@@ -243,3 +243,15 @@
   color: #2d6bff;
   cursor: pointer;
 }
+
+/* 통제 정보 멈춤 경고 (T7.13) — TOPIS 돌발을 30분 넘게 못 받았을 때만, 슬라이더 위 한 줄 */
+.stale {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #b45309;
+}
+
+.stale::before {
+  content: "⚠ ";
+}
