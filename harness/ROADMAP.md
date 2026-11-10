@@ -450,12 +450,12 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - 산출: 서울 실시간 도로 링크 속도 API 링크 ID ↔ 표준노드링크 1회 대조 → 맞으면 활성 통제 주변 링크만 5분 기록, 실시간 도시데이터(OA-21285) 혼잡도도 활성 통제 근처 장소만 기록. 둘 다 기록만(경로·확신도 반영 없음)
 
 ### T7.7 PWA 기반 — manifest·서비스워커·iOS 안내·권한 버튼
-- status: DOING
+- status: DONE
 - depends: T7.17 (태우 11/10 "PWA 알림도 중요 기능 중 하나라 필요" — 멘토링 T7.15~T7.17 뒤, T7.18 앞, 11/16 안)
 - 산출: `app/manifest.ts`, `public/sw.js`(push → 항상 showNotification, 클릭 → `/?event=`), iOS 16.4+ 홈 화면 안내, 권한은 버튼으로만. Provider 추가 안 함
 
 ### T7.8 BE 구독·관심 지역 API
-- status: TODO
+- status: DOING
 - depends: T7.7
 - 산출: `GET /push/vapid-public-key`, `POST·DELETE /push/subscribe`, `GET·POST·DELETE /watch-areas`(saved 300·500·1000 m, last_seen 150 m 격자·3시간), 표 셋(0006). 🧑 태우: VAPID 키(.env). 구독 테스트 입력 = 태우 실제 구독을 가린 기록(`{D}/recorded/push/`)
 

@@ -358,3 +358,9 @@
 - 막힌 것 / 태우 대기: 🧑 `sudo systemctl restart naru`(0006·0007·피드). 커밋 55개 미푸시. 피드 e2e 없음(HTTP 테스트·임시 스택 curl)
 - 커밋: 07b6f23 193a071 2555050 18deb44 97d4bc4 1d8e2df 316a241 (하네스 e7d640a) / 이 항목의 커밋
 
+## 2026-11-10 · T7.7 DONE (태우 "다시 ㄱㄱ" = 이어서)
+- 한 것: PWA 바탕(ADR-014 D) — `app/manifest.ts`(나루·standalone·테마, 아이콘 PNG 192/512/maskable 은 app/icon.svg 를 뜬 것), `public/sw.js`(알림만: push → showNotification, 클릭 → /?event=, 캐시 없음), `push/usePush` 훅(sw.js 등록, 권한은 버튼에서만, Provider 없음), 시트 맨 아래 '통제 알림' 칸(버튼 / 허용됨 — 관심 지역은 다음 업데이트 / 꺼짐 / iPhone 홈 화면 안내 / 미지원). make serve 가 public/ 을 standalone 에 복사. CONVENTIONS §5 PWA 줄
+- 정한 것: fetch 핸들러 없음, iPhone 판정 = UA + 터치 있는 MacIntel, 홈 화면(standalone)이면 보통 흐름, 구독은 T7.8 뒤
+- 막힌 것 / 태우 대기: 🧑 VAPID 키(.env NARU_VAPID_PRIVATE_KEY·NARU_VAPID_SUBJECT) — T7.8 운영 구독에 필요. 🧑 `sudo systemctl restart naru`. 커밋 60개 미푸시. 헤드리스는 권한 창이 안 떠 버튼→허용 흐름은 e2e 밖
+- 커밋: 01454f6 7658ad7 7b2078b fe48c42 8aa1e0d (하네스 70f2c31) / 이 항목의 커밋
+
