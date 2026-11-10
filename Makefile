@@ -56,6 +56,7 @@ serve:
 	uv run alembic -c packages/be/alembic.ini upgrade head
 	cd packages/fe && NARU_NEXT_DIST_DIR=dist NARU_API_ORIGIN=http://127.0.0.1:$(SERVE_BE_PORT) pnpm build
 	rm -rf packages/fe/dist/standalone/dist/static && cp -r packages/fe/dist/static packages/fe/dist/standalone/dist/static
+	rm -rf packages/fe/dist/standalone/public && cp -r packages/fe/public packages/fe/dist/standalone/public
 	@trap 'kill 0' EXIT; \
 	uv run gunicorn --workers 2 --threads 4 --bind 127.0.0.1:$(SERVE_BE_PORT) 'naru_be.app:create_app()' & \
 	curl -sf --retry 90 --retry-connrefused --retry-delay 2 -o /dev/null '$(SERVE_CHECK)' && \
