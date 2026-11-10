@@ -321,3 +321,9 @@
 - 정한 것: 넓은 창 ±365일(300 상한), 기준 줄이 제목 자리(절반 시트 목록 iPhone 13: 4 → 37 → 줄 삭제 75 px), 지금 판정 = 지금 모드이거나 ±5분, 더 보기는 시각을 옮겨도 펼친 채. demo.gif 커밋은 통째로 지우지 않고 gif 만 바꿈(README·hero_route.png 가 같이 들어 있어서)
 - 막힌 것 / 태우 대기: 멈춤 경고는 T7.13 까지 없음. e2e 8 workers 에선 07:45 경로 카드가 5초를 넘길 때가 있다(혼자·4 workers 통과, /route 10 ms), 11/7 15:00 경로 둘은 데이터 의존 그대로. progress 의 T5.x 해시 54개는 이번 전부터 develop 에 없는 해시. 🧑 `sudo systemctl restart naru`(T7.12 공개)
 - 커밋: d500df6 3d691c4 e35bb19 989a515 42a6bba 8e4bdfa 756fbd5 d066f71 ade02d4 5147e87 (하네스 fc35d7b · f8b2ddc) / 이 항목의 커밋
+
+## 2026-11-10 · T7.13 DONE (태우 "다음")
+- 한 것: TOPIS 돌발 배치를 30분 넘게 못 받으면 시트 부제 아래 "통제 정보가 N분째 갱신되지 않았어요"(평소·받은 적 없음은 아무것도 없음, 1분마다 다시 봄 — 멈추면 사건 응답이 304 라 안 그려져서), /licenses 맨 아래 "데이터 기준 시각"(예전 시트 문구 dataAsOfKo 그대로, client 컴포넌트 DataAsOf — 'use client' 경계 셋: CLAUDE.md §3-4·CONVENTIONS §5.3). 시트의 기준 시각 줄 삭제는 T7.12 에서
+- 정한 것: 경고는 실제 멈춘 시간(N분째·시간째·일째), 자리는 예전 기준 시각 줄 자리(부제 아래), 카드엔 없음, /licenses 섹션은 맨 아래(태우 "페이지 아래에")
+- 막힌 것 / 태우 대기: 경고가 뜬 화면은 실데이터로 30분 기다려야 해 못 찍음(운영 기록 렌더 테스트로 확인). INTERFACE §3.1 data_as_of 끝의 FE 설명("목록 위에 기준 시각 … 회색 경고")이 이제 다름 — 고칠지, ARCHITECTURE FE 표 'use client' 경계에 DataAsOf 를 더할지 태우 답 대기. T7.13 커밋은 아직 push 안 함. 🧑 `sudo systemctl restart naru`(T7.12·T7.13 공개)
+- 커밋: 4e9ac09 05e57e0 9af59a1 (하네스 9e5ac07 · cc5276c) / 이 항목의 커밋
