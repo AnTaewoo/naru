@@ -13,6 +13,7 @@ from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
 from naru_be.models.domain.geocoder import Geocoder
 from naru_be.models.domain.ped_graph import PedGraph
+from naru_be.models.domain.reports import ReportDesk
 from naru_be.models.domain.road_graph import RoadGraph
 from naru_be.models.domain.route_planner import RoutePlanner
 from naru_be.models.repositories.closure_repository import ClosureRepository
@@ -30,6 +31,7 @@ class NaruModels:
     intake: CandidateIntake
     geocoder: Geocoder
     bus_intake: BusIntake
+    report_desk: ReportDesk  # 통제 제보 (T7.15)
 
 
 def naru_models() -> NaruModels:

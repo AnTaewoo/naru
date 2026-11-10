@@ -21,6 +21,7 @@ from naru_be.controllers import (
     candidate_controller,
     closure_controller,
     geocode_controller,
+    report_controller,
     route_controller,
 )
 from naru_be.controllers._deps import NaruModels
@@ -34,12 +35,14 @@ from naru_be.models.domain.crosswalk_index import CrosswalkIndex
 from naru_be.models.domain.crosswalk_names import name_crosswalks
 from naru_be.models.domain.geocoder import Geocoder
 from naru_be.models.domain.ped_graph import PedGraph
+from naru_be.models.domain.reports import ReportDesk
 from naru_be.models.domain.road_graph import RoadGraph
 from naru_be.models.domain.route_planner import RoutePlanner
 from naru_be.models.domain.routers import BaselineRouter, TimeDependentRouter
 from naru_be.models.repositories.bus_repository import BusRepository
 from naru_be.models.repositories.closure_repository import ClosureRepository
 from naru_be.models.repositories.kakao_local import KakaoLocal, LiveKakaoLocal, RecordedKakaoLocal
+from naru_be.models.repositories.report_repository import ReportRepository
 from naru_be.views import error_view
 
 log = logging.getLogger(__name__)
@@ -86,6 +89,7 @@ def build_models(settings: Settings) -> NaruModels:
         intake,
         Geocoder(kakao(settings)),
         BusIntake(BusRepository(sessions)),
+        ReportDesk(index, ReportRepository(sessions), settings),
     )
 
 
@@ -108,6 +112,7 @@ def create_app(settings: Settings | None = None, models: NaruModels | None = Non
     app.register_blueprint(candidate_controller.bp)
     app.register_blueprint(bus_controller.bp)
     app.register_blueprint(geocode_controller.bp)
+    app.register_blueprint(report_controller.bp)
     _register_errors(app)
     return app
 

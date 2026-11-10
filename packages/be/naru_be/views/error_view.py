@@ -43,4 +43,6 @@ def _code(code: str) -> ErrorCode:
         return "out_of_coverage"
     if code == "geocode_unavailable":
         return "geocode_unavailable"
+    if code == "too_many_reports":
+        return "too_many_reports"
     return "internal"
