@@ -460,12 +460,12 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - 산출: `GET /push/vapid-public-key`, `POST·DELETE /push/subscribe`, `GET·POST·DELETE /watch-areas`(saved 300·500·1000 m, last_seen 150 m 격자·3시간), 표 셋(0006). 🧑 태우: VAPID 키(.env). 구독 테스트 입력 = 태우 실제 구독을 가린 기록(`{D}/recorded/push/`)
 
 ### T7.9 매칭·발송
-- status: DOING
+- status: DONE
 - depends: T7.2, T7.8
 - 산출: created·confirmed → blocks·≥ 0.7 → STRtree → (구독, 사건, 종류) 한 번 → 22~07 created 는 07시 → pywebpush(410·404 끔). 워커 `push` 60초 → `POST /internal/push/dispatch`
 
 ### T7.10 알림 → 카드, ☆ 이 근처 알림 받기, 관심 지역 관리
-- status: TODO
+- status: DOING
 - depends: T7.9
 - 산출: 알림 클릭 → 사건 카드, 카드 ☆(중심 반경 500 m), 관심 지역 목록·삭제, last_seen. 운영에서 태우 실제 구독으로 끝에서 끝
 - PC-7B (T7.10 뒤): 태우 PC Chrome·폰에 실제 통제 알림이 오고 눌러서 카드
