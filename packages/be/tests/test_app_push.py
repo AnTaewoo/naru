@@ -80,8 +80,10 @@ def test_vapid_public_key_matches_recording(
     assert resp.status_code == 200, resp.get_data(as_text=True)
     key = VapidPublicKey.model_validate(resp.get_json()).public_key
     assert key == recorded_push["vapid_public_key"]  # 브라우저가 구독할 때 쓴 바로 그 키
-    # 키가 없는 서버는 503 push_unavailable (Model 만)
-    desk = PushDesk(client.application.extensions["naru"].push.repo, Settings())
+    # 키가 없는 서버는 503 push_unavailable (Model 만 — .env 의 운영 키를 읽지 않게 빈 키를 준다)
+    desk = PushDesk(
+        client.application.extensions["naru"].push.repo, Settings(vapid_private_key=SecretStr(""))
+    )
     with pytest.raises(PushUnavailableError) as e:
         desk.public_key()
     assert e.value.http_status == 503
