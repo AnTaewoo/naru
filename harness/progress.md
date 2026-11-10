@@ -352,3 +352,9 @@
 - 막힌 것 / 태우 대기: 긴 행진(행렬 200 m)은 ±20% 로도 P 가 하한(통제 중 0.5)에 머문다 — 11/14 현장 검증 뒤 가정값 재조정. 키프레임 본문 2.3 MB(gzip 65 KB) — nginx gzip 확인. 🧑 `sudo systemctl restart naru`(0006·0007). 커밋 46개 미푸시
 - 커밋: 148c41f 2273652 adb8fd9 8cf8820 113d776 928d111 31c5c89 3162fbc 93a405b f5d8acf e867515 b4bde82 de0b4c2 c0a60d5 ba69320 a4722d9 cefab1b de64086 b45ad84 6c1a95b 3668966 3c7509a e7c26f4 f84aeae 1be80e9 8fea88e 98c169d (하네스 fd6bc7b) / 이 항목의 커밋
 
+## 2026-11-10 · T7.17 DONE (태우 "다음")
+- 한 것: 공개 `GET /closures/feed?at=`(INTERFACE §3.3, 이력만) — 그 시각 걸린 통제를 GeoJSON 으로(횡단보도 Point: 관리번호·교차로명·상태·확신도·행진 P / 사건 구역 Polygon / 행진 경로 LineString, 사건 칸 공통), /closures·/closures/events·/route 와 같은 조회·판정 재사용, 분 단위 캐시 60초(ETag·304·public max-age)·IP 분당 60회(429 rate_limited, X-Forwarded-For 첫 값), CORS *. README '데이터 피드' 절
+- 정한 것: 같은 사건·횡단보도는 하나(가장 심한 상태), 캐시·제한은 gunicorn 워커마다(메모리), at 없는 요청도 분으로 내려 캐시, attribution 여분 멤버(공공누리 1유형·추정값)
+- 막힌 것 / 태우 대기: 🧑 `sudo systemctl restart naru`(0006·0007·피드). 커밋 55개 미푸시. 피드 e2e 없음(HTTP 테스트·임시 스택 curl)
+- 커밋: 07b6f23 193a071 2555050 18deb44 97d4bc4 1d8e2df 316a241 (하네스 e7d640a) / 이 항목의 커밋
+
