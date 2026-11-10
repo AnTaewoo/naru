@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import uuid
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -53,6 +54,14 @@ from naru_contracts import (
 )
 from naru_contracts.enums import ClosureType
 from naru_contracts.errors import ErrorCode
+from naru_contracts.reports_api import (
+    NearestCrosswalkQuery,
+    NearestCrosswalkResponse,
+    RecentReportsQuery,
+    RecentReportsResponse,
+    ReportRequest,
+    ReportResponse,
+)
 
 INTERFACE = Path(__file__).resolve().parents[3] / "docs" / "INTERFACE.md"
 
@@ -75,11 +84,11 @@ def _json(i: int) -> dict[str, Any]:
     return data
 
 
-def test_document_has_eleven_json_blocks() -> None:
-    # §1.1·§1.2·§3.1·§7.1·§7.2 는 ### 소제목이라 상위 § 로 잡힌다
+def test_document_has_twelve_json_blocks() -> None:
+    # §1.1·§1.2·§3.1·§7.1·§7.2·§8.1 은 ### 소제목이라 상위 § 로 잡힌다
     assert [s for s, _ in BLOCKS] == [
         *("§1", "§1", "§1", "§1", "§1"),
-        *("§2", "§3", "§3", "§6", "§7", "§7"),
+        *("§2", "§3", "§3", "§6", "§7", "§7", "§8"),
     ]
 
 
@@ -163,6 +172,7 @@ def test_error_body_example() -> None:  # §6
         "no_route",
         "out_of_coverage",  # v0.9, ADR-011 그래프 밖 — 그래프에 붙일 거리 150 m 초과
         "geocode_unavailable",  # v0.11, ADR-011 B — 카카오 로컬을 못 불렀다 (503)
+        "too_many_reports",  # v0.14 보충, T7.15 — 같은 기기·횡단보도 600초 안 다시 제보 (429)
         "internal",
     }
 
@@ -517,3 +527,89 @@ def test_candidate_summary_rules() -> None:  # §1 v0.12 — 구조화 칸만, �
         ClosureCandidate.model_validate({**c, "summary": {**c["summary"], "reported_people": -1}})
     with pytest.raises(ValidationError):  # 문장 칸(title 등)은 없다
         ClosureCandidate.model_validate({**c, "summary": {**c["summary"], "title": "행진"}})
+
+
+def test_report_nearest_example() -> None:  # §8.1 v0.14 보충 (태우 지시 11/10, T7.15)
+    found = NearestCrosswalkResponse.model_validate(_json(11))
+    cw = found.crosswalk
+    assert cw is not None
+    # OA-23081.xlsx 행 20198 (연번 20197): 06-0000051345 종로구 교차로명 '교보생명',
+    # EPSG:5186 (198028.96, 552449.50). §7.1 광화문교보빌딩 카카오 좌표에서 STRtree 최근접 71.07 m
+    # (CrosswalkIndex.from_xlsx + shapely 거리, 2026-11-10)
+    assert (cw.id, cw.name, cw.district, cw.distance_m) == (
+        "06-0000051345",
+        "교보생명",
+        "종로구",
+        71,
+    )
+    assert cw.coord == (126.97768829792257, 37.571585764131775)
+    assert NearestCrosswalkResponse.model_validate(found.model_dump(mode="json")) == found
+    assert NearestCrosswalkResponse.model_validate({"crosswalk": None}).crosswalk is None
+
+
+def test_report_rules() -> None:  # §8 — 본문 범위·모양, 응답 시각 오프셋, 최근 제보 질의
+    kyobo = {"lat": 37.5709686446227, "lng": 126.9779039768265}  # §7.1 광화문교보빌딩
+    assert NearestCrosswalkQuery.model_validate(kyobo).lat == 37.5709686446227
+    for bad in ({"lat": 91}, {"lng": 181}, {"lat": float("nan")}, {"lat": None}):
+        with pytest.raises(ValidationError):
+            NearestCrosswalkQuery.model_validate({**kyobo, **bad})
+    with pytest.raises(ValidationError):  # 좌표 말고는 받지 않는다
+        NearestCrosswalkQuery.model_validate({**kyobo, "accuracy_m": 15})
+    device = str(uuid.uuid4())  # FE 와 같은 방식(crypto.randomUUID)의 기기 토큰
+    ok = {
+        "crosswalk_id": "06-0000051345",
+        "state": "blocked",
+        "accuracy_m": 0,
+        "source": "field",
+        "device": device,
+    }
+    r = ReportRequest.model_validate(ok)
+    assert (r.state, r.source, r.accuracy_m) == ("blocked", "field", 0)
+    assert ReportRequest.model_validate({**ok, "accuracy_m": 1000}).accuracy_m == 1000
+    for bad_body in (
+        {"crosswalk_id": "교보생명"},
+        {"crosswalk_id": "06-000005134"},  # 숫자 9자리
+        {"state": "closed"},
+        {"source": "bus"},
+        {"accuracy_m": -1},
+        {"accuracy_m": 1001},
+        {"accuracy_m": 14.5},  # 정수 m (FE 가 반올림)
+        {"device": "short-token"},
+        {"device": "x" * 65},
+        {"device": device.replace("-", "/")},
+        {"lat": 37.57},  # 좌표는 제보에 없다
+    ):
+        with pytest.raises(ValidationError):
+            ReportRequest.model_validate({**ok, **bad_body})
+    reply = {"id": 1, "crosswalk_id": "06-0000051345", "state": "open"}
+    at = datetime(2026, 11, 10, 15, 0, tzinfo=timezone(timedelta(hours=9)))
+    assert ReportResponse.model_validate({**reply, "reported_at": at}).reported_at == at
+    with pytest.raises(ValidationError, match="오프셋"):
+        ReportResponse.model_validate({**reply, "reported_at": "2026-11-10T15:00:00"})
+    q = RecentReportsQuery.model_validate({"ids": " 06-0000051345, 06-0000030621,06-0000051345 ,"})
+    assert q.ids == ("06-0000051345", "06-0000030621") and q.minutes == 60
+    one = {"ids": "06-0000051345"}
+    assert RecentReportsQuery.model_validate({**one, "minutes": "1440"}).minutes == 1440
+    # 50개까지 — data/recorded/naru_api/closures_0745.json 의 횡단보도 64곳 중 51
+    recorded = INTERFACE.parents[1] / "data" / "recorded" / "naru_api"
+    closures = json.loads((recorded / "closures_0745.json").read_text("utf-8"))
+    features = closures["body"]["features"]
+    cw_ids = list(dict.fromkeys(f["properties"]["crosswalk_id"] for f in features))
+    assert len(cw_ids) == 64
+    assert len(RecentReportsQuery.model_validate({"ids": ",".join(cw_ids[:50])}).ids) == 50
+    with pytest.raises(ValidationError, match="50개"):
+        RecentReportsQuery.model_validate({"ids": ",".join(cw_ids[:51])})
+    for bad_q in (
+        {"ids": ""},
+        {"ids": "교보생명"},
+        {**one, "minutes": 0},
+        {**one, "minutes": 1441},
+    ):
+        with pytest.raises(ValidationError):
+            RecentReportsQuery.model_validate(bad_q)
+    counts = RecentReportsResponse.model_validate(
+        {"counts": {"06-0000051345": {"blocked": 2, "open": 1}}}
+    ).counts
+    assert counts["06-0000051345"].blocked == 2
+    with pytest.raises(ValidationError):
+        RecentReportsResponse.model_validate({"counts": {one["ids"]: {"blocked": -1, "open": 0}}})

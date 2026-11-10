@@ -227,9 +227,10 @@ ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, �
 ```json
 {"error": {"code": "invalid_query", "message": "depart_at: 오프셋 없는 시각", "field": "depart_at"}}
 ```
-- `code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, geocode_unavailable, internal}`. HTTP 400 / 401 / 404 / 422(`no_route`·`out_of_coverage`) / 503(`geocode_unavailable`) / 500. Flask `error_view`(View 계층)가 만든다.
+- `code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, geocode_unavailable, too_many_reports, internal}`. HTTP 400 / 401 / 404 / 422(`no_route`·`out_of_coverage`) / 429(`too_many_reports`) / 503(`geocode_unavailable`) / 500. Flask `error_view`(View 계층)가 만든다.
 - `out_of_coverage` (v0.9, ADR-011): 출발·도착을 보행망 노드에 붙일 거리가 150 m(`max_snap_m`)를 넘는다. `field` = `from` 또는 `to`.
 - `geocode_unavailable` (v0.11, ADR-011 B): 카카오 로컬을 못 불렀다 — 서버 키 없음·카카오 오류·시간 초과(재생 모드면 기록 없음). FE 는 검색이면 "검색을 못 했어요", 주소면 "선택한 위치".
+- `too_many_reports` (v0.14 보충, T7.15): 같은 기기가 같은 횡단보도를 600초(`report_min_interval_s`) 안에 다시 제보했다(§8.2). `field` = `crosswalk_id`.
 
 ## §7 BE → FE: 지오코딩 (v0.11, ADR-011 B)
 BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKAO_REST_KEY` 에만 — 브라우저·응답·로그에 없다. FE 는 `/api/geocode/*` 로만 부른다.
@@ -255,6 +256,28 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 - 2026-11-08 기록(광화문교보빌딩 점 37.5709686, 126.9779040). `label` = 화면용 짧은 주소 — 도로명 주소에서 시·도를 뺀 것, 도로명이 없으면 지번에서(예: "중구 남대문로2가 9-9"). 주소가 없는 점이면 셋 다 null 이고 FE 는 "선택한 위치"
 - 오류: `q`·`near`·`lat`·`lng` 형식이 틀리면 400 `invalid_query`(field = 그 이름). 카카오를 못 부르면 503 `geocode_unavailable`(§6)
 
+## §8 FE → BE: 통제 제보 (v0.14 보충, 태우 지시 11/10 — 교수님 멘토링 T-A)
+사람이 지금 위치에서 가장 가까운 횡단보도를 "막혔어요 / 열렸어요"로 남긴다. **기록만** — 경로·확신도·상태에 쓰지 않는다(버스 신호와 같은 원칙, ADR-013 보류). 현장 검증 제보(`source` = `field`)는 `scripts/field_compare.py` 가 그 시각 나루 예측과 맞춰 본다.
+- 좌표는 §8.1 요청 본문으로만 받는다(POST — 쿼리 문자열·접근 로그에 안 남게). 저장·로그하지 않는다. 제보 행에는 횡단보도 ID·상태·서버 시각·정확도·출처·기기 해시(sha256)만 남는다.
+- 횡단보도 ID 는 OA-23081 횡단보도관리번호 모양(숫자 2 `-` 숫자 10).
+
+### §8.1 `POST /crosswalks/nearest`
+- 본문 `{"lat": …, "lng": …}`(범위는 §7.2 와 같다, 다른 칸은 받지 않는다). 100 m(`report_snap_m`) 안에서 가장 가까운 횡단보도, 없으면 `{"crosswalk": null}`
+```json
+{"crosswalk": {"id": "06-0000051345", "name": "교보생명", "district": "종로구",
+               "coord": [126.97768829792257, 37.571585764131775], "distance_m": 71}}
+```
+- §7.1 광화문교보빌딩 카카오 좌표에서. OA-23081 행 20198(교차로명 '교보생명', 종로구), 71.1 m. `name` = 교차로명, `coord` = [lng, lat], `distance_m` = 요청 점과의 거리(EPSG:5179, 반올림)
+
+### §8.2 `POST /reports`
+- 본문 `{crosswalk_id, state, accuracy_m, source, device}` — `state` ∈ {`blocked`, `open`}, `accuracy_m` 위치 정확도 0~1000(정수 m, 브라우저 값 반올림), `source` ∈ {`user`, `field`(현장 검증 — FE `?mode=field`)}, `device` 기기 토큰(영문·숫자·`-` 16~64자, FE 가 처음 한 번 만든 무작위 값). BE 는 토큰의 sha256 만 저장한다
+- 201 `{id, crosswalk_id, state, reported_at}` — `id` 정수, `reported_at` 서버가 받은 시각(+09:00)
+- 오류: 본문 형식 400 `invalid_query`(field = 그 이름), 범위에 없는 횡단보도 400 `invalid_query`(field `crosswalk_id`), 같은 기기·같은 횡단보도 600초 안 429 `too_many_reports`(§6)
+
+### §8.3 `GET /reports/recent?ids=&minutes=60`
+- `ids` 횡단보도 ID 쉼표(1~50개, 겹치면 하나), `minutes` 1~1440(기본 60)
+- 200 `{"counts": {"<id>": {"blocked": n, "open": n}}}` — 그 시간 안에 제보가 있는 ID 만. FE 통제 근거(§2 `avoided` 사유별) "최근 1시간 제보 N건"
+
 ## 변경 이력
 | 날짜 | 버전 | 변경 | 누가 |
 |---|---|---|---|
@@ -279,3 +302,4 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 | 2026-11-09 | v0.14 | §3.1 `GET /closures/events` 에 `at`·`from`·`to`(지금 지도 — 시간 창), 사건 `id`·`status`·`confidence` 필수·`area`·`centroid`(T7.2 까지 null), 응답 `at`·`truncated`, ETag·304 (ADR-014 A, T7.1) | 태우 승인 (ADR-014) |
 | 2026-11-10 | v0.14 (보충) | §3.1 `data_as_of` FE 표시 설명만 — 기준 시각은 `/licenses`, 시트는 TOPIS 돌발 30분 멈춤 경고만(null 은 경고 없음, T7.12·T7.13). 스키마 그대로 | 태우 (11/10) |
 | 2026-11-10 | v0.14 (보충) | §2 `GET /route` 에 `avoid`(사건 id 쉼표, 10개까지) — 그 사건 횡단보도를 시각·확신도와 상관없이 막음, 없는 id 는 무시, 응답 스키마 그대로 (ADR-014 A, T7.6) | 태우 승인 (ADR-014) |
+| 2026-11-10 | v0.14 (보충) | §8 통제 제보 `POST /crosswalks/nearest`·`POST /reports`·`GET /reports/recent` 추가 — 기록만(경로·확신도·상태에 안 씀), 좌표는 본문으로만·저장 안 함, 기기는 해시. §6 `too_many_reports`(429) | 태우 지시 (11/10, T7.15) |
