@@ -182,6 +182,30 @@
     "FeedCollection": {
       "$ref": "#/$defs/FeedCollection"
     },
+    "PushKeys": {
+      "$ref": "#/$defs/PushKeys"
+    },
+    "PushSubscription": {
+      "$ref": "#/$defs/PushSubscription"
+    },
+    "SubscribeResponse": {
+      "$ref": "#/$defs/SubscribeResponse"
+    },
+    "UnsubscribeRequest": {
+      "$ref": "#/$defs/UnsubscribeRequest"
+    },
+    "VapidPublicKey": {
+      "$ref": "#/$defs/VapidPublicKey"
+    },
+    "WatchAreaRequest": {
+      "$ref": "#/$defs/WatchAreaRequest"
+    },
+    "WatchArea": {
+      "$ref": "#/$defs/WatchArea"
+    },
+    "WatchAreasResponse": {
+      "$ref": "#/$defs/WatchAreasResponse"
+    },
     "ErrorDetail": {
       "$ref": "#/$defs/ErrorDetail"
     },
@@ -2529,6 +2553,231 @@
       "title": "FeedCollection",
       "type": "object"
     },
+    "PushKeys": {
+      "additionalProperties": false,
+      "properties": {
+        "p256dh": {
+          "maxLength": 88,
+          "minLength": 87,
+          "title": "P256Dh",
+          "type": "string"
+        },
+        "auth": {
+          "maxLength": 24,
+          "minLength": 22,
+          "title": "Auth",
+          "type": "string"
+        }
+      },
+      "required": [
+        "p256dh",
+        "auth"
+      ],
+      "title": "PushKeys",
+      "type": "object"
+    },
+    "PushSubscription": {
+      "additionalProperties": false,
+      "description": "브라우저 PushSubscription.toJSON() 그대로.",
+      "properties": {
+        "endpoint": {
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "keys": {
+          "$ref": "#/$defs/PushKeys"
+        },
+        "expirationTime": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expirationtime"
+        }
+      },
+      "required": [
+        "endpoint",
+        "keys"
+      ],
+      "title": "PushSubscription",
+      "type": "object"
+    },
+    "SubscribeResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "active": {
+          "title": "Active",
+          "type": "boolean"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "active",
+        "created_at"
+      ],
+      "title": "SubscribeResponse",
+      "type": "object"
+    },
+    "UnsubscribeRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "title": "Endpoint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "endpoint"
+      ],
+      "title": "UnsubscribeRequest",
+      "type": "object"
+    },
+    "VapidPublicKey": {
+      "additionalProperties": false,
+      "properties": {
+        "public_key": {
+          "maxLength": 88,
+          "minLength": 87,
+          "title": "Public Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "public_key"
+      ],
+      "title": "VapidPublicKey",
+      "type": "object"
+    },
+    "WatchAreaRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "saved",
+            "last_seen"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "lng": {
+          "maximum": 180,
+          "minimum": -180,
+          "title": "Lng",
+          "type": "number"
+        },
+        "lat": {
+          "maximum": 90,
+          "minimum": -90,
+          "title": "Lat",
+          "type": "number"
+        },
+        "radius_m": {
+          "default": 500,
+          "title": "Radius M",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "endpoint",
+        "kind",
+        "lng",
+        "lat"
+      ],
+      "title": "WatchAreaRequest",
+      "type": "object"
+    },
+    "WatchArea": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "kind": {
+          "enum": [
+            "saved",
+            "last_seen"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "lng": {
+          "title": "Lng",
+          "type": "number"
+        },
+        "lat": {
+          "title": "Lat",
+          "type": "number"
+        },
+        "radius_m": {
+          "title": "Radius M",
+          "type": "integer"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Expires At"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "lng",
+        "lat",
+        "radius_m",
+        "created_at",
+        "expires_at"
+      ],
+      "title": "WatchArea",
+      "type": "object"
+    },
+    "WatchAreasResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "areas": {
+          "items": {
+            "$ref": "#/$defs/WatchArea"
+          },
+          "title": "Areas",
+          "type": "array"
+        }
+      },
+      "required": [
+        "areas"
+      ],
+      "title": "WatchAreasResponse",
+      "type": "object"
+    },
     "ErrorDetail": {
       "additionalProperties": false,
       "properties": {
@@ -2543,6 +2792,7 @@
             "too_many_reports",
             "not_modeled",
             "rate_limited",
+            "push_unavailable",
             "internal"
           ],
           "title": "Code",

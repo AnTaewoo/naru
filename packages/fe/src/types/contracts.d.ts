@@ -262,6 +262,28 @@ export type At5 = string;
 export type GeneratedAt = string;
 export type Attribution = string;
 export type Features1 = FeedFeature[];
+export type P256Dh = string;
+export type Auth = string;
+export type Endpoint = string;
+export type Expirationtime = number | null;
+export type Id4 = number;
+export type Active = boolean;
+export type CreatedAt = string;
+export type Endpoint1 = string;
+export type PublicKey = string;
+export type Endpoint2 = string;
+export type Kind5 = "saved" | "last_seen";
+export type Lng4 = number;
+export type Lat4 = number;
+export type RadiusM1 = number;
+export type Id5 = number;
+export type Kind6 = "saved" | "last_seen";
+export type Lng5 = number;
+export type Lat5 = number;
+export type RadiusM2 = number;
+export type CreatedAt1 = string;
+export type ExpiresAt = string | null;
+export type Areas = WatchArea[];
 export type Code =
   | "invalid_query"
   | "unauthorized"
@@ -272,6 +294,7 @@ export type Code =
   | "too_many_reports"
   | "not_modeled"
   | "rate_limited"
+  | "push_unavailable"
   | "internal";
 export type Message = string;
 export type Field = string | null;
@@ -339,6 +362,14 @@ export interface NaruContracts {
   FeedProperties?: FeedProperties;
   LineStringGeometry?: LineStringGeometry;
   FeedCollection?: FeedCollection;
+  PushKeys?: PushKeys;
+  PushSubscription?: PushSubscription;
+  SubscribeResponse?: SubscribeResponse;
+  UnsubscribeRequest?: UnsubscribeRequest;
+  VapidPublicKey?: VapidPublicKey;
+  WatchAreaRequest?: WatchAreaRequest;
+  WatchArea?: WatchArea;
+  WatchAreasResponse?: WatchAreasResponse;
   ErrorDetail?: ErrorDetail;
   ErrorBody?: ErrorBody;
   [k: string]: unknown;
@@ -702,6 +733,48 @@ export interface FeedCollection {
   generated_at: GeneratedAt;
   attribution: Attribution;
   features: Features1;
+}
+export interface PushKeys {
+  p256dh: P256Dh;
+  auth: Auth;
+}
+/**
+ * 브라우저 PushSubscription.toJSON() 그대로.
+ */
+export interface PushSubscription {
+  endpoint: Endpoint;
+  keys: PushKeys;
+  expirationTime?: Expirationtime;
+}
+export interface SubscribeResponse {
+  id: Id4;
+  active: Active;
+  created_at: CreatedAt;
+}
+export interface UnsubscribeRequest {
+  endpoint: Endpoint1;
+}
+export interface VapidPublicKey {
+  public_key: PublicKey;
+}
+export interface WatchAreaRequest {
+  endpoint: Endpoint2;
+  kind: Kind5;
+  lng: Lng4;
+  lat: Lat4;
+  radius_m?: RadiusM1;
+}
+export interface WatchArea {
+  id: Id5;
+  kind: Kind6;
+  lng: Lng5;
+  lat: Lat5;
+  radius_m: RadiusM2;
+  created_at: CreatedAt1;
+  expires_at: ExpiresAt;
+}
+export interface WatchAreasResponse {
+  areas: Areas;
 }
 export interface ErrorDetail {
   code: Code;
