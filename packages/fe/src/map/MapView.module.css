@@ -78,6 +78,11 @@
   --pin: #222222;
 }
 
+/* 검색한 장소 (T7.14) */
+.pinPlace {
+  --pin: #e5322d;
+}
+
 .pinLabel {
   padding: 4px 10px;
   border-radius: 6px;

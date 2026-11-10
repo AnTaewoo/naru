@@ -27,13 +27,14 @@ import {
 } from "../map/eventKinds";
 import { EXAMPLES, type Example } from "../map/examples";
 import { asBbox4, useClosureDispatch, useClosures } from "../state/ClosureProvider";
-import { useRouteDispatch } from "../state/RouteProvider";
+import { useRoute, useRouteDispatch } from "../state/RouteProvider";
 import { isNowAt, kstIso, useTime, useTimeDispatch } from "../state/TimeProvider";
 import type { ClosureEvent } from "../types/contracts";
 import { BottomSheet, type SheetStage } from "./BottomSheet";
 import { ClosureTimeline } from "./ClosureTimeline";
 import { EventCard } from "./EventCard";
 import styles from "./LiveSheet.module.css";
+import { PlaceCard } from "./PlaceCard";
 import { StaleWarning } from "./StaleWarning";
 import { TimeSlider } from "./TimeSlider";
 
@@ -50,6 +51,7 @@ export function LiveSheet() {
   const dispatch = useClosureDispatch();
   const timeDispatch = useTimeDispatch();
   const routeDispatch = useRouteDispatch();
+  const { place } = useRoute(); // 검색한 장소(T7.14) — 있으면 시트는 장소 카드
   const { t, ready, live: following } = useTime();
   const atMs = eventsAt ? Date.parse(eventsAt) : 0;
   // 목록 — 넓은 창(t 기준 상태)을 받기 전엔 지도 사건으로
@@ -158,7 +160,9 @@ export function LiveSheet() {
   };
   return (
     <BottomSheet label={title} stage={stage} onStage={setStage}>
-      {card ? (
+      {place ? (
+        <PlaceCard />
+      ) : card ? (
         <>
           {banner && <div className={styles.pad}>{banner}</div>}
           <EventCard

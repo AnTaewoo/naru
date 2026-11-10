@@ -6,9 +6,10 @@ import { describe, expect, it } from "vitest";
 import { createNaruApiClient } from "../api/naruApiClient";
 import { ApiProvider } from "../state/ApiProvider";
 import { ClosureProvider, type ClosureState } from "../state/ClosureProvider";
-import { RouteProvider, useRoute } from "../state/RouteProvider";
+import { RouteProvider, placePick, useRoute, type RouteState } from "../state/RouteProvider";
 import { TimeProvider } from "../state/TimeProvider";
-import { recordedClosures, recordedEvents, recordedLive } from "../test/recorded";
+import { parseGeocodeSearch } from "../api/naruApiClient";
+import { recorded, recordedClosures, recordedEvents, recordedLive } from "../test/recorded";
 import { LiveSheet } from "./LiveSheet";
 
 const fc0745 = recordedClosures("closures_0745");
@@ -28,11 +29,13 @@ function Providers({
   live = live0745,
   catalog = null,
   state = {},
+  route,
 }: {
   children: ReactNode;
   live?: Live | null;
   catalog?: Live | null;
   state?: Partial<ClosureState>;
+  route?: Partial<RouteState>;
 }) {
   const at = (catalog ?? live)?.body.at ?? live0745.body.at;
   return (
@@ -52,7 +55,9 @@ function Providers({
             ...state,
           }}
         >
-          <RouteProvider fetchEnabled={false}>{children}</RouteProvider>
+          <RouteProvider fetchEnabled={false} initialState={route}>
+            {children}
+          </RouteProvider>
         </ClosureProvider>
       </TimeProvider>
     </ApiProvider>
@@ -257,6 +262,17 @@ describe("LiveSheet — 행·카드·구 칩·묶음 (T7.5)", () => {
     expect(screen.getByLabelText("길찾기 상태").textContent).toBe("false -");
     fireEvent.click(screen.getByRole("button", { name: "이 구역 피해서 길찾기" }));
     expect(screen.getByLabelText("길찾기 상태").textContent).toBe("true 2e930ec6deeb");
+  });
+
+  it("검색한 장소가 있으면 시트는 그 장소 카드 (T7.14)", () => {
+    const [kyobo] = parseGeocodeSearch(recorded("geocode_search_kyobo").body).places;
+    render(
+      <Providers live={live1107} route={{ place: kyobo ? placePick(kyobo) : null }}>
+        <LiveSheet />
+      </Providers>,
+    );
+    expect(screen.getByRole("article", { name: "광화문교보빌딩" })).toBeDefined();
+    expect(screen.queryByRole("region", { name: "이 시각" })).toBeNull();
   });
 
   it("고른 사건(?event=·지도)이면 처음부터 그 카드", () => {

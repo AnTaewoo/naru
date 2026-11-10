@@ -220,6 +220,24 @@ function fitRoute(map: MapLibreMap, route: RouteResponse | null, fitted: RefObje
   map.fitBounds(bounds, { padding: fitPadding(map), maxZoom: 17 });
 }
 
+/** 검색으로 고른 곳으로 갈 때 줌 (T7.14, 네이버지도·카카오맵 장소처럼) */
+const FOCUS_ZOOM = 17;
+
+/** 검색한 장소 핀 (T7.14) — 출발·도착 핀과 같은 말풍선, 글은 장소 이름 */
+function placePinElement(name: string): HTMLElement {
+  const el = document.createElement("div");
+  el.className = `${styles.pin} ${styles.pinPlace}`;
+  el.setAttribute("role", "img");
+  el.setAttribute("aria-label", `${name} 위치`);
+  const label = document.createElement("span");
+  label.className = styles.pinLabel ?? "";
+  label.textContent = name;
+  const dot = document.createElement("span");
+  dot.className = styles.pinDot ?? "";
+  el.append(label, dot);
+  return el;
+}
+
 /** 출발·도착 핀 — 글리프 서버 없이 DOM 마커로 (시안 02 말풍선) */
 function pinElement(kind: "from" | "to"): HTMLElement {
   const el = document.createElement("div");
@@ -267,7 +285,7 @@ export function MapView({ visible }: MapViewProps) {
   const loaded = useRef(false);
   const { closures, bbox, coverage, events, eventsAt, selected, frame, catalog } = useClosures();
   const dispatch = useClosureDispatch();
-  const { route, from, to, active, view } = useRoute();
+  const { route, from, to, active, view, place, focus } = useRoute();
   // 원래 길 카드를 골랐나 (T5.11) — 피한 통제가 없으면 원래 길도 없다
   const original = view === "original" && (route?.avoided.length ?? 0) > 0;
   const originalRef = useRef(original);
@@ -275,6 +293,7 @@ export function MapView({ visible }: MapViewProps) {
   const activeRef = useRef(active);
   const selectedRef = useRef(selected);
   const fromPin = useRef<Marker | null>(null);
+  const placePin = useRef<Marker | null>(null);
   const toPin = useRef<Marker | null>(null);
   const fitted = useRef<string | null>(null);
   // 지도 load 전에는 회색 대신 로딩 표시 (T5.6)
@@ -405,6 +424,7 @@ export function MapView({ visible }: MapViewProps) {
     });
     map.on("click", (e) => {
       if (activeRef.current) return;
+      routeDispatch({ type: "place", place: null }); // 지도를 누르면 검색한 장소 핀·카드는 닫는다 (T7.14)
       const layers = EVENT_HIT_LAYERS.filter((id) => map.getLayer(id));
       const ids = clickedIds(map.queryRenderedFeatures(e.point, { layers }));
       if (ids.length) dispatch({ type: "pick", ids });
@@ -422,7 +442,7 @@ export function MapView({ visible }: MapViewProps) {
     mapRef.current = map;
     return () => {
       loaded.current = false;
-      for (const pin of [fromPin, toPin]) {
+      for (const pin of [fromPin, toPin, placePin]) {
         pin.current?.remove();
         pin.current = null;
       }
@@ -469,6 +489,32 @@ export function MapView({ visible }: MapViewProps) {
     if (loaded.current) run();
     else map.once("load", run);
   }, [from, to]);
+
+  // 검색으로 고른 곳(장소·칸, T7.14) — 부드럽게 그리로(줌 17), 위 검색창·아래 시트에 가리지 않게
+  const flown = useRef<number | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !focus || flown.current === focus.seq) return;
+    flown.current = focus.seq;
+    const run = () => {
+      framed.current = true;
+      map.flyTo({ center: focus.point, zoom: FOCUS_ZOOM, padding: framePadding(map) });
+    };
+    if (loaded.current) run();
+    else map.once("load", run);
+  }, [focus]);
+
+  // 검색한 장소 핀 — 이름 말풍선 (T7.14). 다른 검색·지도 누르기·카드 닫기로 사라진다
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    placePin.current?.remove();
+    placePin.current = place
+      ? new Marker({ element: placePinElement(place.name), anchor: "bottom", offset: [0, 5] })
+          .setLngLat(place.point)
+          .addTo(map)
+      : null;
+  }, [place]);
 
   // 사건·칩이 바뀌면 사건 소스만 갱신 (T7.4)
   useEffect(() => {
