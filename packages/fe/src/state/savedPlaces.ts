@@ -44,7 +44,8 @@ export function toggleSaved(list: readonly PlacePick[], place: PlacePick): Place
   return [place, ...list].slice(0, SAVED_MAX);
 }
 
-function storage(): Storage | null {
+/** 이 브라우저 localStorage — 막혀 있으면 null (기기 토큰 T7.15 도 같이 쓴다) */
+export function browserStorage(): Storage | null {
   try {
     return typeof window === "undefined" ? null : window.localStorage;
   } catch {
@@ -59,11 +60,11 @@ export function useSavedPlaces(): {
 } {
   const [saved, setSaved] = useState<PlacePick[]>([]);
   useEffect(() => {
-    setSaved(readSaved(storage()));
+    setSaved(readSaved(browserStorage()));
   }, []);
   const toggle = useCallback((place: PlacePick) => {
-    const next = toggleSaved(readSaved(storage()), place);
-    writeSaved(storage(), next);
+    const next = toggleSaved(readSaved(browserStorage()), place);
+    writeSaved(browserStorage(), next);
     setSaved(next);
   }, []);
   return { saved, toggle };
