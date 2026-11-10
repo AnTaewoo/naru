@@ -430,12 +430,12 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - 산출: 지금 위치에서 가장 가까운 횡단보도를 지도에 표시 + "막혔어요 / 열렸어요"(그 횡단보도를 확인한 뒤 전송). 저장 = 횡단보도 ID·상태·제보 시각·위치 정확도(m)·출처(user/field) — 원 좌표는 스냅한 뒤 저장하지 않는다(Alembic 0006). 기록만(경로·확신도 반영 없음, 버스 신호와 같은 원칙), 통제 근거에 최근 제보 건수만. 같은 기기·같은 횡단보도 간격 제한. `scripts/field_checklist.py`(날짜·시간대에 막힌다고 예측한 횡단보도 — ID·좌표·예측 통제 시간·상태·확신도·근거 사건 → CSV·GeoJSON), `scripts/field_compare.py`(field 제보 vs 그 시각 예측 → 맞음·덜 막음·더 막음 표, recall·precision → `docs/eval/field_YYYYMMDD.md`). 문구는 ko.ts 톤. INTERFACE 새 절
 
 ### T7.16 행진 확률 모델 + 예상 위치 애니메이션 (T-B) — ADR-015 승인 뒤
-- status: DOING
+- status: DONE
 - depends: T7.15
 - 산출: ADR-015 대로 — 순서 있는 경로·시작·종료가 다 있는 행진만 P(t, s)(속도 = 경로 길이/(끝−시작), ±폭 결정적 표본, 선행 통제·행렬 길이, 창 안 하한·창 밖 0), 라우터 행진 예정 비용 = P × 기존 예정 비용(P ≥ 임계면 제외), 1분 키프레임 API(표본 점·중심·반경·횡단보도별 P — 라우터와 같은 함수), FE heatmap·원·P 6단계·보간·재생("공지 일정 기준 예상 위치"), 카드 "이 시각 막혀 있을 확률". 테스트는 K-016 등 실제 행진 공지, /route p50/p95 전후, iPhone 13 애니메이션
 
 ### T7.17 통제 데이터 GeoJSON 피드 (T-C)
-- status: TODO
+- status: DOING
 - depends: T7.16
 - 산출: 공개 GET 하나(/api/internal 밖) — 시각 t 기준 FeatureCollection(횡단보도·구간 geometry, 이벤트명·출처·시작·종료·상태·확신도, 행진이면 P), 기존 통제 조회 로직 재사용, 응답 캐시·요청 제한, README "데이터 피드" 절(예시 요청·필드)
 

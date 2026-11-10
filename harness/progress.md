@@ -346,3 +346,9 @@
 - 막힌 것 / 태우 대기: 🧑 11/13 전 `sudo systemctl restart naru`(0006 적용). ARCHITECTURE 에 ReportDesk·reports·prediction 줄(DataAsOf 질문과 같이). 막는 장치는 기기·횡단보도 10분 간격뿐(토큰 지우면 새 기기, ?mode=field 누구나). 커밋 20개 미푸시. e2e 11/7 15:00 둘은 데이터 의존 그대로
 - 커밋: 148c41f d3d356e 9a21337 a13153c 73c4a16 8648805 f9d8ea6 c9a9c36 623d34f 8d13d50 79f5127 2605639 742bbc5 b145692 cf3c74d 47482b5 5ecbaab 8f09e9d 057c4ad 80ab834 / 이 항목의 커밋
 
+## 2026-11-10 · T7.16 DONE (태우 "③ + ① 로 가고 다음")
+- 한 것: 행진 확률 모델(ADR-015) — 방향을 아는 행진(공지 구간이 이어짐·TOPIS 사슬 하나, 시작·끝)만 접수 때 경로 선·길이·행렬·횡단보도별 s 를 사건 행 JSON `march`(0007)에, `p_at`(21 표본 ±20%, 선행 300 m, 창 안 하한 예정 0.2·통제 중 0.5, 창 밖 0) 하나를 라우터(비용 = P x 360 m, P ≥ 0.8 제외, scheduled·confirmed 모두)·`GET /closures/events/{id}/march` 1분 키프레임(표본 점·중심·반경·횡단보도 P, 대상 아니면 404 not_modeled)·현장 체크리스트/비교가 같이 씀. FE heatmap·중심 원·P 6단계 점, 키프레임 보간, 카드 "이 시각 막혀 있을 확률 N%"·재생(12초, 네트워크 없음). INTERFACE v0.15 §3.2·§5·§6
+- 정한 것: 폭은 지난 도로명 등급 최빈(같으면 넓은 쪽, 없으면 '로'), 구간이 지점으로만 풀린 후보가 있으면 대상 아님, 응답에 crosswalk_points·step_s·window 추가, 카드 확률은 경로 위 최대 P, 재생은 ClosureProvider playMs, e2e 는 행진 404 를 정상 응답으로. 처음 ±50% 는 국회대로 9.5 km 에서 P 가 전부 하한으로 눌려 태우 "③ + ①" — ±20%·통제 중 하한 0.5(ADR 표에 근거)
+- 막힌 것 / 태우 대기: 긴 행진(행렬 200 m)은 ±20% 로도 P 가 하한(통제 중 0.5)에 머문다 — 11/14 현장 검증 뒤 가정값 재조정. 키프레임 본문 2.3 MB(gzip 65 KB) — nginx gzip 확인. 🧑 `sudo systemctl restart naru`(0006·0007). 커밋 46개 미푸시
+- 커밋: 148c41f 2273652 adb8fd9 8cf8820 113d776 928d111 31c5c89 3162fbc 93a405b f5d8acf e867515 b4bde82 de0b4c2 c0a60d5 ba69320 a4722d9 cefab1b de64086 b45ad84 6c1a95b 3668966 3c7509a e7c26f4 f84aeae 1be80e9 8fea88e 98c169d (하네스 fd6bc7b) / 이 항목의 커밋
+
