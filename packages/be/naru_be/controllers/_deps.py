@@ -11,6 +11,7 @@ from naru_be.models.domain.bus_intake import BusIntake
 from naru_be.models.domain.candidate_intake import CandidateIntake
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
+from naru_be.models.domain.feed import FeedDesk
 from naru_be.models.domain.geocoder import Geocoder
 from naru_be.models.domain.ped_graph import PedGraph
 from naru_be.models.domain.reports import ReportDesk
@@ -32,6 +33,7 @@ class NaruModels:
     geocoder: Geocoder
     bus_intake: BusIntake
     report_desk: ReportDesk  # 통제 제보 (T7.15)
+    feed: FeedDesk  # 공개 GeoJSON 피드 (T7.17)
 
 
 def naru_models() -> NaruModels:
