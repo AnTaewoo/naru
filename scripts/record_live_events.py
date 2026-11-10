@@ -11,7 +11,8 @@ TOPIS 공지 6300(11/7 09:00 에 볼 글)·TOPIS 통제지도 11/9 08:37 목록(
 11/7 15:30 = 집회 날, 11/9 13:30 = 국회대로 행진 통제 중·강남대로 30분 뒤, 3/15 07:45 = 마라톤,
 11/8 20:00 = 다음 날(11/9) 통제가 '내일'(T7.5). 시트 목록(T7.12)은 at 앞뒤 365일
 넓은 창 — 11/7 15:30, 11/8 12:00(이 시각 걸린 통제 없음). 길찾기 avoid(T7.6) — 교보빌딩 → 대한문을
-3/15 04:30·13:30 에 마라톤 1구간을 피해서(GET /route?avoid=).
+3/15 04:30·13:30 에 마라톤 1구간을 피해서(GET /route?avoid=). 통제 제보(T7.15, INTERFACE §8) —
+교보빌딩 점 최근접·서울 밖 없음·제보 201·같은 기기 429·최근 집계(기기 토큰은 파일에 안 남긴다).
 T7.4 에서 PDF·통제지도를 더해 다시 기록 — FE 지금 지도에 확신도 0.7 미만 사건이 있어야 한다.
 """
 
@@ -20,6 +21,7 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -71,6 +73,22 @@ ROUTES = {
 # 태우 11/10 — 공지 해제 시각 뒤 30분(released_grace, 아직 막힘) 문구 "정리 중":
 # 3/15 08:35 는 1구간(08:08)·출발지 구간(08:30) 둘 다 해제 시각이 지났지만 +30분 안이라 통제 중
 ROUTES["route_0835"] = {"from": KYOBO, "to": DAEHANMUN, "depart_at": "2026-03-15T08:35:00+09:00"}
+# T7.15 통제 제보 — 교보빌딩 카카오 점 → 06-0000051345 '교보생명' 71 m,
+# 성남(서울 밖, test_routers 와 같은 점) → 없음.
+# 제보는 교보생명 막힘, 같은 기기가 바로 다시 열림 → 429,
+# 세종대로사거리(06-0000023206 — route_0745 가 피하는 1구간 횡단보도) 막힘
+# → 최근 집계는 교보생명·세종대로사거리 각 1
+KYOBO_CW, SEJONG_CW = "06-0000051345", "06-0000023206"
+NEAREST: dict[str, dict[str, object]] = {
+    "report_nearest_kyobo": {"lat": 37.5709686446227, "lng": 126.9779039768265},
+    "report_nearest_none": {"lat": 37.3947, "lng": 127.1112},
+}
+REPORT: dict[str, object] = {
+    "crosswalk_id": KYOBO_CW,
+    "state": "blocked",
+    "accuracy_m": 14,
+    "source": "user",
+}
 
 
 def wide(at: str) -> dict[str, str]:
@@ -162,6 +180,30 @@ def main() -> None:
         path.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
         avoided = [(a["crosswalk_id"], a["status"]) for a in doc["body"].get("avoided", [])]
         print(path.relative_to(ROOT), resp.status_code, "avoided", avoided)
+    models.report_desk.repo.truncate()
+    device = str(uuid.uuid4())  # FE 와 같은 방식의 기기 토큰 — 기록 파일에는 안 남긴다
+    posts: list[tuple[str, str, dict[str, object]]] = [
+        *(("/crosswalks/nearest", name, body) for name, body in NEAREST.items()),
+        ("/reports", "report_sent", REPORT),
+        ("/reports", "report_too_many", {**REPORT, "state": "open"}),
+        ("/reports", "report_sent_sejong", {**REPORT, "crosswalk_id": SEJONG_CW}),
+    ]
+    for url, name, body in posts:
+        payload = {**body, "device": device} if url == "/reports" else body
+        resp = client.post(url, json=payload)
+        doc = {"method": "POST", "path": url, "json": body, "status": resp.status_code}
+        doc["body"] = resp.get_json()
+        path = out / f"{name}.json"
+        path.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print(path.relative_to(ROOT), resp.status_code, doc["body"])
+    query = {"ids": f"{KYOBO_CW},{SEJONG_CW},06-0000036391", "minutes": "60"}
+    resp = client.get("/reports/recent", query_string=query)
+    doc = {"method": "GET", "path": "/reports/recent", "query": query, "status": resp.status_code}
+    doc["body"] = resp.get_json()
+    path = out / "reports_recent.json"
+    path.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print(path.relative_to(ROOT), resp.status_code, doc["body"])
+    models.report_desk.repo.truncate()
     models.repo.truncate()
 
 
