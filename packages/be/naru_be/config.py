@@ -79,3 +79,6 @@ class Settings(BaseSettings):
     connector_max_m: float = 30.0
     # 경로 상세(T5.10) — 관리번호 없는 횡단보도 간선은 이 안의 가장 가까운 도로명으로 이름을 단다
     crosswalk_road_name_m: float = 20.0
+    # 통제 제보 (T7.15, INTERFACE §8) — 가정값, 11/14 현장 검증 뒤 다시 정한다
+    report_snap_m: float = 100.0  # 지금 위치 → 가장 가까운 횡단보도 상한
+    report_min_interval_s: int = 600  # 같은 기기·같은 횡단보도 다시 제보 간격

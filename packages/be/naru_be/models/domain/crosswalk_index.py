@@ -135,6 +135,16 @@ class CrosswalkIndex:
     def get(self, crosswalk_id: str) -> Crosswalk:
         return self._by_id[crosswalk_id]
 
+    def find(self, crosswalk_id: str) -> Crosswalk | None:
+        return self._by_id.get(crosswalk_id)
+
+    def nearest(self, lng: float, lat: float) -> tuple[Crosswalk, float]:
+        """가장 가까운 횡단보도와 거리(m, EPSG:5179) — 통제 제보(T7.15)."""
+        x, y = _4326_TO_5179.transform(lng, lat)
+        p = shapely.Point(x, y)
+        c = self._items[int(self._tree.nearest(p))]
+        return c, float(shapely.Point(c.x, c.y).distance(p))
+
     def district_of(self, crosswalk_id: str) -> str | None:
         """자치구 (T6.9 통제 불러오기 구 칩). 지금 범위 밖 관리번호면 None."""
         c = self._by_id.get(crosswalk_id)

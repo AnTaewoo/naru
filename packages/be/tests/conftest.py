@@ -4,19 +4,26 @@
 """
 
 import json
+from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import NamedTuple
 
 import pytest
+from alembic import command
+from alembic.config import Config
+from naru_be.models.repositories.report_repository import ReportRepository
+from sqlalchemy import inspect
 
 from naru_be.config import Settings
+from naru_be.db import make_engine, make_sessions
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
 from naru_be.models.domain.ped_graph import PedGraph
 from naru_contracts import CandidateBatch, ClosureState, LineGeom, Status
 
 DATA = Path(__file__).resolve().parents[3] / "data"
+BE_DIR = Path(__file__).resolve().parents[1]
 KST = timezone(timedelta(hours=9))
 
 
@@ -79,3 +86,31 @@ def course_world(seoul_spatial_dir: Path, recorded_dir: Path) -> CourseWorld:
     states = [s for group in by_candidate.values() for s in group]
     assert len(states) > 100 and {s.status for s in states} == {Status.scheduled}
     return CourseWorld(settings, ped, index, engine, states, by_candidate)
+
+
+@pytest.fixture(scope="module")
+def report_repo() -> Iterator[ReportRepository]:
+    """통제 제보 표(T7.15) — 실제 MySQL naru_test, Alembic head. 모듈 앞뒤로 비운다."""
+    settings = Settings()
+    assert settings.test_database_url.endswith("/naru_test"), settings.test_database_url
+    cfg = Config(str(BE_DIR / "alembic.ini"))
+    cfg.cmd_opts = type("Opts", (), {"x": [f"url={settings.test_database_url}"]})()
+    command.upgrade(cfg, "head")
+    engine = make_engine(settings.test_database_url)
+    with engine.connect() as conn:
+        cols = {c["name"] for c in inspect(conn).get_columns("reports")}
+    # 좌표·기기 토큰 원문 칸은 없다 (INTERFACE §8 — 저장 안 함)
+    assert cols == {
+        "id",
+        "crosswalk_id",
+        "state",
+        "reported_at",
+        "accuracy_m",
+        "source",
+        "device_hash",
+    }
+    repo = ReportRepository(make_sessions(engine))
+    repo.truncate()
+    yield repo
+    repo.truncate()
+    engine.dispose()
