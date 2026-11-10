@@ -110,3 +110,21 @@ class WatchArea(Contract):
 
 class WatchAreasResponse(Contract):
     areas: list[WatchArea]
+
+
+class PushDispatchRequest(Contract):
+    """§9.4 — 워커가 60초마다. at 은 테스트·재현용 기준 시각(없으면 서버 지금)."""
+
+    at: datetime | None = None
+
+    _tz = field_validator("at")(_require_offset)
+
+
+class PushDispatchResponse(Contract):
+    at: datetime
+    matched: int  # 관심 지역과 겹친 (구독, 사건, 종류) — 이미 보낸 것 빼고 새로 줄 세운 수
+    sent: int  # 이번에 보낸 수 (밤 created 는 07:00 까지 기다린다)
+    failed: int  # 푸시 서비스가 거절(410·404 는 구독을 끄고 deactivated 에도)
+    deactivated: int
+
+    _tz = field_validator("at")(_require_offset)

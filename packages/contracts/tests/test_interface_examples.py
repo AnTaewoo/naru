@@ -57,6 +57,8 @@ from naru_contracts.errors import ErrorCode
 from naru_contracts.feed_api import FeedCollection, FeedQuery
 from naru_contracts.march_api import MarchKeyframe, MarchQuery, MarchResponse
 from naru_contracts.push_api import (
+    PushDispatchRequest,
+    PushDispatchResponse,
     PushSubscription,
     UnsubscribeRequest,
     VapidPublicKey,
@@ -93,11 +95,11 @@ def _json(i: int) -> dict[str, Any]:
     return data
 
 
-def test_document_has_seventeen_json_blocks() -> None:
-    # §1.1·§1.2·§3.1·§3.2·§3.3·§7.1·§7.2·§8.1·§9.1~9.3 은 ### 소제목이라 상위 § 로 잡힌다
+def test_document_has_eighteen_json_blocks() -> None:
+    # §1.1·§1.2·§3.1·§3.2·§3.3·§7.1·§7.2·§8.1·§9.1~9.4 는 ### 소제목이라 상위 § 로 잡힌다
     assert [s for s, _ in BLOCKS] == [
         *("§1", "§1", "§1", "§1", "§1"),
-        *("§2", "§3", "§3", "§3", "§3", "§6", "§7", "§7", "§8", "§9", "§9", "§9"),
+        *("§2", "§3", "§3", "§3", "§3", "§6", "§7", "§7", "§8", "§9", "§9", "§9", "§9"),
     ]
 
 
@@ -819,3 +821,12 @@ def test_push_rules() -> None:  # §9 — endpoint https·512자, 키 길이, �
     for bad in ({"radius_m": 400}, {"kind": "home"}, {"lat": 91}, {"lng": "nan"}):
         with pytest.raises(ValidationError):
             WatchAreaRequest.model_validate({**base, **bad})
+
+
+def test_push_dispatch_example() -> None:  # §9.4 (T7.9) — 2026-11-11 기록 push_dispatch
+    r = PushDispatchResponse.model_validate(_json(17))
+    assert (r.matched, r.sent, r.failed, r.deactivated) == (6, 0, 0, 0)
+    assert r.at == datetime(2026, 11, 6, 23, 0, tzinfo=timezone(timedelta(hours=9)))
+    assert PushDispatchRequest.model_validate({}).at is None
+    with pytest.raises(ValidationError, match="오프셋"):
+        PushDispatchRequest.model_validate({"at": "2026-11-06T23:00:00"})

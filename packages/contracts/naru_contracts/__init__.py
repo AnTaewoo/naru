@@ -57,6 +57,8 @@ from naru_contracts.geocode_api import (
 )
 from naru_contracts.march_api import MarchKeyframe, MarchQuery, MarchResponse
 from naru_contracts.push_api import (
+    PushDispatchRequest,
+    PushDispatchResponse,
     PushKeys,
     PushSubscription,
     SubscribeResponse,
@@ -124,6 +126,8 @@ __all__ = [
     "Place",
     "PlacePoint",
     "PointGeom",
+    "PushDispatchRequest",
+    "PushDispatchResponse",
     "PushKeys",
     "PushSubscription",
     "RecentReportsQuery",
