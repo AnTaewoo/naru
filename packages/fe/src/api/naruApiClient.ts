@@ -15,6 +15,8 @@ export interface RouteParams {
   to: string;
   /** ISO 8601 + 오프셋 */
   departAt: string;
+  /** 피할 사건 id (INTERFACE §2 v0.14 avoid, T7.6) — 시각·확신도와 상관없이 막는다 */
+  avoid?: readonly string[];
 }
 
 export interface ClosuresParams {
@@ -62,6 +64,7 @@ export class NaruApiError extends Error {
 
 export function routeUrl(baseUrl: string, p: RouteParams): string {
   const q = new URLSearchParams({ from: p.from, to: p.to, depart_at: p.departAt, mode: "walk" });
+  if (p.avoid && p.avoid.length > 0) q.set("avoid", p.avoid.join(","));
   return `${baseUrl}/route?${q.toString()}`;
 }
 

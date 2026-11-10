@@ -39,6 +39,15 @@ describe("naruApiClient", () => {
     expect(q.get("from")).toBe("37.5709686446227,126.9779039768265");
     expect(q.get("depart_at")).toBe("2026-03-15T07:45:00+09:00");
     expect(q.get("mode")).toBe("walk");
+    expect(q.get("avoid")).toBeNull(); // 피할 사건이 없으면 안 보낸다
+    // v0.14 avoid (T7.6) — 사건 id 쉼표. 마라톤 1구간 adaea2f4cc02 (사건 v2 기록 closure_events_live_0315_0745)
+    const avoid = routeUrl("/api", {
+      from: "37.5709686446227,126.9779039768265",
+      to: "37.5650416322942,126.976542945622",
+      departAt: "2026-03-15T13:30:00+09:00",
+      avoid: ["adaea2f4cc02"],
+    });
+    expect(new URL(avoid, "http://naru.test").searchParams.get("avoid")).toBe("adaea2f4cc02");
     const c = new URL(
       closuresUrl("/api", {
         bbox: "126.965,37.555,126.990,37.580",

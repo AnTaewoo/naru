@@ -61,6 +61,8 @@ export interface RouteState {
   editing: OdField | null;
   /** 고른 길 (T5.11) — 원래 길 카드를 누르면 original */
   view: RouteView;
+  /** 피할 사건 id (T7.6) — 사건 카드 "이 구역 피해서 길찾기"·?avoid=. 시각·확신도와 상관없이 막는다 */
+  avoid: string | null;
 }
 
 export type RouteAction =
@@ -79,7 +81,8 @@ export type RouteAction =
   | { type: "edit"; which: OdField | null }
   | { type: "choose"; which: OdField; point: LngLat; name: string }
   | { type: "named"; which: OdField; point: LngLat; text: string | null }
-  | { type: "view"; view: RouteView };
+  | { type: "view"; view: RouteView }
+  | { type: "avoid"; id: string | null };
 
 export function initialRouteState(partial: Partial<RouteState> = {}): RouteState {
   return {
@@ -96,6 +99,7 @@ export function initialRouteState(partial: Partial<RouteState> = {}): RouteState
     names: { from: null, to: null },
     editing: null,
     view: "fastest",
+    avoid: null,
     ...partial,
   };
 }
@@ -134,6 +138,22 @@ export function routeReducer(state: RouteState, action: RouteAction): RouteState
       return { ...state, active: true, locate: state.from ? null : FROM_MINE };
     case "close":
       return initialRouteState();
+    case "avoid": {
+      // 이 구역 피해서 길찾기 (T7.6) — 길찾기를 켜고(출발이 없으면 내 위치부터), 받은 경로는 버리고 다시 받는다
+      const opened = state.active
+        ? state
+        : { ...state, active: true, locate: state.from ? null : FROM_MINE };
+      return {
+        ...opened,
+        avoid: action.id,
+        status: "idle",
+        route: null,
+        at: null,
+        error: null,
+        errorCode: null,
+        view: "fastest",
+      };
+    }
     case "pick": {
       if (!state.active) return state;
       // 입력 중인 칸이 있으면 그 칸(T5.8), 아니면 빈 칸 차례로
@@ -254,6 +274,12 @@ export function latLngParam(p: LngLat): string {
   return `${p[1]},${p[0]}`;
 }
 
+/** URL `?avoid=<사건 id>` (T7.6) — 계약의 사건 id(소문자 16진수 12자리)만, 아니면 null */
+export function avoidFromLocation(search: string): string | null {
+  const id = new URLSearchParams(search).get("avoid");
+  return id && /^[0-9a-f]{12}$/.test(id) ? id : null;
+}
+
 /** URL `?from=lat,lng&to=lat,lng` — 시연은 README 의 주소 (t 와 함께) */
 export function odFromLocation(search: string): { from: LngLat | null; to: LngLat | null } {
   const q = new URLSearchParams(search);
@@ -302,7 +328,7 @@ export function RouteProvider({
   const [state, dispatch] = useReducer(routeReducer, initialState, initialRouteState);
   const api = useNaruApi();
   const { t, ready } = useTime();
-  const { active, from, to } = state;
+  const { active, from, to, avoid } = state;
   const hasInitial = initialState !== undefined;
   // 내 위치가 보행망 밖인지 — /closures/events 의 coverage (위치를 받는 순간의 값)
   const { coverage } = useClosures();
@@ -314,6 +340,8 @@ export function RouteProvider({
     if (hasInitial) return;
     const od = odFromLocation(window.location.search);
     if (od.from || od.to) dispatch({ type: "setOd", ...od });
+    const id = avoidFromLocation(window.location.search);
+    if (id) dispatch({ type: "avoid", id });
   }, [hasInitial]);
 
   useEffect(() => {
@@ -322,7 +350,15 @@ export function RouteProvider({
     const timer = setTimeout(() => {
       dispatch({ type: "request", at: t });
       api
-        .route({ from: latLngParam(from), to: latLngParam(to), departAt: t }, controller.signal)
+        .route(
+          {
+            from: latLngParam(from),
+            to: latLngParam(to),
+            departAt: t,
+            avoid: avoid ? [avoid] : [],
+          },
+          controller.signal,
+        )
         .then((route) => dispatch({ type: "receive", at: t, route }))
         .catch((e: unknown) => {
           if (controller.signal.aborted) return;
@@ -335,7 +371,7 @@ export function RouteProvider({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [api, t, ready, active, from, to, fetchEnabled, debounceMs]);
+  }, [api, t, ready, active, from, to, avoid, fetchEnabled, debounceMs]);
 
   useEffect(() => {
     coverageRef.current = coverage;

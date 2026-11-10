@@ -27,6 +27,7 @@ import {
   initialClosureState,
 } from "./ClosureProvider";
 import {
+  avoidFromLocation,
   initialRouteState,
   latLngParam,
   odFromLocation,
@@ -246,6 +247,34 @@ describe("routeReducer", () => {
     expect(unset.to).toBeNull();
     expect(routeReducer(unset, { type: "pick", point: third }).to).toEqual(third);
     expect(routeReducer(s3, { type: "close" })).toEqual(initialRouteState());
+  });
+
+  it("이 구역 피해서 길찾기 (T7.6) — 홈에서 켜면 길찾기 + 내 위치부터, 받은 경로는 버리고 다시, 빼기·닫기, ?avoid=", () => {
+    const s0 = initialRouteState();
+    expect(s0.avoid).toBeNull();
+    const s1 = routeReducer(s0, { type: "avoid", id: "adaea2f4cc02" }); // 마라톤 1구간 (사건 v2 기록)
+    expect(s1.active).toBe(true);
+    expect(s1.avoid).toBe("adaea2f4cc02");
+    expect(s1.locate).toEqual({ which: "from", status: "locating" });
+    const ready = routeReducer(routeReducer(s0, { type: "setOd", from, to }), {
+      type: "receive",
+      at: T745,
+      route: r0745,
+    });
+    const s2 = routeReducer(ready, { type: "avoid", id: "adaea2f4cc02" });
+    expect(s2.route).toBeNull(); // avoid 가 바뀌면 다시 받는다
+    expect(s2.status).toBe("idle");
+    expect(s2.from).toEqual(from);
+    expect(s2.locate).toBeNull(); // 출발이 있으면 찾지 않는다
+    const off = routeReducer(s2, { type: "avoid", id: null });
+    expect(off.avoid).toBeNull();
+    expect(off.active).toBe(true);
+    expect(routeReducer(s2, { type: "close" })).toEqual(initialRouteState());
+    expect(avoidFromLocation("?t=2026-03-15T13:30:00%2B09:00&avoid=adaea2f4cc02")).toBe(
+      "adaea2f4cc02",
+    );
+    expect(avoidFromLocation("?avoid=ADAEA2F4CC02")).toBeNull(); // 계약은 소문자 12자리
+    expect(avoidFromLocation(`?t=${T745}`)).toBeNull();
   });
 
   it("request → receive → (t 이동) request 중엔 이전 경로 유지 → fail 은 경로를 지운다. 출발·도착이 바뀌어도 지운다", () => {
