@@ -46,6 +46,7 @@ test("앱을 열면 그 시각 서울 사건 — 클러스터, 칩은 사건 수
   await expect(sheet).toContainText("15:00–16:00 · 횡단보도 22곳");
   await expect(sheet).not.toContainText("내자");
   await expect(sheet).not.toContainText(EXCERPT); // 원문은 카드의 '통제 근거 보기'에서만 (T5.9·T7.5)
+  await expect(sheet).not.toContainText("시각표 기준"); // 데이터 기준 시각 줄은 /licenses 로 (T7.12·T7.13)
   // 이 시각 묶음 (T7.12) — 통제 중 8 + 1시간 안 시작 4. 넓은 창 기록 closure_events_catalog_1107_1530 과 같다
   await expect(sheet.getByRole("region", { name: "이 시각" }).getByRole("button")).toHaveCount(12);
   await expect(page.getByRole("button", { name: "통제 불러오기" })).toHaveCount(0);

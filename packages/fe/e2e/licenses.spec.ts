@@ -33,7 +33,22 @@ test("고지 — 지도 출처 칸은 'OSM' 한 줄, 시트를 펼치면 맨 아
   await expect(maplibre).toContainText("Copyright (c) 2023, MapLibre contributors");
   await expect(maplibre).toContainText("Copyright (c) 2020, Mapbox");
   await expect(page.getByRole("article", { name: /react-dom/ })).toContainText("MIT");
+  // 데이터 기준 시각 (T7.13) — 시트에서 뺀 문구가 여기에. layout 의 ClosureProvider 가 받은 사건 응답 data_as_of
+  const asof = page.getByRole("region", { name: "데이터 기준 시각" });
+  await expect(asof).toContainText("경찰청 11/6 공지");
+  await expect(asof).toContainText("마라톤 3/12 시각표 기준");
   expect(ownErrors(errors)).toEqual([]);
+});
+
+test("고지 페이지를 바로 열어도 데이터 기준 시각 — 그 페이지에서 사건 응답을 받는다 (T7.13)", async ({
+  page,
+}) => {
+  await page.goto("/licenses");
+  const asof = page.getByRole("region", { name: "데이터 기준 시각" });
+  // 임시 스택(naru_test) data_as_of — 경찰청 11/6 18:00 공지 · TOPIS 11/9 08:37 지도 · 마라톤 3/12 16:07 시각표
+  await expect(asof).toContainText(
+    /TOPIS \d\d:\d\d · 경찰청 11\/6 공지 · TOPIS 11\/9 공지 · 마라톤 3\/12 시각표 기준/,
+  );
 });
 
 test.describe("데스크톱 폭", () => {
