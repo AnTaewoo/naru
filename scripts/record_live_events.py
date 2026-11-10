@@ -68,6 +68,9 @@ ROUTES = {
     }
     for hhmm in ("0430", "1330")
 }
+# 태우 11/10 — 공지 해제 시각 뒤 30분(released_grace, 아직 막힘) 문구 "정리 중":
+# 3/15 08:35 는 1구간(08:08)·출발지 구간(08:30) 둘 다 해제 시각이 지났지만 +30분 안이라 통제 중
+ROUTES["route_0835"] = {"from": KYOBO, "to": DAEHANMUN, "depart_at": "2026-03-15T08:35:00+09:00"}
 
 
 def wide(at: str) -> dict[str, str]:
