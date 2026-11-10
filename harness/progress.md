@@ -364,3 +364,9 @@
 - 막힌 것 / 태우 대기: 🧑 VAPID 키(.env NARU_VAPID_PRIVATE_KEY·NARU_VAPID_SUBJECT) — T7.8 운영 구독에 필요. 🧑 `sudo systemctl restart naru`. 커밋 60개 미푸시. 헤드리스는 권한 창이 안 떠 버튼→허용 흐름은 e2e 밖
 - 커밋: 01454f6 7658ad7 7b2078b fe48c42 8aa1e0d (하네스 70f2c31) / 이 항목의 커밋
 
+## 2026-11-11 · T7.8 DONE (태우 "다음 다 했어")
+- 한 것: 알림 서버 쪽(INTERFACE §9) — `GET /push/vapid-public-key`(.env 개인키 PEM·raw → 공개점, 없으면 503 push_unavailable), `POST·DELETE /push/subscribe`(브라우저 구독 그대로, 같은 endpoint 같은 id), `GET·POST /watch-areas`·`DELETE /watch-areas/{id}`(saved 10개·300/500/1000 m, last_seen 하나 — 150 m 격자 가운데·3시간, 헤더 X-Push-Endpoint). 표 0008 셋. pywebpush 2.5.0(ADR-006 표). 구독 테스트 입력 = 헤드리스 Chrome 영속 프로필이 실제 FCM 에 만든 구독(`scripts/record_push_subscription.py`, recorded/push, 테스트 VAPID 키)
+- 정한 것: GET·DELETE 의 endpoint 는 헤더(로그에 안 남게), 격자 가운데, 기본 반경 500, 키 PEM·raw 둘 다, 기록은 키 그대로(폴더가 git 밖), 표 번호 0008
+- 막힌 것 / 태우 대기: 🧑 운영 VAPID 키 .env(태우 "다 했어" — 11/11 확인), 배포 재시작. 커밋 74개 미푸시. 개인정보 안내는 T7.10
+- 커밋: 8d49062 0d8d645 f2f3a83 4b6b581 8320b80 9cc2101 9ac5ee7 393afad (하네스 717f137) / 이 항목의 커밋
+

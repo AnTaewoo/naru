@@ -455,12 +455,12 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - 산출: `app/manifest.ts`, `public/sw.js`(push → 항상 showNotification, 클릭 → `/?event=`), iOS 16.4+ 홈 화면 안내, 권한은 버튼으로만. Provider 추가 안 함
 
 ### T7.8 BE 구독·관심 지역 API
-- status: DOING
+- status: DONE
 - depends: T7.7
 - 산출: `GET /push/vapid-public-key`, `POST·DELETE /push/subscribe`, `GET·POST·DELETE /watch-areas`(saved 300·500·1000 m, last_seen 150 m 격자·3시간), 표 셋(0006). 🧑 태우: VAPID 키(.env). 구독 테스트 입력 = 태우 실제 구독을 가린 기록(`{D}/recorded/push/`)
 
 ### T7.9 매칭·발송
-- status: TODO
+- status: DOING
 - depends: T7.2, T7.8
 - 산출: created·confirmed → blocks·≥ 0.7 → STRtree → (구독, 사건, 종류) 한 번 → 22~07 created 는 07시 → pywebpush(410·404 끔). 워커 `push` 60초 → `POST /internal/push/dispatch`
 
