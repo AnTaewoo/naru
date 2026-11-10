@@ -19,7 +19,10 @@ import {
   readEvents,
   eventsInit,
   routeUrl,
+  marchOrNull,
+  marchUrl,
   nearestUrl,
+  parseMarch,
   parseNearestCrosswalk,
   parseRecentReports,
   parseReportResponse,
@@ -244,5 +247,25 @@ describe("naruApiClient", () => {
       open: 0,
     });
     expect(() => parseRecentReports(near.body)).toThrow(NaruApiError);
+  });
+
+  it("행진 키프레임 (INTERFACE §3.2, T7.16) — URL, recorded 응답 파싱, 404 not_modeled 은 null", () => {
+    expect(marchUrl("/api", "be5f89a4ebf3")).toBe("/api/closures/events/be5f89a4ebf3/march");
+    const u = new URL(
+      marchUrl("/api", "be5f89a4ebf3", { from: "2026-11-07T15:30:00+09:00" }),
+      "http://naru.test",
+    );
+    expect(u.searchParams.get("from")).toBe("2026-11-07T15:30:00+09:00");
+    expect(u.searchParams.get("to")).toBeNull();
+    const rec = recorded("march_be5f89a4ebf3");
+    const body = parseMarch(rec.body);
+    expect(body.event_id).toBe("be5f89a4ebf3");
+    expect(body.keyframes).toHaveLength(241); // 12:00~16:00 1분
+    expect(Object.keys(body.crosswalk_points)).toHaveLength(13);
+    expect(() => parseMarch(recorded("reports_recent").body)).toThrow(NaruApiError);
+    const none = recorded("error_not_modeled");
+    expect(none.status).toBe(404);
+    expect(marchOrNull(new NaruApiError(none.status, none.body as ErrorBody))).toBeNull();
+    expect(() => marchOrNull(new NaruApiError(500, null))).toThrow(NaruApiError);
   });
 });

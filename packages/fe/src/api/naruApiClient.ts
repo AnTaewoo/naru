@@ -5,6 +5,7 @@ import type {
   FeatureCollection,
   GeocodeReverseResponse,
   GeocodeSearchResponse,
+  MarchResponse,
   NearestCrosswalk,
   NearestCrosswalkQuery,
   NearestCrosswalkResponse,
@@ -58,6 +59,12 @@ export interface GeocodeReverseParams {
   lng: number;
 }
 
+/** 행진 키프레임 (INTERFACE §3.2, T7.16) — from·to 없으면 통제 시간 전체 */
+export interface MarchParams {
+  from?: string;
+  to?: string;
+}
+
 /** 최근 제보 수 (INTERFACE §8.3, T7.15) */
 export interface RecentReportsParams {
   /** 횡단보도 ID 1~50개 */
@@ -106,6 +113,15 @@ export function geocodeSearchUrl(baseUrl: string, p: GeocodeSearchParams): strin
 export function geocodeReverseUrl(baseUrl: string, p: GeocodeReverseParams): string {
   const q = new URLSearchParams({ lat: String(p.lat), lng: String(p.lng) });
   return `${baseUrl}/geocode/reverse?${q.toString()}`;
+}
+
+/** 행진 키프레임 주소 (INTERFACE §3.2, T7.16) — 사건 id 는 §3.1 의 12자 소문자 16진수 */
+export function marchUrl(baseUrl: string, eventId: string, p: MarchParams = {}): string {
+  const q = new URLSearchParams();
+  if (p.from) q.set("from", p.from);
+  if (p.to) q.set("to", p.to);
+  const qs = q.toString();
+  return `${baseUrl}/closures/events/${eventId}/march${qs ? `?${qs}` : ""}`;
 }
 
 // 통제 제보 (INTERFACE §8, T7.15) — 좌표·제보는 주소가 아니라 POST 본문으로 (접근 로그에 안 남게)
@@ -274,6 +290,33 @@ export function parseRecentReports(json: unknown): RecentReportsResponse {
   return json as unknown as RecentReportsResponse;
 }
 
+export function parseMarch(json: unknown): MarchResponse {
+  const ok =
+    isRecord(json) &&
+    typeof json.event_id === "string" &&
+    typeof json.step_s === "number" &&
+    isRecord(json.window) &&
+    isRecord(json.crosswalk_points) &&
+    Array.isArray(json.keyframes) &&
+    json.keyframes.every(
+      (k) =>
+        isRecord(k) &&
+        typeof k.t === "string" &&
+        Array.isArray(k.samples) &&
+        Array.isArray(k.center) &&
+        typeof k.radius_m === "number" &&
+        isRecord(k.crosswalks),
+    );
+  if (!ok) throw new NaruApiError(200, null);
+  return json as unknown as MarchResponse;
+}
+
+/** 404 not_modeled(대상이 아닌 사건) 은 오류가 아니라 '모델 없음' */
+export function marchOrNull(e: unknown): null {
+  if (e instanceof NaruApiError && e.body?.error.code === "not_modeled") return null;
+  throw e;
+}
+
 export function parseGeocodeReverse(json: unknown): GeocodeReverseResponse {
   const label: unknown = isRecord(json) ? json.label : undefined;
   if (label !== null && typeof label !== "string") throw new NaruApiError(200, null);
@@ -288,6 +331,8 @@ export interface NaruApiClient {
   events(p?: EventsParams, signal?: AbortSignal, etag?: string | null): Promise<EventsFetch>;
   geocodeSearch(p: GeocodeSearchParams, signal?: AbortSignal): Promise<GeocodeSearchResponse>;
   geocodeReverse(p: GeocodeReverseParams, signal?: AbortSignal): Promise<GeocodeReverseResponse>;
+  /** 행진 예상 위치 키프레임 (T7.16) — 대상이 아닌 사건(404 not_modeled)은 null */
+  march(eventId: string, p?: MarchParams, signal?: AbortSignal): Promise<MarchResponse | null>;
   /** 통제 제보 (T7.15) — 좌표는 본문으로 */
   nearestCrosswalk(
     p: NearestCrosswalkQuery,
@@ -341,6 +386,8 @@ export function createNaruApiClient(
       parseGeocodeSearch(await getJson(geocodeSearchUrl(baseUrl, p), fetchImpl, signal)),
     geocodeReverse: async (p, signal) =>
       parseGeocodeReverse(await getJson(geocodeReverseUrl(baseUrl, p), fetchImpl, signal)),
+    march: async (eventId, p = {}, signal) =>
+      getJson(marchUrl(baseUrl, eventId, p), fetchImpl, signal).then(parseMarch, marchOrNull),
     nearestCrosswalk: async (p, signal) =>
       parseNearestCrosswalk(await postJson(nearestUrl(baseUrl), p, fetchImpl, signal)),
     report: async (body, signal) =>
