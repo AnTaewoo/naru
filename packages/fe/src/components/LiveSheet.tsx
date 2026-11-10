@@ -35,6 +35,7 @@ import { ClosureTimeline } from "./ClosureTimeline";
 import { EventCard } from "./EventCard";
 import styles from "./LiveSheet.module.css";
 import { PlaceCard } from "./PlaceCard";
+import { ReportCard } from "./ReportCard";
 import { StaleWarning } from "./StaleWarning";
 import { TimeSlider } from "./TimeSlider";
 
@@ -51,7 +52,8 @@ export function LiveSheet() {
   const dispatch = useClosureDispatch();
   const timeDispatch = useTimeDispatch();
   const routeDispatch = useRouteDispatch();
-  const { place } = useRoute(); // 검색한 장소(T7.14) — 있으면 시트는 장소 카드
+  // 검색한 장소(T7.14) — 있으면 시트는 장소 카드. 통제 제보(T7.15) 중이면 제보 카드가 먼저
+  const { place, report } = useRoute();
   const { t, ready, live: following } = useTime();
   const atMs = eventsAt ? Date.parse(eventsAt) : 0;
   // 목록 — 넓은 창(t 기준 상태)을 받기 전엔 지도 사건으로
@@ -66,10 +68,11 @@ export function LiveSheet() {
   const fromList = selected ? catalog?.find((e) => e.id === selected) : undefined;
   const card: ClosureEvent | null = fromMap ?? fromList ?? null;
   const cardAtMs = fromMap ? atMs : listAtMs;
-  // 지도·?event=·목록으로 카드나 묶음을 열면 접힌 시트를 절반으로
+  // 지도·?event=·목록으로 카드나 묶음을 열면(제보 시작도) 접힌 시트를 절반으로
+  const reporting = report !== null;
   useEffect(() => {
-    if (card || picked) setStage((s) => (s === "collapsed" ? "half" : s));
-  }, [card, picked]);
+    if (card || picked || reporting) setStage((s) => (s === "collapsed" ? "half" : s));
+  }, [card, picked, reporting]);
   const chips = useMemo(
     () =>
       districtChips(
@@ -160,7 +163,9 @@ export function LiveSheet() {
   };
   return (
     <BottomSheet label={title} stage={stage} onStage={setStage}>
-      {place ? (
+      {report ? (
+        <ReportCard />
+      ) : place ? (
         <PlaceCard />
       ) : card ? (
         <>
