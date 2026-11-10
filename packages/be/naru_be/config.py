@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     march_keyframe_s: int = 60  # 키프레임 간격 (태우 1분)
     march_point_step_m: float = 25.0  # 표본마다 머리~꼬리 점 간격
     march_points_max: int = 600  # 키프레임당 점 상한
+    # 공개 피드 (T7.17, INTERFACE §3.3) — 분 단위 캐시, IP 당 분당 요청 상한 (gunicorn 워커마다)
+    feed_cache_s: int = 60
+    feed_cache_max: int = 64
+    feed_rate_per_min: int = 60
     # 통제 제보 (T7.15, INTERFACE §8) — 가정값, 11/14 현장 검증 뒤 다시 정한다
     report_snap_m: float = 100.0  # 지금 위치 → 가장 가까운 횡단보도 상한
     report_min_interval_s: int = 600  # 같은 기기·같은 횡단보도 다시 제보 간격

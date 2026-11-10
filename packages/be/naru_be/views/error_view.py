@@ -47,4 +47,6 @@ def _code(code: str) -> ErrorCode:
         return "too_many_reports"
     if code == "not_modeled":
         return "not_modeled"
+    if code == "rate_limited":
+        return "rate_limited"
     return "internal"

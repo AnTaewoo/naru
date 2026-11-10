@@ -1,7 +1,7 @@
 """BE 도메인 예외 — INTERFACE §6 오류 코드와 1:1. Model 이 던지고 error_view 가 응답으로 만든다.
 
 code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, geocode_unavailable,
-too_many_reports, not_modeled, internal}.
+too_many_reports, not_modeled, rate_limited, internal}.
 Flask 를 모른다.
 """
 
@@ -54,3 +54,10 @@ class NotModeledError(NaruError):
 
     code = "not_modeled"
     http_status = 404
+
+
+class RateLimitedError(NaruError):
+    """공개 피드 IP 당 분당 요청 상한 (INTERFACE §3.3, T7.17)."""
+
+    code = "rate_limited"
+    http_status = 429
