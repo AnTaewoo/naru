@@ -8,7 +8,8 @@ BaselineRouter 는 같은 그래프에서 통제를 보지 않는다 (INTERFACE 
     scheduled_penalty_s(300초) x walk_speed (ADR-011 A). 창 밖(시작 전·끝난 뒤)은 보통
   scheduled 인데 confidence < 0.7, zone_scheduled, released → 보통 간선 (INTERFACE §5, 상태기계 표)
 출발·도착을 붙일 노드가 max_snap_m(150 m) 보다 멀면 OutOfCoverageError (ADR-011 그래프 밖).
-간선 도착 시각 = 출발 시각 + 지금까지 거리 / walk_speed. 폐쇄 판정은 ClosureEngine.status_of_state.
+간선 도착 시각 = 출발 시각 + 지금까지 거리 / walk_speed. 폐쇄 판정은 ClosureEngine.status_of_state,
+창 안 예정 판정은 prediction.penalized (현장 체크리스트·제보 비교와 같은 함수, T7.15).
 avoided = 통제가 없었다면 지났을(기준 경로) 횡단보도 중 도착 시각에 confirmed 이거나 scheduled 라서
 피한 것.
 avoid(T7.6, INTERFACE §2 v0.14) = 길찾기에서 고른 사건의 상태 — 그 횡단보도는 시각·확신도와 상관없이
@@ -27,6 +28,7 @@ from naru_be.config import Settings
 from naru_be.errors import NoRouteError, OutOfCoverageError
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.ped_graph import EdgeKind, PedEdge, PedGraph
+from naru_be.models.domain.prediction import penalized
 from naru_be.models.domain.types import AvoidedCrosswalk, LngLat, Path, RouteLeg
 from naru_contracts import ClosureState, Status
 
@@ -228,25 +230,18 @@ class TimeDependentRouter(_AStarRouter):
             out.setdefault(c.crosswalk_id, []).append(c)
         return out
 
-    def _penalized(self, state: ClosureState, status: Status, at: datetime) -> bool:
-        """예정이고 확신도 ≥ 0.7 이고 at 이 공지 창 안 (ADR-011 A). 끝이 없으면 시작 뒤 전부."""
-        if status is not Status.scheduled or state.confidence < self.settings.review_confidence:
-            return False
-        start, end = state.window.start, state.window.end
-        return (start is None or at >= start) and (end is None or at <= end)
-
     def _closure_cost(self, edge: PedEdge, at: datetime, by_crosswalk: ByCrosswalk) -> float | None:
         """None = 제외(confirmed). 창 안 예정 횡단보도마다 scheduled_penalty_s x walk_speed (m)."""
         penalty_m = self.settings.scheduled_penalty_s * self.settings.walk_speed_mps
         extra = 0.0
         for cid in edge.crosswalk_ids:
-            penalized = False
+            inside = False  # 창 안 예정
             for state in by_crosswalk.get(cid, ()):
                 status = self.engine.status_of_state(state, at)
                 if status is Status.confirmed:
                     return None
-                penalized = penalized or self._penalized(state, status, at)
-            if penalized:
+                inside = inside or penalized(state, status, at, self.settings)
+            if inside:
                 extra += penalty_m
         return extra
 
@@ -273,7 +268,7 @@ class TimeDependentRouter(_AStarRouter):
                     continue
                 for state in by_crosswalk.get(cid, ()):
                     status = self.engine.status_of_state(state, at)
-                    if status is Status.confirmed or self._penalized(state, status, at):
+                    if status is Status.confirmed or penalized(state, status, at, self.settings):
                         seen.add(cid)
                         out.append(self._entry(cid, state, status))
                         break
