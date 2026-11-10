@@ -63,7 +63,7 @@ naru_ai/
   publish.py              # CandidatePublisher — CandidateBatch를 BE로 POST
 ```
 - AI는 **독립 프로세스**(`python -m naru_ai.worker`)로 돈다. BE를 import하지 않는다.
-- 스케줄: 공지 5분 · 돌발 1분 · 버스는 통제 창 ±30분 안 15초 / 밖 5분. 일 호출 예산 상한은 `Settings`.
+- 스케줄: 공지 5분 · 돌발 1분 · 버스는 통제 창 ±30분 안 15초 / 밖 5분 · 알림 발송 깨우기 60초(`push` 소스 → `POST /internal/push/dispatch`, T7.9). 일 호출 예산 상한은 `Settings`.
 - `CandidatePublisher`는 httpx로 `POST {NARU_BE_URL}/internal/candidates`, 헤더 `X-Naru-Internal-Token`. 실패 시 3회 재시도 후 로그. **단위 테스트하지 않는다** — e2e에서 실제 BE로만.
 
 ### 3.2 LLM — Claude API (ADR-007)

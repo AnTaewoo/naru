@@ -369,7 +369,14 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 - `DELETE /watch-areas/{id}` 헤더 `X-Push-Endpoint` → 204. 내 것이 아니거나 없으면 404.
 - 오류: 본문·헤더 형식 400 `invalid_query`(field = 그 이름 — 반경이면 `radius_m`, 헤더 없음은 `endpoint`), 저장 10개 초과 400(field `kind`).
 
-### §9.4 `POST /internal/push/dispatch` (워커, 토큰) — T7.9 에서
+### §9.4 `POST /internal/push/dispatch` (워커, 토큰 `X-Naru-Internal-Token`)
+- AI 워커가 60초마다(`NARU_PUSH_INTERVAL_S`) 깨운다 — 매칭·발송은 BE 가 한다(gunicorn 워커 둘이 겹치지 않게 DB 유일키 `(구독, 사건, 종류)`). 본문 `{"at": …}`(선택, 테스트·재현용 기준 시각; 없으면 서버 지금).
+- 매칭: 그 시각 통제 중 ~ 24시간(`push_horizon_h`) 안 사건 중 통제 중·예정(구역 예정 제외)·확신도 ≥ 0.7·구역 있는 것 × 켜진 구독의 관심 지역 원(만료된 last_seen 은 지우고) → 겹치면 (구독, 사건, 종류) 한 번. 종류 `confirmed`(그 시각 통제 중) · `created`(예정). `created` 가 밤(22~07시 KST)이면 다음 07:00 에, 그 밖은 바로.
+- 발송: 때가 된 것을 pywebpush(VAPID, aes128gcm)로. 푸시 본문(JSON) `{kind, event_id, type, event(사건 이름 첫 줄 80자), start, end, url}` — 한국어 문구는 서비스워커(`public/sw.js`)가 붙인다. 404·410 이면 그 구독을 끈다(`active` false).
+```json
+{"at": "2026-11-06T23:00:00+09:00", "matched": 6, "sent": 0, "failed": 0, "deactivated": 0}
+```
+- 2026-11-11 기록 `naru_api/push_dispatch.json` — 11/6 23:00 기준, 구독 하나에 광화문교보빌딩 saved 500 m + 덕수궁 대한문 last_seen 500 m: 교보 원에 11/7 r01·r04 행진·TOPIS 공지 6300, 대한문 원에 세종대로 집회 돌발 셋 → 여섯이 줄 섰고(전부 그 시각엔 예정 = `created`, 밤이라 07:00 까지 안 보냄). `matched` 새로 줄 선 수 · `sent` 이번에 보낸 수 · `failed` 거절 · `deactivated` 끈 구독 수.
 
 ## 변경 이력
 | 날짜 | 버전 | 변경 | 누가 |
@@ -399,3 +406,4 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 | 2026-11-10 | v0.15 | §3.2 `GET /closures/events/{id}/march` 행진 예상 위치 키프레임(표본 점·중심·반경·횡단보도별 P, 1분), §5 행진 예정 비용 = P × 예정 비용(P ≥ 0.8 제외, scheduled·confirmed 모두), §6 `not_modeled`(404) (ADR-015) | 태우 승인 (ADR-015) |
 | 2026-11-10 | v0.15 (보충) | §3.3 `GET /closures/feed?at=` 공개 GeoJSON 피드(횡단보도·사건 구역·행진 경로, 사건 칸·상태·확신도·P, 분 캐시·IP 분당 60회), §6 `rate_limited`(429) | 태우 지시 (11/10, T7.17 — 이력만) |
 | 2026-11-10 | v0.15 (보충) | §9 알림 구독·관심 지역 `GET /push/vapid-public-key`·`POST·DELETE /push/subscribe`·`GET·POST /watch-areas`·`DELETE /watch-areas/{id}`(endpoint 는 헤더 X-Push-Endpoint, last_seen 150 m 격자·3시간, saved 10개), §6 `push_unavailable`(503). 표 0008 | 태우 승인 (ADR-014 C) |
+| 2026-11-11 | v0.15 (보충) | §9.4 `POST /internal/push/dispatch`(워커 60초, 매칭 규칙·밤 07:00·푸시 본문·404/410 끔) | 태우 승인 (ADR-014 C) |

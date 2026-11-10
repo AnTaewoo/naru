@@ -61,6 +61,7 @@
 |---|---|---|---|
 | `route_controller` | `GET /route` | `RoutePlanner.plan(query)` | `route_view.render` |
 | `closure_controller` | `GET /closures` | `ClosureRepository.active_horizon(t, bbox)` → `ClosureEngine.restate(states, t)` | `closure_view.render` |
+| `push_controller.internal` | `POST /internal/push/dispatch` (토큰) | `PushDesk.dispatch(at)` — 사건 × 관심 지역 매칭(`push_dispatcher.plan_sends` 순수) → `push_sends` 줄 세움 → `WebPushSender`(pywebpush) 발송, 404·410 끔 (T7.9) | `push_view.render_dispatch` |
 | `push_controller` | `GET /push/vapid-public-key` · `POST·DELETE /push/subscribe` · `GET·POST /watch-areas` · `DELETE /watch-areas/{id}` | `PushDesk.public_key / subscribe / unsubscribe / areas / add_area / remove_area` (ADR-014 C, T7.8). GET·DELETE 의 endpoint 는 헤더 `X-Push-Endpoint` | `push_view` |
 | `feed_controller` | `GET /closures/feed` | 요청 제한(`FeedDesk.limiter`, IP 분당 60) → `FeedDesk.collection_at(at)` (분 캐시, T7.17) | `feed_view.render` (ETag·public max-age·CORS) |
 | `closure_controller` | `GET /closures/events/{id}/march` | `ClosureRepository.march_of(id)` → `march.march_result(…)` (키프레임, ADR-015 F, T7.16) | `march_view.render` (ETag) |
@@ -128,6 +129,7 @@
                                                                                     ▼
                  Next.js /api/* rewrites → NaruApiClient → Time/Closure/Route Provider → MapView · LegList
 
+⑨ 워커 push 60초 ─→ POST /internal/push/dispatch → [M] PushDesk.dispatch(사건 × 관심 지역 → push_sends → pywebpush) → 브라우저 sw.js showNotification → 클릭 /?event= (ADR-014 C, T7.9)
 ④ 버스 위치 ─→ BusPoller ─→ data/recorded/bus/<notice|marathon>/ (기록만, NARU_BUS_RECORD_ONLY=1)
                  버스는 후보·상태를 만들지 않는다 — 확신도 보정은 보류 (ADR-013 보류, 2026-11-09)
 ```
