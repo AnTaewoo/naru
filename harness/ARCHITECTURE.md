@@ -105,6 +105,7 @@
 | `map/MapView.tsx` | client | `useRef(maplibre.Map)`, `source.setData()` |
 | `map/layers/{closure,route,zone,event}Layer.ts` | 순수 함수 | contracts → MapLibre source. event = 지금 지도 사건 중심점(클러스터)·구역 (T7.4) |
 | `map/eventKinds.ts` | 순수 함수 | 사건 종류(통제 중·1시간 안·예정·예정 구역·해제)·칩 수·목록 순서·줌 3단계 (T7.4) |
+| `app/manifest.ts` · `public/sw.js` · `push/usePush.ts` | PWA (T7.7) | 매니페스트(설치), 서비스워커(push → showNotification, 클릭 → `/?event=`), 지원 판정·등록·권한 훅(Provider 없음). 구독·관심 지역은 T7.8~T7.10 |
 | `map/layers/marchLayer.ts` | 순수 함수 | 행진 키프레임(§3.2) → 그 시각 프레임(두 키프레임 사이 보간) → heatmap·중심 원·횡단보도 P 6단계 소스. 재생은 ClosureProvider `playMs`(네트워크 없음) (T7.16) |
 | `components/TimeSlider` · `LegList` · `EvidencePopover` · `Footer` | client | |
 

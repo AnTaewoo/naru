@@ -191,6 +191,7 @@ migrations/            # Alembic
 - **`'use client'` 경계는 세 파일뿐**: `app/providers.tsx`(Provider 묶음), `components/NaruApp.tsx`(지도 화면 루트), `components/DataAsOf.tsx`(서버 페이지 `/licenses`의 데이터 기준 시각 — layout의 ClosureProvider를 읽는다, T7.13). Context·hooks·maplibre를 쓰는 코드는 전부 이 셋 아래.
 - `MapView`는 `next/dynamic(() => import("../map/MapView"), { ssr: false })` — maplibre는 `window`가 필요하다. `ssr: false`는 클라이언트 컴포넌트 안에서만 쓸 수 있으므로 `NaruApp.tsx`에서 부른다.
 - 서버 컴포넌트에서 BE를 fetch하지 않는다. 지도 데이터는 시각 `t`에 따라 클라이언트가 다시 받는다.
+- PWA(ADR-014 D, T7.7): 매니페스트는 `app/manifest.ts`(Next 가 `/manifest.webmanifest`), 서비스워커는 `public/sw.js`(알림만 — push → showNotification, 클릭 → `/?event=`; 캐시·오프라인 없음), 등록·권한은 `push/usePush.ts` 훅(Provider 추가 안 함, 권한은 버튼에서만 묻는다). `make serve` 는 `public/` 을 standalone 에 복사한다.
 
 ### 5.4 구조
 ```
@@ -201,6 +202,8 @@ packages/fe/
   src/app/providers.tsx          # 'use client' — ApiProvider > TimeProvider > ClosureProvider > RouteProvider
   src/components/NaruApp.tsx     # 'use client' — 화면 루트, MapView dynamic import
   src/components/DataAsOf.tsx    # 'use client' — /licenses 의 데이터 기준 시각 (T7.13)
+  src/app/manifest.ts            # PWA 매니페스트 (T7.7). public/sw.js 서비스워커, public/icons PNG
+  src/push/support.ts  usePush.ts # 알림 지원 판정(순수)·등록·권한 훅 (T7.7)
   src/components/TimeSlider.tsx  LegList.tsx  EvidencePopover.tsx  Footer.tsx
   src/api/naruApiClient.ts       # fetch("/api/route"), fetch("/api/closures") — 네트워크 만지는 유일한 파일
   src/state/ApiProvider.tsx  TimeProvider.tsx  ClosureProvider.tsx  RouteProvider.tsx
