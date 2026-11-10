@@ -14,6 +14,9 @@ avoided = 통제가 없었다면 지났을(기준 경로) 횡단보도 중 도�
 피한 것.
 avoid(T7.6, INTERFACE §2 v0.14) = 길찾기에서 고른 사건의 상태 — 그 횡단보도는 시각·확신도와 상관없이
 간선 제외(§5 규칙보다 앞). 기준 경로가 지나면 avoided 에 그 시각 실제 상태로 넣는다.
+행진(ADR-015 E, T7.16) — 사건에 프로필(marches)이 있고 그 횡단보도가 경로 위면, scheduled(확신도
+≥ 0.7)든 confirmed 든 창 전체 대신 P(t, s): 비용 = P x 예정 비용, P ≥ march_p_block 이면 제외.
+창 밖은 P 0.
 """
 
 from __future__ import annotations
@@ -21,18 +24,20 @@ from __future__ import annotations
 import heapq
 import itertools
 import math
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 
 from naru_be.config import Settings
 from naru_be.errors import NoRouteError, OutOfCoverageError
 from naru_be.models.domain.closure_engine import ClosureEngine
+from naru_be.models.domain.march import MarchProfile, p_at
 from naru_be.models.domain.ped_graph import EdgeKind, PedEdge, PedGraph
 from naru_be.models.domain.prediction import penalized
 from naru_be.models.domain.types import AvoidedCrosswalk, LngLat, Path, RouteLeg
 from naru_contracts import ClosureState, Status
 
-ByCrosswalk = dict[str, list[ClosureState]]
+EventKey = tuple[str, datetime | None, datetime | None]  # (reason, 시작, 끝) — 사건
+ByCrosswalk = dict[str, list[tuple[ClosureState, MarchProfile | None]]]  # 상태, 그 사건 행진 프로필
 EPOCH = datetime(2000, 1, 1, tzinfo=UTC)  # 통제를 안 볼 때의 시각 — 쓰이지 않는다
 
 
@@ -211,11 +216,13 @@ class TimeDependentRouter(_AStarRouter):
         t: datetime,
         closures: Sequence[ClosureState],
         avoid: Sequence[ClosureState] = (),
+        marches: Mapping[EventKey, MarchProfile] | None = None,
     ) -> Path:
-        """avoid = 길찾기에서 피할 사건의 상태(T7.6) — 시각·확신도와 상관없이 막는다"""
+        """avoid = 길찾기에서 피할 사건의 상태(T7.6) — 시각·확신도와 상관없이 막는다.
+        marches = 사건별 행진 프로필(T7.16) — 그 사건 경로 위 횡단보도는 P(t, s)"""
         if t.tzinfo is None:
             raise ValueError("t 는 tz-aware 여야 한다")
-        by_crosswalk = self._by_crosswalk(closures)
+        by_crosswalk = self._by_crosswalk(closures, marches)
         forced = self._by_crosswalk(avoid)
         a, b, snap_in, snap_out = self._snap(src, dst)
         baseline = self._search(a, b, t, {})
@@ -224,25 +231,46 @@ class TimeDependentRouter(_AStarRouter):
         return self._build(path, src, dst, snap_in, snap_out, avoided)
 
     @staticmethod
-    def _by_crosswalk(closures: Iterable[ClosureState]) -> ByCrosswalk:
+    def _by_crosswalk(
+        closures: Iterable[ClosureState], marches: Mapping[EventKey, MarchProfile] | None = None
+    ) -> ByCrosswalk:
         out: ByCrosswalk = {}
         for c in closures:
-            out.setdefault(c.crosswalk_id, []).append(c)
+            march = marches.get((c.reason, c.window.start, c.window.end)) if marches else None
+            out.setdefault(c.crosswalk_id, []).append((c, march))
         return out
 
+    def _march_p(
+        self, state: ClosureState, march: MarchProfile, status: Status, at: datetime
+    ) -> float | None:
+        """행진 경로 위 횡단보도의 P — 라우팅 대상 상태(confirmed, 확신도 ≥ 0.7 예정)일 때만."""
+        counted = status is Status.confirmed or (
+            status is Status.scheduled and state.confidence >= self.settings.review_confidence
+        )
+        start, end = state.window.start, state.window.end
+        if not counted or start is None or end is None:
+            return None
+        return p_at(march, start, end, state.crosswalk_id, at, self.settings)
+
     def _closure_cost(self, edge: PedEdge, at: datetime, by_crosswalk: ByCrosswalk) -> float | None:
-        """None = 제외(confirmed). 창 안 예정 횡단보도마다 scheduled_penalty_s x walk_speed (m)."""
+        """None = 제외(confirmed, 행진 P ≥ march_p_block). 횡단보도마다 예정 비용
+        (scheduled_penalty_s x walk_speed, m) x 몫 — 창 안 예정이면 1, 행진이면 P 중 큰 값."""
         penalty_m = self.settings.scheduled_penalty_s * self.settings.walk_speed_mps
         extra = 0.0
         for cid in edge.crosswalk_ids:
-            inside = False  # 창 안 예정
-            for state in by_crosswalk.get(cid, ()):
+            share = 0.0
+            for state, march in by_crosswalk.get(cid, ()):
                 status = self.engine.status_of_state(state, at)
-                if status is Status.confirmed:
+                p = self._march_p(state, march, status, at) if march else None
+                if p is not None:
+                    if p >= self.settings.march_p_block:
+                        return None
+                    share = max(share, p)
+                elif status is Status.confirmed:
                     return None
-                inside = inside or penalized(state, status, at, self.settings)
-            if inside:
-                extra += penalty_m
+                elif penalized(state, status, at, self.settings):
+                    share = 1.0
+            extra += penalty_m * share
         return extra
 
     def _avoided(
@@ -266,14 +294,21 @@ class TimeDependentRouter(_AStarRouter):
             for cid in edge.crosswalk_ids:
                 if cid in seen or cid in used:
                     continue
-                for state in by_crosswalk.get(cid, ()):
+                for state, march in by_crosswalk.get(cid, ()):
                     status = self.engine.status_of_state(state, at)
-                    if status is Status.confirmed or penalized(state, status, at, self.settings):
+                    p = self._march_p(state, march, status, at) if march else None
+                    hit = (
+                        p > 0.0
+                        if p is not None
+                        else status is Status.confirmed
+                        or penalized(state, status, at, self.settings)
+                    )
+                    if hit:
                         seen.add(cid)
                         out.append(self._entry(cid, state, status))
                         break
                 if cid not in seen and cid in forced:
-                    state = forced[cid][0]
+                    state, _ = forced[cid][0]
                     seen.add(cid)
                     out.append(self._entry(cid, state, self.engine.status_of_state(state, at)))
         return tuple(out)
