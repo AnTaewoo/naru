@@ -1,7 +1,8 @@
 """현장 체크리스트 — 그 날 그 시간대 나루가 막힘으로 보는 (횡단보도, 사건) → CSV + GeoJSON (T7.15).
 
 교수님 멘토링 T-A(11/10): 11/14 현장 검증에 들고 나간다. 막힘 판정은 라우터와 같은 함수
-(naru_be.models.domain.prediction — confirmed, 또는 확신도 ≥ 0.7 예정이 공지 창 안).
+(naru_be.models.domain.prediction — confirmed, 또는 확신도 ≥ 0.7 예정이 공지 창 안; 행진 확률
+모델 사건은 P(t, s) ≥ 0.8, ADR-015).
 1분 간격으로 보고 처음·마지막으로 막힌 분을 적는다. actual·checked_at·note 는 현장에서 적는
 예비 칸(주는 제보 앱).
 DB 는 읽기만. 기본 DB 는 Settings.database_url(운영), 검증 DB 면 --database-url.
@@ -24,7 +25,7 @@ from naru_be.config import Settings
 from naru_be.db import make_engine, make_sessions
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
-from naru_be.models.domain.prediction import ChecklistRow, checklist
+from naru_be.models.domain.prediction import ChecklistRow, checklist, key_of
 from naru_be.models.repositories.closure_repository import ClosureRepository
 
 KST = timezone(timedelta(hours=9))
@@ -78,10 +79,11 @@ def main(argv: list[str] | None = None) -> int:
     spatial = latest_dir(settings.data_dir / "raw", "seoul_spatial_*")
     index = CrosswalkIndex.from_xlsx(spatial / "OA-23081.xlsx", settings)
     url = args.database_url or settings.database_url
-    states = ClosureRepository(make_sessions(make_engine(url)), settings).active_between(
-        start, end, WORLD
-    )
-    rows = checklist(states, index, ClosureEngine(index, settings), settings, start, end)
+    repo = ClosureRepository(make_sessions(make_engine(url)), settings)
+    states = repo.active_between(start, end, WORLD)
+    marches = repo.marches_of({key_of(st) for st in states})  # 행진 사건은 P ≥ 0.8 인 분만 (T7.16)
+    engine = ClosureEngine(index, settings)
+    rows = checklist(states, index, engine, settings, start, end, marches=marches)
     if not rows:
         print(
             f"{start:%Y-%m-%d %H:%M}~{end:%H:%M} 막힘 예측 없음 (상태 {len(states)}건)",

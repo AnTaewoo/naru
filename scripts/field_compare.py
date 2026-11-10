@@ -2,7 +2,8 @@
 
 양성 = 막힘. 맞음 · 덜 막음(나루 열림, 실제 막힘) · 더 막음(나루 막힘, 실제 열림).
 recall = 맞힌 막힘 / 실제 막힘, precision = 맞힌 막힘 / 나루 막힘. 예측은 라우터와 같은 함수
-(naru_be.models.domain.prediction.blocked_at). 제보는 source=field 만(FE ?mode=field). DB 는 읽기만.
+(naru_be.models.domain.prediction.blocked_at — 행진 확률 모델 사건은 P ≥ 0.8, ADR-015). 제보는
+source=field 만(FE ?mode=field). DB 는 읽기만.
 
     uv run python scripts/field_compare.py --date 2026-11-14 [--database-url URL] [--out FILE]
 """
@@ -19,7 +20,7 @@ from naru_be.config import Settings
 from naru_be.db import make_engine, make_sessions
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
-from naru_be.models.domain.prediction import CompareResult, Verdict, compare
+from naru_be.models.domain.prediction import CompareResult, Verdict, compare, key_of
 from naru_be.models.repositories.closure_repository import ClosureRepository
 from naru_be.models.repositories.report_repository import ReportRepository
 from naru_contracts import Status
@@ -87,8 +88,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     spatial = latest_dir(settings.data_dir / "raw", "seoul_spatial_*")
     index = CrosswalkIndex.from_xlsx(spatial / "OA-23081.xlsx", settings)
-    states = ClosureRepository(sessions, settings).active_between(day0, day1, WORLD)
-    result = compare(reports, states, ClosureEngine(index, settings), settings)
+    repo = ClosureRepository(sessions, settings)
+    states = repo.active_between(day0, day1, WORLD)
+    marches = repo.marches_of({key_of(st) for st in states})  # 행진 사건은 P ≥ 0.8 (T7.16)
+    result = compare(reports, states, ClosureEngine(index, settings), settings, marches)
     out: Path = args.out or Path("docs/eval") / f"field_{args.date:%Y%m%d}.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(render(result, index, args.date, url.rsplit("/", 1)[-1]), "utf-8")

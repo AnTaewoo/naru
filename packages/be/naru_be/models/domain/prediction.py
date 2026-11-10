@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Literal
@@ -72,6 +72,13 @@ class ChecklistRow:
     blocked_to: datetime  # 마지막으로 막힌 분
 
 
+EventKey = tuple[str, datetime | None, datetime | None]  # (reason, 시작, 끝) — 사건
+
+
+def key_of(state: ClosureState) -> EventKey:
+    return (state.reason, state.window.start, state.window.end)
+
+
 def checklist(
     states: Iterable[ClosureState],
     index: CrosswalkIndex,
@@ -80,14 +87,17 @@ def checklist(
     start: datetime,
     end: datetime,
     step: timedelta = timedelta(minutes=1),
+    marches: Mapping[EventKey, MarchProfile] | None = None,
 ) -> list[ChecklistRow]:
-    """[start, end] 에 한 번이라도 막히는 (횡단보도, 사건) — 현장에 들고 나갈 목록."""
+    """[start, end] 에 한 번이라도 막히는 (횡단보도, 사건) — 현장에 들고 나갈 목록. marches 가
+    있으면 행진 사건은 P ≥ march_p_block 인 분만 막힘."""
     found: dict[tuple[str, str], ChecklistRow] = {}
     for st in states:
+        march = marches.get(key_of(st)) if marches else None
         hits: list[tuple[datetime, Status]] = []
         t = start
         while t <= end:
-            status = blocked_at(st, t, engine, settings)
+            status = blocked_at(st, t, engine, settings, march)
             if status is not None:
                 hits.append((t, status))
             t += step
@@ -153,8 +163,9 @@ def compare(
     states: Iterable[ClosureState],
     engine: ClosureEngine,
     settings: Settings,
+    marches: Mapping[EventKey, MarchProfile] | None = None,
 ) -> CompareResult:
-    """제보마다 그 시각 나루 예측과 맞춰 본다 (양성 = 막힘)."""
+    """제보마다 그 시각 나루 예측과 맞춰 본다 (양성 = 막힘). marches 는 checklist 와 같다."""
     by_cw: dict[str, list[ClosureState]] = {}
     for st in states:
         by_cw.setdefault(st.crosswalk_id, []).append(st)
@@ -163,7 +174,16 @@ def compare(
         hits = [
             (status, st.reason)
             for st in by_cw.get(r.crosswalk_id, ())
-            if (status := blocked_at(st, r.reported_at, engine, settings)) is not None
+            if (
+                status := blocked_at(
+                    st,
+                    r.reported_at,
+                    engine,
+                    settings,
+                    marches.get(key_of(st)) if marches else None,
+                )
+            )
+            is not None
         ]
         predicted = worst(s for s, _ in hits) if hits else None
         reason = next((why for s, why in hits if s is predicted), None)
