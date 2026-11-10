@@ -327,3 +327,9 @@
 - 정한 것: 경고는 실제 멈춘 시간(N분째·시간째·일째), 자리는 예전 기준 시각 줄 자리(부제 아래), 카드엔 없음, /licenses 섹션은 맨 아래(태우 "페이지 아래에")
 - 막힌 것 / 태우 대기: 경고가 뜬 화면은 실데이터로 30분 기다려야 해 못 찍음(운영 기록 렌더 테스트로 확인). INTERFACE §3.1 data_as_of 끝의 FE 설명("목록 위에 기준 시각 … 회색 경고")이 이제 다름 — 고칠지, ARCHITECTURE FE 표 'use client' 경계에 DataAsOf 를 더할지 태우 답 대기. T7.13 커밋은 아직 push 안 함. 🧑 `sudo systemctl restart naru`(T7.12·T7.13 공개)
 - 커밋: 4e9ac09 05e57e0 9af59a1 (하네스 9e5ac07 · cc5276c) / 이 항목의 커밋
+
+## 2026-11-10 · T7.6 DONE (태우 "다음")
+- 한 것: 이 구역 피해서 길찾기 — 계약 v0.14 보충 `GET /route?avoid=<사건 id,…>`(ADR-014 A 그대로, 10개까지·없는 id 무시·응답 스키마 그대로), BE 사건 id → 상태(closure_states 묶음에서 계산 — 구역 없는 옛 사건도) → A* 가 그 횡단보도를 시각·확신도와 상관없이 뺌, avoided 에 그 시각 실제 상태. FE 사건 카드 "이 구역 피해서 길찾기"(목업 03 주 버튼) → 길찾기 + avoid, 시트 맨 위 "피하는 구역 · 제목 [빼기]", 원래 길 카드 "피한 구역 N곳"(보낸 사건의 reason·끝으로 알아봄), ?avoid= 공유 링크. 3/15 07:45 공유 링크 회귀 e2e(%2B·날짜 칸). 태우 11/10 중간: 해제 예정 뒤 30분(BE released_grace — 아직 막힘)을 "해제됨" 대신 "정리 중"(카드 "08:38까지 정리 중" + 까닭 한 줄, 배지·통제 근거 "정리 중 · 08:38까지", 길찾기 "09:00까지 정리 중"). 기록: route_avoid_0430·1330·route_0835(scripts/record_live_events.py)
+- 정한 것: 피한 구역 판별은 계약을 늘리지 않고 FE 가(해제·예정 구역 상태는 avoid 로만 오니 그대로), 없는 id 는 400 대신 무시, 카드 버튼은 해제 사건에도, 정리 시간 30분은 FE 상수 RELEASE_GRACE_MS(BE released_grace_min 과 같이)
+- 막힌 것 / 태우 대기: T7.13·T7.6 커밋 push 할지, INTERFACE §3.1 FE 설명 줄·ARCHITECTURE DataAsOf 줄(T7.13 질문) 대기. 임시 BE(5060)를 avoid 코드로 다시 띄움. 🧑 `sudo systemctl restart naru`(T7.12·T7.13·T7.6 공개)
+- 커밋: d66fefc 5b03a84 9ab2c80 512f872 a1995d6 ffd6f02 af4013f 555387a 82c5584 (하네스 3b82834 · a59f82d) / 이 항목의 커밋
