@@ -425,12 +425,30 @@ export const PUSH_KO = {
   title: "통제 알림",
   why: "관심 지역 근처에 통제가 생기면 알려 드려요",
   enable: "통제 알림 받기",
-  granted: "알림이 허용됐어요. 관심 지역 등록은 다음 업데이트에서 열려요",
+  working: "알림을 켜는 중…",
+  on: "알림 받는 중",
+  off: "알림 끄기",
+  granted: "알림이 허용됐어요. 사건 카드의 ☆로 관심 지역을 더하세요",
   denied: "알림이 꺼져 있어요. 브라우저 설정에서 이 사이트의 알림을 허용하면 받을 수 있어요",
   iosInstall:
     "iPhone·iPad 는 홈 화면에 추가한 뒤에 알림을 켤 수 있어요 — 공유 버튼 → '홈 화면에 추가' (iOS 16.4 이상)",
   unsupported: "이 브라우저는 알림을 지원하지 않아요",
+  failed: "알림 구독을 만들지 못했어요. 시크릿 창이거나 푸시 서비스에 닿지 못했을 수 있어요",
+  areasHead: "관심 지역",
+  noAreas: "아직 관심 지역이 없어요 — 사건 카드의 ☆ 이 근처 알림 받기",
+  lastSeen: "마지막 위치 근처",
+  remove: "빼기",
+  watch: "☆ 이 근처 알림 받기",
+  watching: "★ 이 근처 알림 받는 중",
+  privacy:
+    "저장하는 건 구독 주소와 관심 지역 좌표뿐이에요. 마지막 위치는 150 m 단위로 3시간만 — 자세한 건 고지",
 } as const;
+
+/** 관심 지역 한 줄 — "종로구 종로 1 · 500 m", 마지막 위치면 "마지막 위치 근처 · 500 m" */
+export function watchAreaKo(label: string | null, radiusM: number, lastSeen: boolean): string {
+  const where = lastSeen ? PUSH_KO.lastSeen : (label ?? SELECTED_PLACE_KO);
+  return `${where} · ${radiusM} m`;
+}
 
 /** 통제 제보 (T7.15, INTERFACE §8) — 기록만, 길찾기에는 아직 안 쓴다 */
 export const REPORT_KO = {
