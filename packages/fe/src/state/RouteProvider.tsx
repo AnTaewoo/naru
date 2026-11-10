@@ -10,9 +10,9 @@ import {
   type Dispatch,
   type ReactNode,
 } from "react";
-import { NaruApiError } from "../api/naruApiClient";
+import { NaruApiError, placeLngLat } from "../api/naruApiClient";
 import type { LngLat } from "../map/layers/routeLayer";
-import type { RouteResponse } from "../types/contracts";
+import type { Place, RouteResponse } from "../types/contracts";
 import { useNaruApi } from "./ApiProvider";
 import { inBbox, useClosures, type Bbox4 } from "./ClosureProvider";
 import { useTime } from "./TimeProvider";
@@ -35,6 +35,26 @@ export interface LocateState {
 export interface PlaceName {
   point: LngLat;
   text: string | null;
+}
+
+/** 검색한 장소 (T7.14) — 홈 검색 결과를 누르면 핀·장소 카드. 출발·도착으로 고르면 사라진다 */
+export interface PlacePick {
+  id: string;
+  name: string;
+  /** 도로명 주소, 없으면 지번 (INTERFACE §7.1) */
+  address: string;
+  point: LngLat;
+}
+
+export function placePick(p: Place): PlacePick | null {
+  const point = placeLngLat(p);
+  return point ? { id: p.id, name: p.name, address: p.address, point } : null;
+}
+
+/** 지도를 옮길 점 (T7.14) — 검색으로 고른 장소·칸. seq 가 바뀌면 MapView 가 flyTo */
+export interface MapFocus {
+  point: LngLat;
+  seq: number;
 }
 
 export interface RouteState {
@@ -63,6 +83,10 @@ export interface RouteState {
   view: RouteView;
   /** 피할 사건 id (T7.6) — 사건 카드 "이 구역 피해서 길찾기"·?avoid=. 시각·확신도와 상관없이 막는다 */
   avoid: string | null;
+  /** 검색한 장소 (T7.14) — 핀·장소 카드, 길찾기를 켜지 않는다 */
+  place: PlacePick | null;
+  /** 지도를 옮길 점 (T7.14) */
+  focus: MapFocus | null;
 }
 
 export type RouteAction =
@@ -82,7 +106,8 @@ export type RouteAction =
   | { type: "choose"; which: OdField; point: LngLat; name: string }
   | { type: "named"; which: OdField; point: LngLat; text: string | null }
   | { type: "view"; view: RouteView }
-  | { type: "avoid"; id: string | null };
+  | { type: "avoid"; id: string | null }
+  | { type: "place"; place: PlacePick | null };
 
 export function initialRouteState(partial: Partial<RouteState> = {}): RouteState {
   return {
@@ -100,6 +125,8 @@ export function initialRouteState(partial: Partial<RouteState> = {}): RouteState
     editing: null,
     view: "fastest",
     avoid: null,
+    place: null,
+    focus: null,
     ...partial,
   };
 }
@@ -223,12 +250,26 @@ export function routeReducer(state: RouteState, action: RouteAction): RouteState
     }
     case "edit":
       return state.active ? { ...state, editing: action.which } : state;
+    case "place":
+      // 검색한 장소 (T7.14) — 핀·카드, 지도는 그리로. 다른 검색·지도 누르기·카드 닫기는 null
+      return action.place
+        ? {
+            ...state,
+            place: action.place,
+            focus: { point: action.place.point, seq: (state.focus?.seq ?? 0) + 1 },
+          }
+        : state.place === null
+          ? state
+          : { ...state, place: null };
     case "choose": {
-      // 검색으로 고른 장소 (T5.8) — 칸 이름은 장소 이름. 홈에서 고르면 길찾기가 켜진다
+      // 검색으로 고른 장소 (T5.8) — 칸 이름은 장소 이름. 홈에서 고르면 길찾기가 켜진다.
+      // 지도도 그 점으로(T7.14), 장소 카드는 닫는다
       const name: PlaceName = { point: action.point, text: action.name };
       const next = {
         ...withField(state, action.which, action.point),
         names: { ...state.names, [action.which]: name },
+        place: null,
+        focus: { point: action.point, seq: (state.focus?.seq ?? 0) + 1 },
       };
       // 홈에서 도착을 고르면 출발은 내 위치부터(T5.7 기본값). 다른 칸을 찾던 중이면 계속
       if (!state.active && action.which === "to" && !state.from)

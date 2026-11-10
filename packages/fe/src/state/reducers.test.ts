@@ -32,6 +32,7 @@ import {
   latLngParam,
   odFromLocation,
   parseLatLng,
+  placePick,
   routeReducer,
 } from "./RouteProvider";
 import {
@@ -247,6 +248,30 @@ describe("routeReducer", () => {
     expect(unset.to).toBeNull();
     expect(routeReducer(unset, { type: "pick", point: third }).to).toEqual(third);
     expect(routeReducer(s3, { type: "close" })).toEqual(initialRouteState());
+  });
+
+  it("검색한 장소 (T7.14) — 핀·카드(길찾기는 안 켬)·지도 이동, 출발·도착으로 고르면 장소는 사라지고 그 점으로 이동, 빼기", () => {
+    const [kyobo] = parseGeocodeSearch(recorded("geocode_search_kyobo").body).places;
+    const pick = kyobo ? placePick(kyobo) : null;
+    expect(pick?.name).toBe("광화문교보빌딩");
+    if (!pick) return;
+    const s1 = routeReducer(initialRouteState(), { type: "place", place: pick });
+    expect(s1.active).toBe(false);
+    expect(s1.place).toEqual(pick);
+    expect(s1.focus?.point).toEqual(pick.point);
+    const seq = s1.focus?.seq ?? 0;
+    const s2 = routeReducer(s1, {
+      type: "choose",
+      which: "from",
+      point: pick.point,
+      name: pick.name,
+    });
+    expect(s2.active).toBe(true);
+    expect(s2.place).toBeNull();
+    expect(s2.from).toEqual(pick.point);
+    expect(s2.focus).toEqual({ point: pick.point, seq: seq + 1 }); // 칸 검색으로 고른 점도 그리로
+    expect(routeReducer(s1, { type: "place", place: null }).place).toBeNull();
+    expect(routeReducer(s1, { type: "close" })).toEqual(initialRouteState());
   });
 
   it("이 구역 피해서 길찾기 (T7.6) — 홈에서 켜면 길찾기 + 내 위치부터, 받은 경로는 버리고 다시, 빼기·닫기, ?avoid=", () => {
