@@ -158,6 +158,15 @@
     "RecentReportsResponse": {
       "$ref": "#/$defs/RecentReportsResponse"
     },
+    "MarchQuery": {
+      "$ref": "#/$defs/MarchQuery"
+    },
+    "MarchKeyframe": {
+      "$ref": "#/$defs/MarchKeyframe"
+    },
+    "MarchResponse": {
+      "$ref": "#/$defs/MarchResponse"
+    },
     "ErrorDetail": {
       "$ref": "#/$defs/ErrorDetail"
     },
@@ -2085,6 +2094,163 @@
       "title": "RecentReportsResponse",
       "type": "object"
     },
+    "MarchQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "pattern": "^[0-9a-f]{12}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "From"
+        },
+        "to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "To"
+        }
+      },
+      "required": [
+        "event_id"
+      ],
+      "title": "MarchQuery",
+      "type": "object"
+    },
+    "MarchKeyframe": {
+      "additionalProperties": false,
+      "properties": {
+        "t": {
+          "format": "date-time",
+          "title": "T",
+          "type": "string"
+        },
+        "samples": {
+          "items": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "title": "Samples",
+          "type": "array"
+        },
+        "center": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Center",
+          "type": "array"
+        },
+        "radius_m": {
+          "minimum": 0,
+          "title": "Radius M",
+          "type": "number"
+        },
+        "crosswalks": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Crosswalks",
+          "type": "object"
+        }
+      },
+      "required": [
+        "t",
+        "samples",
+        "center",
+        "radius_m",
+        "crosswalks"
+      ],
+      "title": "MarchKeyframe",
+      "type": "object"
+    },
+    "MarchResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "pattern": "^[0-9a-f]{12}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "window": {
+          "$ref": "#/$defs/Window"
+        },
+        "step_s": {
+          "minimum": 1,
+          "title": "Step S",
+          "type": "integer"
+        },
+        "crosswalk_points": {
+          "additionalProperties": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Crosswalk Points",
+          "type": "object"
+        },
+        "keyframes": {
+          "items": {
+            "$ref": "#/$defs/MarchKeyframe"
+          },
+          "title": "Keyframes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "event_id",
+        "window",
+        "step_s",
+        "crosswalk_points",
+        "keyframes"
+      ],
+      "title": "MarchResponse",
+      "type": "object"
+    },
     "ErrorDetail": {
       "additionalProperties": false,
       "properties": {
@@ -2097,6 +2263,7 @@
             "out_of_coverage",
             "geocode_unavailable",
             "too_many_reports",
+            "not_modeled",
             "internal"
           ],
           "title": "Code",

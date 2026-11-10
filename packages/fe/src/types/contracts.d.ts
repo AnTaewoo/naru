@@ -225,6 +225,20 @@ export type Ids = [string, ...string[]];
 export type Minutes = number;
 export type Blocked = number;
 export type Open = number;
+export type EventId = string;
+export type From3 = string | null;
+export type To3 = string | null;
+export type T = string;
+export type Samples = [unknown, unknown][][];
+/**
+ * @minItems 2
+ * @maxItems 2
+ */
+export type Center = [unknown, unknown];
+export type RadiusM = number;
+export type EventId1 = string;
+export type StepS = number;
+export type Keyframes = MarchKeyframe[];
 export type Code =
   | "invalid_query"
   | "unauthorized"
@@ -233,6 +247,7 @@ export type Code =
   | "out_of_coverage"
   | "geocode_unavailable"
   | "too_many_reports"
+  | "not_modeled"
   | "internal";
 export type Message = string;
 export type Field = string | null;
@@ -292,6 +307,9 @@ export interface NaruContracts {
   RecentReportsQuery?: RecentReportsQuery;
   ReportCounts?: ReportCounts;
   RecentReportsResponse?: RecentReportsResponse;
+  MarchQuery?: MarchQuery;
+  MarchKeyframe?: MarchKeyframe;
+  MarchResponse?: MarchResponse;
   ErrorDetail?: ErrorDetail;
   ErrorBody?: ErrorBody;
   [k: string]: unknown;
@@ -592,6 +610,35 @@ export interface RecentReportsResponse {
 }
 export interface Counts {
   [k: string]: ReportCounts;
+}
+export interface MarchQuery {
+  event_id: EventId;
+  from?: From3;
+  to?: To3;
+}
+export interface MarchKeyframe {
+  t: T;
+  samples: Samples;
+  center: Center;
+  radius_m: RadiusM;
+  crosswalks: Crosswalks1;
+}
+export interface Crosswalks1 {
+  [k: string]: number;
+}
+export interface MarchResponse {
+  event_id: EventId1;
+  window: Window;
+  step_s: StepS;
+  crosswalk_points: CrosswalkPoints;
+  keyframes: Keyframes;
+}
+export interface CrosswalkPoints {
+  /**
+   * @minItems 2
+   * @maxItems 2
+   */
+  [k: string]: [unknown, unknown];
 }
 export interface ErrorDetail {
   code: Code;
