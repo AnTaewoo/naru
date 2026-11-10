@@ -5,6 +5,7 @@ import {
   AVOID_KO,
   GRACE_NOTE_KO,
   MARCH_KO,
+  PUSH_KO,
   TYPE_KO,
   confidenceKo,
   dayKo,
@@ -35,6 +36,7 @@ export function EventCard({
   march = null,
   playMs = null,
   onPlay,
+  watch,
 }: {
   event: ClosureEvent;
   atMs: number;
@@ -47,6 +49,8 @@ export function EventCard({
   playMs?: number | null;
   /** 재생·정지 (T7.16) */
   onPlay?: () => void;
+  /** ☆ 이 근처 알림 받기 (T7.10) — 사건 중심 500 m. 없으면(중심 없음) 버튼을 안 그린다 */
+  watch?: { watched: boolean; busy: boolean; note: string | null; onToggle: () => void };
 }) {
   const [open, setOpen] = useState(false);
   const kind = eventKind(event, atMs);
@@ -125,6 +129,24 @@ export function EventCard({
         <button type="button" className={`${styles.cta} ${styles.primary}`} onClick={onAvoid}>
           {AVOID_KO.button}
         </button>
+      )}
+      {watch && (
+        <>
+          <button
+            type="button"
+            className={styles.cta}
+            aria-pressed={watch.watched}
+            disabled={watch.busy}
+            onClick={watch.onToggle}
+          >
+            {watch.watched ? PUSH_KO.watching : PUSH_KO.watch}
+          </button>
+          {watch.note && (
+            <p className={styles.grace} role="status">
+              {watch.note}
+            </p>
+          )}
+        </>
       )}
       {event.notice && (
         <>

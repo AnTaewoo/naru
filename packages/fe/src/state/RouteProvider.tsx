@@ -23,6 +23,7 @@ import {
   type ReportEvent,
   type ReportState,
 } from "./report";
+import { lastSeenFrom } from "../push/usePush";
 import { browserStorage } from "./savedPlaces";
 import { isNowAt, useTime } from "./TimeProvider";
 
@@ -465,6 +466,7 @@ export function RouteProvider({
       (pos) => {
         const point: LngLat = [pos.coords.longitude, pos.coords.latitude];
         if (live) dispatch({ type: "located", point, coverage: coverageRef.current });
+        if (live) lastSeenFrom(api, point); // 내 위치를 켰을 때만 마지막 위치 관심 지역 (T7.10)
       },
       (err) => {
         const reason = err.code === err.PERMISSION_DENIED ? "denied" : "unavailable";
@@ -475,7 +477,7 @@ export function RouteProvider({
     return () => {
       live = false;
     };
-  }, [locating, fetchEnabled]);
+  }, [locating, fetchEnabled, api]);
 
   // 통제 제보 (T7.15) — 지금 위치 한 번(정확도 우선, 지난 위치는 안 씀) → 최근접 횡단보도 → 보내기
   const reportPhase = state.report?.phase ?? null;

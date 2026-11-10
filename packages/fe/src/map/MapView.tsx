@@ -22,6 +22,8 @@ import {
   useClosures,
   type Bbox4,
 } from "../state/ClosureProvider";
+import { lastSeenFrom } from "../push/usePush";
+import { useNaruApi } from "../state/ApiProvider";
 import { fieldModeFromLocation } from "../state/report";
 import { POSITION_OPTIONS, useRoute, useRouteDispatch } from "../state/RouteProvider";
 import { useTime } from "../state/TimeProvider";
@@ -326,6 +328,7 @@ export function MapView({ visible }: MapViewProps) {
   const { closures, bbox, coverage, events, eventsAt, selected, frame, catalog, march, playMs } =
     useClosures();
   const { t } = useTime();
+  const api = useNaruApi();
   const dispatch = useClosureDispatch();
   const { route, from, to, active, view, place, focus, report } = useRoute();
   // 원래 길 카드를 골랐나 (T5.11) — 피한 통제가 없으면 원래 길도 없다
@@ -389,6 +392,8 @@ export function MapView({ visible }: MapViewProps) {
       const cov = coverageRef.current;
       const outside = cov !== null && !inBbox([e.coords.longitude, e.coords.latitude], cov);
       setNotice(outside ? MAP_OUTSIDE_KO : null);
+      // 내 위치를 켰을 때만 — 구독이 있으면 마지막 위치 근처도 관심 지역 (T7.10, 150 m 격자·3시간은 BE)
+      lastSeenFrom(api, [e.coords.longitude, e.coords.latitude]);
     });
     map.addControl(geolocate, "top-right");
     // 통제 제보 (T7.15) — 주소에 ?mode=field 면 현장 검증 제보
@@ -514,7 +519,7 @@ export function MapView({ visible }: MapViewProps) {
       map.remove(); // StrictMode 이중 마운트에서 map 이 둘 생기지 않게
       mapRef.current = null;
     };
-  }, [dispatch, routeDispatch]);
+  }, [dispatch, routeDispatch, api]);
 
   useEffect(() => {
     coverageRef.current = coverage;

@@ -26,9 +26,11 @@ import {
   type ListedEvent,
 } from "../map/eventKinds";
 import { EXAMPLES, type Example } from "../map/examples";
+import { usePush } from "../push/usePush";
 import { asBbox4, useClosureDispatch, useClosures } from "../state/ClosureProvider";
 import { useRoute, useRouteDispatch } from "../state/RouteProvider";
 import { isNowAt, kstIso, useTime, useTimeDispatch } from "../state/TimeProvider";
+import { PUSH_KO } from "../i18n/ko";
 import type { ClosureEvent } from "../types/contracts";
 import { BottomSheet, type SheetStage } from "./BottomSheet";
 import { ClosureTimeline } from "./ClosureTimeline";
@@ -42,6 +44,12 @@ import { TimeSlider } from "./TimeSlider";
 
 /** 지난 통제는 처음에 이만큼, 나머지는 "더 보기" (태우 11/10) */
 const PAST_FIRST = 5;
+/** [lng, lat] 숫자 둘이면 — 생성 타입은 unknown 튜플 */
+function pair(xs: readonly unknown[]): [number, number] | null {
+  const [a, b] = xs;
+  return typeof a === "number" && typeof b === "number" ? [a, b] : null;
+}
+
 /** 행진 예상 위치 재생 (T7.16) — 통제 시간 전체를 이 초에, 이 간격으로 */
 const PLAY_SECONDS = 12;
 const PLAY_TICK_MS = 100;
@@ -83,6 +91,33 @@ export function LiveSheet() {
   const fromList = selected ? catalog?.find((e) => e.id === selected) : undefined;
   const card: ClosureEvent | null = fromMap ?? fromList ?? null;
   const cardAtMs = fromMap ? atMs : listAtMs;
+  // ☆ 이 근처 알림 받기 (T7.10) — 사건 중심 500 m 를 저장 관심 지역으로. 알림을 못 켜는 브라우저면 까닭 한 줄
+  const push = usePush();
+  const [watchNote, setWatchNote] = useState<string | null>(null);
+  useEffect(() => setWatchNote(null), [selected]);
+  const centroid = card?.centroid ? pair(card.centroid) : null;
+  const watchedNow = centroid ? push.watchedArea(centroid) : null;
+  const watch =
+    card && centroid
+      ? {
+          watched: watchedNow !== null,
+          busy: push.busy,
+          note:
+            watchNote ??
+            (push.error === "limit"
+              ? "저장 관심 지역은 10곳까지예요"
+              : push.error === "failed"
+                ? PUSH_KO.failed
+                : null),
+          onToggle: () => {
+            if (watchedNow) return push.unwatch(watchedNow.id);
+            if (push.support === "ios_install") return setWatchNote(PUSH_KO.iosInstall);
+            if (push.support === "denied") return setWatchNote(PUSH_KO.denied);
+            if (push.support === "unsupported") return setWatchNote(PUSH_KO.unsupported);
+            push.watch(centroid, eventTitleKo(card));
+          },
+        }
+      : undefined;
   // 행진 예상 위치 재생 (T7.16) — 통제 시간 전체를 PLAY_SECONDS 에, 네트워크 없이 시각만 옮긴다
   const marchBody = card && march?.id === card.id ? march.body : null;
   useEffect(() => {
@@ -210,6 +245,7 @@ export function LiveSheet() {
             march={marchBody}
             playMs={playMs}
             onPlay={togglePlay}
+            watch={watch}
           />
         </>
       ) : (
