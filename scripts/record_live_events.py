@@ -10,7 +10,8 @@ TOPIS 공지 6300(11/7 09:00 에 볼 글)·TOPIS 통제지도 11/9 08:37 목록(
 그 뒤 GET /closures/events?at=… 를 시각마다 그대로 남긴다(record_naru_api 형식, ETag 도).
 11/7 15:30 = 집회 날, 11/9 13:30 = 국회대로 행진 통제 중·강남대로 30분 뒤, 3/15 07:45 = 마라톤,
 11/8 20:00 = 다음 날(11/9) 통제가 '내일'(T7.5). 시트 목록(T7.12)은 at 앞뒤 365일
-넓은 창 — 11/7 15:30, 11/8 12:00(이 시각 걸린 통제 없음).
+넓은 창 — 11/7 15:30, 11/8 12:00(이 시각 걸린 통제 없음). 길찾기 avoid(T7.6) — 교보빌딩 → 대한문을
+3/15 04:30·13:30 에 마라톤 1구간을 피해서(GET /route?avoid=).
 T7.4 에서 PDF·통제지도를 더해 다시 기록 — FE 지금 지도에 확신도 0.7 미만 사건이 있어야 한다.
 """
 
@@ -50,6 +51,22 @@ AT = {
 CATALOG = {
     "closure_events_catalog_1107_1530": "2026-11-07T15:30:00+09:00",
     "closure_events_catalog_1108_1200": "2026-11-08T12:00:00+09:00",
+}
+
+
+# T7.6 이 구역 피해서 길찾기 — /route?avoid= (교보빌딩 → 대한문, record_naru_api 와 같은 카카오 점).
+# 마라톤 1구간(adaea2f4cc02, 07:20~08:08)을 04:30(시작 전 — 예정)·13:30(끝난 뒤 — 해제)에 피한다
+KYOBO = "37.5709686446227,126.9779039768265"
+DAEHANMUN = "37.5650416322942,126.976542945622"
+SEG1 = "adaea2f4cc02"
+ROUTES = {
+    f"route_avoid_{hhmm}": {
+        "from": KYOBO,
+        "to": DAEHANMUN,
+        "depart_at": f"2026-03-15T{hhmm[:2]}:{hhmm[2:]}:00+09:00",
+        "avoid": SEG1,
+    }
+    for hhmm in ("0430", "1330")
 }
 
 
@@ -129,6 +146,19 @@ def main() -> None:
             "vertices",
             verts,
         )
+    for name, query in ROUTES.items():
+        resp = client.get("/route", query_string=query)
+        doc = {
+            "method": "GET",
+            "path": "/route",
+            "query": query,
+            "status": resp.status_code,
+            "body": resp.get_json(),
+        }
+        path = out / f"{name}.json"
+        path.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        avoided = [(a["crosswalk_id"], a["status"]) for a in doc["body"].get("avoided", [])]
+        print(path.relative_to(ROOT), resp.status_code, "avoided", avoided)
     models.repo.truncate()
 
 
