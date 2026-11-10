@@ -27,6 +27,7 @@ import {
 } from "../map/eventKinds";
 import { EXAMPLES } from "../map/examples";
 import { asBbox4, useClosureDispatch, useClosures } from "../state/ClosureProvider";
+import { useRouteDispatch } from "../state/RouteProvider";
 import { isNowAt, kstIso, useTime, useTimeDispatch } from "../state/TimeProvider";
 import type { ClosureEvent } from "../types/contracts";
 import { BottomSheet, type SheetStage } from "./BottomSheet";
@@ -48,6 +49,7 @@ export function LiveSheet() {
     useClosures();
   const dispatch = useClosureDispatch();
   const timeDispatch = useTimeDispatch();
+  const routeDispatch = useRouteDispatch();
   const { t, ready, live: following } = useTime();
   const atMs = eventsAt ? Date.parse(eventsAt) : 0;
   // 목록 — 넓은 창(t 기준 상태)을 받기 전엔 지도 사건으로
@@ -147,6 +149,7 @@ export function LiveSheet() {
             event={card}
             atMs={cardAtMs}
             onClose={() => dispatch({ type: "select", id: null })}
+            onAvoid={() => routeDispatch({ type: "avoid", id: card.id })}
           />
         </>
       ) : (

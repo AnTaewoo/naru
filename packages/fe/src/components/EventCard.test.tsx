@@ -36,6 +36,21 @@ describe("EventCard", () => {
     expect(screen.getByText(excerpt)).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "카드 닫기" }));
     expect(closed).toBe(1);
+    expect(screen.queryByRole("button", { name: "이 구역 피해서 길찾기" })).toBeNull(); // onAvoid 없음
+  });
+
+  it("이 구역 피해서 길찾기 (T7.6) — onAvoid 가 있으면 버튼, 누르면 부른다 (11/7 경찰청 r04)", () => {
+    let asked = 0;
+    render(
+      <EventCard
+        event={eventById(a.body.events, "2e930ec6deeb")}
+        atMs={a.atMs}
+        onClose={() => undefined}
+        onAvoid={() => (asked += 1)}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "이 구역 피해서 길찾기" }));
+    expect(asked).toBe(1);
   });
 
   it("11/7 15:30 경찰청 r01 — 시작했는데 근거가 없으면 '확인 전', 확신도 높음(0.85)·경찰청 공지", () => {

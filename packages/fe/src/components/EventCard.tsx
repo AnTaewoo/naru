@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  AVOID_KO,
   TYPE_KO,
   confidenceKo,
   dayKo,
@@ -18,15 +19,18 @@ import type { ClosureEvent } from "../types/contracts";
 import styles from "./EventCard.module.css";
 
 // 사건 카드 (T7.5, 목업 03_closure) — 배지(상태·원인) → 제목 → 둘째 줄·지나는 곳 → 날짜·창 → 남은 시간(가장 큰 글자)
-// → 출처·확신도·막히는 횡단보도 → 통제 근거 보기(공지 원문). 피해서 길찾기는 T7.6, ☆ 알림은 T7.10
+// → 출처·확신도·막히는 횡단보도 → 이 구역 피해서 길찾기(T7.6) · 통제 근거 보기(공지 원문). ☆ 알림은 T7.10
 export function EventCard({
   event,
   atMs,
   onClose,
+  onAvoid,
 }: {
   event: ClosureEvent;
   atMs: number;
   onClose: () => void;
+  /** 이 사건을 피해서 길찾기 (T7.6) — 없으면 버튼을 안 그린다 */
+  onAvoid?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const kind = eventKind(event, atMs);
@@ -75,6 +79,11 @@ export function EventCard({
           <dd>{event.crosswalks}곳</dd>
         </div>
       </dl>
+      {onAvoid && (
+        <button type="button" className={`${styles.cta} ${styles.primary}`} onClick={onAvoid}>
+          {AVOID_KO.button}
+        </button>
+      )}
       {event.notice && (
         <>
           <button

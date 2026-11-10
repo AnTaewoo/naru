@@ -12,11 +12,17 @@ import { ApiProvider } from "../state/ApiProvider";
 import { ClosureProvider } from "../state/ClosureProvider";
 import { RouteProvider, odFromLocation, type RouteState } from "../state/RouteProvider";
 import { TimeProvider } from "../state/TimeProvider";
-import { recorded, recordedClosures, recordedRoute } from "../test/recorded";
-import type { ErrorBody, RouteResponse } from "../types/contracts";
+import {
+  eventById,
+  recorded,
+  recordedClosures,
+  recordedLive,
+  recordedRoute,
+} from "../test/recorded";
+import type { ClosureEvent, ErrorBody, RouteResponse } from "../types/contracts";
 import { evidenceGroups } from "./EvidencePopover";
 import { legRows } from "./LegList";
-import { RouteCard, fastestCard, originalCard, routeCrossing } from "./RouteCard";
+import { RouteCard, fastestCard, originalCard, originalFactsKo, routeCrossing } from "./RouteCard";
 import { RoutePanel } from "./RoutePanel";
 
 const T745 = "2026-03-15T07:45:00+09:00";
@@ -28,6 +34,14 @@ const r0430 = recordedRoute("route_0430");
 const r1107 = recordedRoute("route_1107_1500");
 const T1107 = "2026-11-07T15:00:00+09:00";
 const fc0745 = recordedClosures("closures_0745");
+// T7.6 avoid — 교보빌딩 → 대한문, 마라톤 1구간(adaea2f4cc02)을 피해서 (scripts/record_live_events.py)
+// 04:30·13:30 둘 다 680 s·816.1 m(세종대로사거리·청계광장 횡단보도), 원래 길 674 s·808.3 m,
+// 피한 23206 하나 — 04:30 은 scheduled(시작 전), 13:30 은 released(끝난 뒤), 끝 08:08
+const rAvoid0430 = recordedRoute("route_avoid_0430");
+const rAvoid1330 = recordedRoute("route_avoid_1330");
+const live0745 = recordedLive("closure_events_live_0315_0745").body.events;
+const seg1 = eventById(live0745, "adaea2f4cc02");
+const seg1Target = { reason: seg1.reason, end: seg1.window.end ?? null };
 const q = recorded("route_0745").query ?? {};
 const od = odFromLocation(`?from=${q["from"] ?? ""}&to=${q["to"] ?? ""}`);
 
@@ -35,17 +49,19 @@ function Providers({
   children,
   at,
   route,
+  events = null,
 }: {
   children: ReactNode;
   at: string;
   route: Partial<RouteState>;
+  events?: ClosureEvent[] | null;
 }) {
   return (
     <ApiProvider client={createNaruApiClient("/api")}>
       <TimeProvider initialT={at}>
         <ClosureProvider
           fetchEnabled={false}
-          initialState={{ status: "ready", closures: fc0745, at }}
+          initialState={{ status: "ready", closures: fc0745, at, events }}
         >
           <RouteProvider
             fetchEnabled={false}
@@ -138,6 +154,37 @@ describe("카드·레그·근거 (순수)", () => {
     ).toBe(
       "횡단보도 1곳이 16:00까지 공지상 통제 시간(현장 확인 전)이라 시청 지하보도로 건너는 길을 골랐어요.",
     );
+  });
+
+  it("이 구역 피해서 (T7.6) — 04:30·13:30 avoid=1구간: 그 시각 상태(예정·해제)라도 '피한 구역', 해제 시각은 안 쓴다", () => {
+    for (const r of [rAvoid0430, rAvoid1330]) {
+      const orig = originalCard(r, seg1Target);
+      expect(orig).toEqual({
+        minutes: 11,
+        distance: "808m",
+        blocked: false,
+        crosswalks: 1,
+        confirmed: 0,
+        scheduled: 0,
+        requested: 1,
+        until: null,
+      });
+      expect(orig && originalFactsKo(orig)).toBe("횡단보도 피한 구역 1곳");
+      expect(fastestCard(r, T1330)).toMatchObject({ minutes: 11, distance: "816m" });
+      expect(
+        routeNoteKo({
+          ...(orig ?? { crosswalks: 0, until: null, blocked: false }),
+          crossing: routeCrossing(r),
+          avoiding: true,
+        }),
+      ).toBe("고른 구역의 횡단보도 1곳을 피해 돌아가는 길을 골랐어요.");
+    }
+    // 사건을 아직 모르면 — 해제 항목은 avoid 로만 오므로 그래도 피한 구역, 예정 항목은 상태대로
+    expect(originalCard(rAvoid1330)).toMatchObject({ requested: 1, scheduled: 0 });
+    expect(originalCard(rAvoid0430)).toMatchObject({ requested: 0, scheduled: 1 });
+    expect(
+      routeNoteKo({ crosswalks: 0, until: null, blocked: false, crossing: null, avoiding: true }),
+    ).toBe("이 길은 고른 구역을 지나지 않아요.");
   });
 
   it("LegList 07:45 — 레그 7행, 이름 있는 지하보도·횡단보도(교차로명, T5.10), 거리는 m 반올림", () => {
@@ -440,5 +487,30 @@ describe("내 위치 안내 (T5.7)", () => {
     });
     expect(text).toContain("위치 권한이 꺼져 있어요. 지도를 눌러 도착을 고르세요");
     expect(text).toContain("12분");
+  });
+});
+
+describe("RouteCard — 이 구역 피해서 (T7.6)", () => {
+  it("맨 위 '피하는 구역 · 마라톤 1구간 …' + 빼기, 원래 길 카드는 '피한 구역'", () => {
+    render(
+      <Providers
+        at={T1330}
+        route={{ ...ready(rAvoid1330, T1330), avoid: "adaea2f4cc02" }}
+        events={live0745}
+      >
+        <RouteCard />
+      </Providers>,
+    );
+    expect(
+      screen.getByText("피하는 구역 · 마라톤 1구간 세종대로 사거리~숭례문 오거리"),
+    ).toBeDefined();
+    const orig = within(screen.getByRole("article", { name: "원래 길" }));
+    expect(orig.getByText("피한 구역")).toBeDefined();
+    expect(orig.getByText("횡단보도 피한 구역 1곳")).toBeDefined();
+    expect(
+      screen.getByText("고른 구역의 횡단보도 1곳을 피해 돌아가는 길을 골랐어요."),
+    ).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "빼기" }));
+    expect(screen.queryByText(/^피하는 구역/)).toBeNull();
   });
 });

@@ -133,3 +133,10 @@
   white-space: pre-line;
   color: #444;
 }
+
+/* 이 구역 피해서 길찾기 (T7.6, 목업 03 '피해서 길찾기') — 주 버튼 */
+.primary {
+  background: #2d6bff;
+  border-color: #2d6bff;
+  color: #fff;
+}

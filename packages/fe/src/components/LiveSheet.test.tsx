@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { createNaruApiClient } from "../api/naruApiClient";
 import { ApiProvider } from "../state/ApiProvider";
 import { ClosureProvider, type ClosureState } from "../state/ClosureProvider";
+import { RouteProvider, useRoute } from "../state/RouteProvider";
 import { TimeProvider } from "../state/TimeProvider";
 import { recordedClosures, recordedEvents, recordedLive } from "../test/recorded";
 import { LiveSheet } from "./LiveSheet";
@@ -51,11 +52,17 @@ function Providers({
             ...state,
           }}
         >
-          {children}
+          <RouteProvider fetchEnabled={false}>{children}</RouteProvider>
         </ClosureProvider>
       </TimeProvider>
     </ApiProvider>
   );
+}
+
+/** 길찾기 상태 — 카드 버튼이 RouteProvider 에 보낸 것 (T7.6) */
+function RouteProbe() {
+  const r = useRoute();
+  return <output aria-label="길찾기 상태">{`${String(r.active)} ${r.avoid ?? "-"}`}</output>;
 }
 
 function section(name: string) {
@@ -238,6 +245,18 @@ describe("LiveSheet — 행·카드·구 칩·묶음 (T7.5)", () => {
     fireEvent.click(screen.getByRole("button", { name: "전체 보기" }));
     expect(screen.queryByText("여기 통제 2건")).toBeNull();
     expect(section("이 시각").getAllByRole("button")).toHaveLength(12);
+  });
+
+  it("카드의 '이 구역 피해서 길찾기' → 길찾기 켜짐 + 그 사건을 피함 (T7.6, 11/7 경찰청 r04)", () => {
+    render(
+      <Providers live={live1107} state={{ selected: "2e930ec6deeb" }}>
+        <LiveSheet />
+        <RouteProbe />
+      </Providers>,
+    );
+    expect(screen.getByLabelText("길찾기 상태").textContent).toBe("false -");
+    fireEvent.click(screen.getByRole("button", { name: "이 구역 피해서 길찾기" }));
+    expect(screen.getByLabelText("길찾기 상태").textContent).toBe("true 2e930ec6deeb");
   });
 
   it("고른 사건(?event=·지도)이면 처음부터 그 카드", () => {
