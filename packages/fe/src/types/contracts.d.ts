@@ -284,6 +284,12 @@ export type RadiusM2 = number;
 export type CreatedAt1 = string;
 export type ExpiresAt = string | null;
 export type Areas = WatchArea[];
+export type At6 = string | null;
+export type At7 = string;
+export type Matched = number;
+export type Sent = number;
+export type Failed = number;
+export type Deactivated = number;
 export type Code =
   | "invalid_query"
   | "unauthorized"
@@ -370,6 +376,8 @@ export interface NaruContracts {
   WatchAreaRequest?: WatchAreaRequest;
   WatchArea?: WatchArea;
   WatchAreasResponse?: WatchAreasResponse;
+  PushDispatchRequest?: PushDispatchRequest;
+  PushDispatchResponse?: PushDispatchResponse;
   ErrorDetail?: ErrorDetail;
   ErrorBody?: ErrorBody;
   [k: string]: unknown;
@@ -775,6 +783,19 @@ export interface WatchArea {
 }
 export interface WatchAreasResponse {
   areas: Areas;
+}
+/**
+ * §9.4 — 워커가 60초마다. at 은 테스트·재현용 기준 시각(없으면 서버 지금).
+ */
+export interface PushDispatchRequest {
+  at?: At6;
+}
+export interface PushDispatchResponse {
+  at: At7;
+  matched: Matched;
+  sent: Sent;
+  failed: Failed;
+  deactivated: Deactivated;
 }
 export interface ErrorDetail {
   code: Code;

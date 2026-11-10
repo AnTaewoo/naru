@@ -206,6 +206,12 @@
     "WatchAreasResponse": {
       "$ref": "#/$defs/WatchAreasResponse"
     },
+    "PushDispatchRequest": {
+      "$ref": "#/$defs/PushDispatchRequest"
+    },
+    "PushDispatchResponse": {
+      "$ref": "#/$defs/PushDispatchResponse"
+    },
     "ErrorDetail": {
       "$ref": "#/$defs/ErrorDetail"
     },
@@ -2776,6 +2782,62 @@
         "areas"
       ],
       "title": "WatchAreasResponse",
+      "type": "object"
+    },
+    "PushDispatchRequest": {
+      "additionalProperties": false,
+      "description": "§9.4 — 워커가 60초마다. at 은 테스트·재현용 기준 시각(없으면 서버 지금).",
+      "properties": {
+        "at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At"
+        }
+      },
+      "title": "PushDispatchRequest",
+      "type": "object"
+    },
+    "PushDispatchResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "matched": {
+          "title": "Matched",
+          "type": "integer"
+        },
+        "sent": {
+          "title": "Sent",
+          "type": "integer"
+        },
+        "failed": {
+          "title": "Failed",
+          "type": "integer"
+        },
+        "deactivated": {
+          "title": "Deactivated",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "at",
+        "matched",
+        "sent",
+        "failed",
+        "deactivated"
+      ],
+      "title": "PushDispatchResponse",
       "type": "object"
     },
     "ErrorDetail": {
