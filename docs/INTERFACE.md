@@ -109,7 +109,9 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 
 ## §2 BE → FE: `GET /route` (v0.7)
 
-**요청** `from=lat,lng` · `to=lat,lng` · `depart_at=ISO8601` · `mode=walk`  (FE는 같은 오리진 `/api/route`로 호출 → Next.js rewrites → Flask `/route`)
+**요청** `from=lat,lng` · `to=lat,lng` · `depart_at=ISO8601` · `mode=walk` · `avoid=<사건 id,…>`(선택, v0.14)  (FE는 같은 오리진 `/api/route`로 호출 → Next.js rewrites → Flask `/route`)
+
+- `avoid` (v0.14, ADR-014 A — "이 구역 피해서 길찾기"): §3.1 사건 `id`(12자리 소문자 16진수)를 쉼표로, 10개까지(겹치면 하나). 그 사건의 횡단보도는 시각·확신도와 상관없이 막는다(§5 규칙보다 앞). 없는 id 는 무시한다(지난 공유 링크). 기준 경로가 그 횡단보도를 지나면 `avoided[]` 에 들어가고, `status` 는 그 시각의 실제 상태(`released`·`scheduled` 일 수 있다) — FE 는 자기가 보낸 사건의 `reason`·끝(`until`)으로 알아본다.
 
 **응답**
 ```json
@@ -275,3 +277,4 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 | 2026-11-09 | v0.13 (보충) | §3.1 사건 `districts`(자치구, 기본 빈 목록) 추가 — 서비스 범위 서울 전체(T6.9)의 구 필터 칩 | 태우 (T6.9) |
 | 2026-11-09 | v0.13 (보충) | ADR-013 보류 — §1 `bus_skip`·`bus_return` 은 상태를 바꾸지 않는다('통제 중' 근거 = `timetable`·`topis_incident`), §1.2 버스는 전면 통제·마라톤만 기록(`NARU_BUS_RECORD_ONLY`), §2 예시 근거 `topis_incident`. 스키마 그대로 | 태우 (2026-11-09) |
 | 2026-11-09 | v0.14 | §3.1 `GET /closures/events` 에 `at`·`from`·`to`(지금 지도 — 시간 창), 사건 `id`·`status`·`confidence` 필수·`area`·`centroid`(T7.2 까지 null), 응답 `at`·`truncated`, ETag·304 (ADR-014 A, T7.1) | 태우 승인 (ADR-014) |
+| 2026-11-10 | v0.14 (보충) | §2 `GET /route` 에 `avoid`(사건 id 쉼표, 10개까지) — 그 사건 횡단보도를 시각·확신도와 상관없이 막음, 없는 id 는 무시, 응답 스키마 그대로 (ADR-014 A, T7.6) | 태우 승인 (ADR-014) |

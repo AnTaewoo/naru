@@ -853,6 +853,14 @@
           "default": "walk",
           "title": "Mode",
           "type": "string"
+        },
+        "avoid": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Avoid",
+          "type": "array"
         }
       },
       "required": [

@@ -1,5 +1,6 @@
 """BE → FE: GET /route (INTERFACE §2)."""
 
+import re
 from datetime import datetime
 
 from pydantic import Field, field_validator, model_validator
@@ -8,14 +9,39 @@ from naru_contracts._base import Contract
 from naru_contracts.closure import Evidence, LngLat, _require_offset
 from naru_contracts.enums import LegKind, Status
 
+AVOID_MAX = 10  # 한 번에 피할 사건 수 (v0.14)
+EVENT_ID = re.compile(r"[0-9a-f]{12}")  # §3.1 사건 id
+
 
 class RouteQuery(Contract):
     from_: str = Field(alias="from")  # "lat,lng" (쿼리 문자열 그대로. 파싱은 BE Model)
     to: str
     depart_at: datetime
     mode: str = "walk"
+    # v0.14 (ADR-014 A, T7.6) — 사건 id(§3.1) 쉼표로 여럿.
+    # 그 사건 횡단보도를 시각·확신도와 상관없이 막는다
+    avoid: tuple[str, ...] = ()
 
     _tz = field_validator("depart_at")(_require_offset)
+
+    @field_validator("avoid", mode="before")
+    @classmethod
+    def _split(cls, v: object) -> object:
+        """쿼리 문자열 "id,id" → 튜플 (빈 칸은 뺀다)"""
+        if isinstance(v, str):
+            return tuple(p for p in (x.strip() for x in v.split(",")) if p)
+        return v
+
+    @field_validator("avoid")
+    @classmethod
+    def _ids(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        bad = next((x for x in v if not EVENT_ID.fullmatch(x)), None)
+        if bad is not None:
+            raise ValueError(f"avoid: 사건 id 는 12자리 소문자 16진수 ({bad})")
+        ids = tuple(dict.fromkeys(v))  # 겹치면 하나, 순서 그대로
+        if len(ids) > AVOID_MAX:
+            raise ValueError(f"avoid: 사건 {AVOID_MAX}개까지 ({len(ids)}개)")
+        return ids
 
 
 class LineString(Contract):

@@ -263,6 +263,33 @@ def test_time_needs_offset_and_window_needs_a_bound() -> None:
         RouteQuery.model_validate({"from": "a", "to": "b", "depart_at": "2026-11-07T15:00:00"})
 
 
+def test_route_query_avoid_v014() -> None:
+    """v0.14 (ADR-014 A, T7.6) — avoid = §3.1 사건 id 를 쉼표로 여럿.
+
+    없으면 빈 튜플, 겹치면 하나, 10개까지.
+    """
+    base = {
+        "from": "37.5709686446227,126.9779039768265",  # 교보빌딩 (카카오 기록, route_0745 질의)
+        "to": "37.5650416322942,126.976542945622",  # 덕수궁 대한문
+        "depart_at": "2026-11-07T12:00:00+09:00",
+    }
+    assert RouteQuery.model_validate(base).avoid == ()
+    assert RouteQuery.model_validate({**base, "avoid": ""}).avoid == ()
+    # data/recorded/naru_api/closure_events_live_1107_1530.json
+    # — 경찰청 r04 2e930ec6deeb · r01 be5f89a4ebf3
+    q = RouteQuery.model_validate({**base, "avoid": "2e930ec6deeb,be5f89a4ebf3,2e930ec6deeb"})
+    assert q.avoid == ("2e930ec6deeb", "be5f89a4ebf3")
+    with pytest.raises(ValidationError, match="12자리"):
+        RouteQuery.model_validate({**base, "avoid": "2e930ec6deeb,2E930EC6DEEB"})
+    recorded = INTERFACE.parents[1] / "data" / "recorded" / "naru_api"
+    catalog = json.loads((recorded / "closure_events_catalog_1107_1530.json").read_text("utf-8"))
+    ids = [e["id"] for e in catalog["body"]["events"]][:11]  # 넓은 창 기록 34건 중 11
+    assert len(set(ids)) == 11
+    assert len(RouteQuery.model_validate({**base, "avoid": ",".join(ids[:10])}).avoid) == 10
+    with pytest.raises(ValidationError, match="10개"):
+        RouteQuery.model_validate({**base, "avoid": ",".join(ids)})
+
+
 def test_adr_008_impact_toward_approx() -> None:
     raw = _json(0)
     with pytest.raises(ValidationError, match="impact"):

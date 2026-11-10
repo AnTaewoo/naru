@@ -86,6 +86,7 @@ export type From1 = string;
 export type To1 = string;
 export type DepartAt = string;
 export type Mode = string;
+export type Avoid = string[];
 export type CrosswalkId1 = string;
 export type Reason1 = string;
 export type Until = string | null;
@@ -369,6 +370,7 @@ export interface RouteQuery {
   to: To1;
   depart_at: DepartAt;
   mode?: Mode;
+  avoid?: Avoid;
 }
 export interface Avoided {
   crosswalk_id: CrosswalkId1;
