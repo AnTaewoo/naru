@@ -425,7 +425,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 > 교수님 멘토링 피드백(2026-11-10) — B 보다 먼저. 최종 제출 11/16, **T7.15 는 11/13(금) 배포**(11/14 현장 검증). 실데이터만, 코드·하네스 커밋 따로
 
 ### T7.15 통제 제보 + 현장 검증 도구 (T-A) ★
-- status: TODO
+- status: DOING
 - depends: T7.14
 - 산출: 지금 위치에서 가장 가까운 횡단보도를 지도에 표시 + "막혔어요 / 열렸어요"(그 횡단보도를 확인한 뒤 전송). 저장 = 횡단보도 ID·상태·제보 시각·위치 정확도(m)·출처(user/field) — 원 좌표는 스냅한 뒤 저장하지 않는다(Alembic 0006). 기록만(경로·확신도 반영 없음, 버스 신호와 같은 원칙), 통제 근거에 최근 제보 건수만. 같은 기기·같은 횡단보도 간격 제한. `scripts/field_checklist.py`(날짜·시간대에 막힌다고 예측한 횡단보도 — ID·좌표·예측 통제 시간·상태·확신도·근거 사건 → CSV·GeoJSON), `scripts/field_compare.py`(field 제보 vs 그 시각 예측 → 맞음·덜 막음·더 막음 표, recall·precision → `docs/eval/field_YYYYMMDD.md`). 문구는 ko.ts 톤. INTERFACE 새 절
 
@@ -441,7 +441,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 
 ### T7.18 TOPIS 공지 아카이브 깊이 확인 (T-D) — 조사만
 - status: TODO
-- depends: T7.17
+- depends: T7.10 (B 뒤 — 태우 11/10 "PWA 알림도 중요 기능"). 결과 문서는 `docs/data/topis_archive.md`(guard 허용 경로, 태우 "알아서")
 - 산출: 공지 게시판 목록 마지막 페이지 → 가장 오래된 공지 날짜·총 건수(요청 몇 건, robots, NaruBot, 본문 수집 없음), 같은 기간 구조화 돌발 기록의 공식 경로(OA-22861 중단). 결과 문서 — 몇 년치인지, 공지 원문과 구조화 기록을 짝지어 라벨을 만들 수 있는지
 
 ### T7.19 간접 신호 기록 (T-E) — 여유 있으면
@@ -451,7 +451,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 
 ### T7.7 PWA 기반 — manifest·서비스워커·iOS 안내·권한 버튼
 - status: TODO
-- depends: T7.19 (멘토링 Task 뒤로 — 태우 확인 대기)
+- depends: T7.17 (태우 11/10 "PWA 알림도 중요 기능 중 하나라 필요" — 멘토링 T7.15~T7.17 뒤, T7.18 앞, 11/16 안)
 - 산출: `app/manifest.ts`, `public/sw.js`(push → 항상 showNotification, 클릭 → `/?event=`), iOS 16.4+ 홈 화면 안내, 권한은 버튼으로만. Provider 추가 안 함
 
 ### T7.8 BE 구독·관심 지역 API
