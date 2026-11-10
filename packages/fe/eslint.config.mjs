@@ -31,6 +31,14 @@ export default tseslint.config(
     },
   },
   {
+    // 서비스워커 (T7.7) — 전역은 워커 것, 모듈 아님
+    files: ["public/sw.js"],
+    languageOptions: {
+      sourceType: "script",
+      globals: { self: "readonly", clients: "readonly", registration: "readonly" },
+    },
+  },
+  {
     files: ["src/types/contracts.d.ts"],
     rules: { "@typescript-eslint/consistent-indexed-object-style": "off" }, // 생성물
   },
