@@ -12,10 +12,19 @@ import {
 } from "react";
 import { NaruApiError, placeLngLat } from "../api/naruApiClient";
 import type { LngLat } from "../map/layers/routeLayer";
-import type { Place, RouteResponse } from "../types/contracts";
+import type { Place, ReportCounts, ReportRequest, RouteResponse } from "../types/contracts";
 import { useNaruApi } from "./ApiProvider";
 import { inBbox, useClosures, type Bbox4 } from "./ClosureProvider";
-import { useTime } from "./TimeProvider";
+import {
+  crosswalkOf,
+  deviceToken,
+  failureOf,
+  reportReducer,
+  type ReportEvent,
+  type ReportState,
+} from "./report";
+import { browserStorage } from "./savedPlaces";
+import { isNowAt, useTime } from "./TimeProvider";
 
 // Provider 4/4 — 길찾기: 출발·도착과 /api/route 결과. t·출발·도착이 바뀌면 다시 받는다 (이전 요청은 Abort)
 export type RouteStatus = "idle" | "loading" | "ready" | "error";
@@ -87,6 +96,10 @@ export interface RouteState {
   place: PlacePick | null;
   /** 지도를 옮길 점 (T7.14) */
   focus: MapFocus | null;
+  /** 통제 제보 (T7.15) — null = 안 함 */
+  report: ReportState | null;
+  /** 이 경로가 피한 횡단보도의 최근 1시간 제보 수 (T7.15) — 지금 시각 경로일 때만 */
+  reportCounts: Record<string, ReportCounts> | null;
 }
 
 export type RouteAction =
@@ -107,7 +120,9 @@ export type RouteAction =
   | { type: "named"; which: OdField; point: LngLat; text: string | null }
   | { type: "view"; view: RouteView }
   | { type: "avoid"; id: string | null }
-  | { type: "place"; place: PlacePick | null };
+  | { type: "place"; place: PlacePick | null }
+  | { type: "report"; event: ReportEvent }
+  | { type: "reportCounts"; counts: Record<string, ReportCounts> | null };
 
 export function initialRouteState(partial: Partial<RouteState> = {}): RouteState {
   return {
@@ -127,6 +142,8 @@ export function initialRouteState(partial: Partial<RouteState> = {}): RouteState
     avoid: null,
     place: null,
     focus: null,
+    report: null,
+    reportCounts: null,
     ...partial,
   };
 }
@@ -280,6 +297,20 @@ export function routeReducer(state: RouteState, action: RouteAction): RouteState
     }
     case "view":
       return state.view === action.view ? state : { ...state, view: action.view };
+    case "report": {
+      // 통제 제보 (T7.15) — 시작하면 장소 카드는 닫고, 횡단보도를 찾으면 지도를 그리로
+      const report = reportReducer(state.report, action.event);
+      if (report === state.report) return state;
+      const found = action.event.type === "found" ? (report?.crosswalk ?? null) : null;
+      return {
+        ...state,
+        report,
+        place: action.event.type === "start" ? null : state.place,
+        focus: found ? { point: found.point, seq: (state.focus?.seq ?? 0) + 1 } : state.focus,
+      };
+    }
+    case "reportCounts":
+      return { ...state, reportCounts: action.counts };
     case "named":
       // 주소는 그 점일 때만 — 그새 칸이 바뀌었으면 버린다
       if (!same(state[action.which], action.point)) return state;
@@ -445,6 +476,92 @@ export function RouteProvider({
       live = false;
     };
   }, [locating, fetchEnabled]);
+
+  // 통제 제보 (T7.15) — 지금 위치 한 번(정확도 우선, 지난 위치는 안 씀) → 최근접 횡단보도 → 보내기
+  const reportPhase = state.report?.phase ?? null;
+  useEffect(() => {
+    if (!fetchEnabled || reportPhase !== "locating") return;
+    const geo = typeof navigator === "undefined" ? undefined : navigator.geolocation;
+    if (!geo) {
+      dispatch({ type: "report", event: { type: "fail", failure: "unavailable" } });
+      return;
+    }
+    let live = true;
+    geo.getCurrentPosition(
+      (pos) => {
+        const point: LngLat = [pos.coords.longitude, pos.coords.latitude];
+        const accuracyM = Math.round(pos.coords.accuracy);
+        if (live) dispatch({ type: "report", event: { type: "located", point, accuracyM } });
+      },
+      (err) => {
+        const failure = err.code === err.PERMISSION_DENIED ? "denied" : "unavailable";
+        if (live) dispatch({ type: "report", event: { type: "fail", failure } });
+      },
+      { ...POSITION_OPTIONS, maximumAge: 0 },
+    );
+    return () => {
+      live = false;
+    };
+  }, [reportPhase, fetchEnabled]);
+
+  const findAt = state.report?.phase === "finding" ? state.report.point : null;
+  useEffect(() => {
+    if (!fetchEnabled || !findAt) return;
+    const controller = new AbortController();
+    api
+      .nearestCrosswalk({ lat: findAt[1], lng: findAt[0] }, controller.signal)
+      .then((r) =>
+        dispatch({ type: "report", event: { type: "found", crosswalk: crosswalkOf(r) } }),
+      )
+      .catch(() => {
+        if (!controller.signal.aborted)
+          dispatch({ type: "report", event: { type: "fail", failure: "failed" } });
+      });
+    return () => controller.abort();
+  }, [api, findAt, fetchEnabled]);
+
+  // 보내기는 한 번만 — 취소하지 않고(StrictMode 두 번 실행에도 POST 하나), 그새 닫거나 새로 시작했으면 결과를 버린다
+  const reportRef = useRef(state.report);
+  reportRef.current = state.report;
+  const posted = useRef<ReportState | null>(null);
+  const sending = state.report?.phase === "sending" ? state.report : null;
+  useEffect(() => {
+    if (!fetchEnabled || !sending?.crosswalk || !sending.sent || posted.current === sending) return;
+    posted.current = sending;
+    const body: ReportRequest = {
+      crosswalk_id: sending.crosswalk.id,
+      state: sending.sent,
+      accuracy_m: sending.accuracyM ?? 0,
+      source: sending.field ? "field" : "user",
+      device: deviceToken(browserStorage()),
+    };
+    const settle = (event: ReportEvent) => {
+      if (reportRef.current === sending) dispatch({ type: "report", event });
+    };
+    api
+      .report(body)
+      .then(() => settle({ type: "sent" }))
+      .catch((e: unknown) => settle({ type: "fail", failure: failureOf(e) }));
+  }, [api, sending, fetchEnabled]);
+
+  // 통제 근거의 "최근 1시간 제보 N건" (T7.15) — 지금 시각 경로가 피한 횡단보도만(50곳까지)
+  const avoidedIds = useMemo(
+    () => [...new Set(state.route?.avoided.map((a) => a.crosswalk_id) ?? [])].slice(0, 50),
+    [state.route],
+  );
+  const routeAt = state.at;
+  useEffect(() => {
+    if (!fetchEnabled || avoidedIds.length === 0 || !routeAt || !isNowAt(routeAt, Date.now()))
+      return;
+    const controller = new AbortController();
+    api
+      .recentReports({ ids: avoidedIds, minutes: 60 }, controller.signal)
+      .then((r) => dispatch({ type: "reportCounts", counts: r.counts }))
+      .catch(() => {
+        if (!controller.signal.aborted) dispatch({ type: "reportCounts", counts: null });
+      });
+    return () => controller.abort();
+  }, [api, avoidedIds, routeAt, fetchEnabled]);
 
   const value = useMemo(() => state, [state]);
   return (

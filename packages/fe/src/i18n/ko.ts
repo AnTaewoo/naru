@@ -19,6 +19,7 @@ import {
   type ConfidenceLevel,
 } from "../map/eventKinds";
 import type { ExampleKey } from "../map/examples";
+import type { ReportFailure, ReportValue } from "../state/report";
 
 export const STATUS_KO: Record<Status, string> = {
   scheduled: "예정",
@@ -406,6 +407,47 @@ export function searchStatusKo(
 
 /** 지도 오른쪽 위 '내 위치 찾기'(GeolocateControl) 결과가 보행망 밖일 때 */
 export const MAP_OUTSIDE_KO = "내 위치는 아직 길찾기 범위(서울) 밖이에요";
+
+/** 통제 제보 (T7.15, INTERFACE §8) — 기록만, 길찾기에는 아직 안 쓴다 */
+export const REPORT_KO = {
+  button: "통제 제보",
+  control: "제보",
+  title: "이 횡단보도가 맞나요?",
+  blocked: "막혔어요",
+  open: "열렸어요",
+  close: "제보 닫기",
+  locating: "지금 위치를 찾고 있어요…",
+  finding: "가까운 횡단보도를 찾고 있어요…",
+  sending: "보내는 중…",
+  note: "제보는 기록만 해요 — 아직 길찾기에는 쓰지 않아요",
+  field: "현장 검증",
+  retry: "다시 하기",
+} as const;
+
+export const REPORT_FAILURE_KO: Record<ReportFailure, string> = {
+  denied: "위치 권한이 꺼져 있어 제보할 수 없어요",
+  unavailable: "지금 위치를 찾지 못했어요",
+  inaccurate: "위치가 정확하지 않아요. 트인 곳에서 다시 해 주세요",
+  none: "가까운 횡단보도를 찾지 못했어요. 횡단보도 옆에서 다시 해 주세요",
+  too_many: "이 횡단보도는 방금 제보했어요. 조금 뒤에 다시 할 수 있어요",
+  failed: "제보를 보내지 못했어요",
+};
+
+/** "여기서 71 m · 위치 정확도 ±14 m" */
+export function reportWhereKo(distanceM: number, accuracyM: number | null): string {
+  const where = `여기서 ${distanceM} m`;
+  return accuracyM === null ? where : `${where} · 위치 정확도 ±${accuracyM} m`;
+}
+
+export function reportSentKo(value: ReportValue): string {
+  return `${value === "blocked" ? "막혔다고" : "열렸다고"} 제보했어요. 고마워요!`;
+}
+
+/** 통제 근거의 제보 줄 — 0건이면 줄을 안 쓴다 */
+export function reportCountKo(c: { blocked: number; open: number } | null): string | null {
+  const n = c ? c.blocked + c.open : 0;
+  return c && n > 0 ? `최근 1시간 제보 ${n}건 (막힘 ${c.blocked} · 열림 ${c.open})` : null;
+}
 
 /**
  * maplibre 컨트롤 문구 — 쓰는 컨트롤 것만. 키는 설치된 maplibre-gl 6.16.0 의 기본 영어 표
