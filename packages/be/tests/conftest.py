@@ -12,7 +12,6 @@ from typing import NamedTuple
 import pytest
 from alembic import command
 from alembic.config import Config
-from naru_be.models.repositories.report_repository import ReportRepository
 from sqlalchemy import inspect
 
 from naru_be.config import Settings
@@ -20,6 +19,8 @@ from naru_be.db import make_engine, make_sessions
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
 from naru_be.models.domain.ped_graph import PedGraph
+from naru_be.models.domain.road_graph import RoadGraph
+from naru_be.models.repositories.report_repository import ReportRepository
 from naru_contracts import CandidateBatch, ClosureState, LineGeom, Status
 
 DATA = Path(__file__).resolve().parents[3] / "data"
@@ -86,6 +87,22 @@ def course_world(seoul_spatial_dir: Path, recorded_dir: Path) -> CourseWorld:
     states = [s for group in by_candidate.values() for s in group]
     assert len(states) > 100 and {s.status for s in states} == {Status.scheduled}
     return CourseWorld(settings, ped, index, engine, states, by_candidate)
+
+
+@pytest.fixture(scope="session")
+def road_index(seoul_spatial_dir: Path, nodelink_seoul_dir: Path) -> CrosswalkIndex:
+    """횡단보도 색인 + 표준노드링크 도로 그래프 — 구간 후보(from_segment)·행진 경로(T7.16)용."""
+    settings = Settings()
+    road_graph = RoadGraph.from_gpkg(nodelink_seoul_dir / "link.gpkg")
+    return CrosswalkIndex.from_xlsx(seoul_spatial_dir / "OA-23081.xlsx", settings, road_graph)
+
+
+@pytest.fixture(scope="session")
+def notice_batch(recorded_dir: Path) -> CandidateBatch:
+    """기록된 공지 후보 배치(최신) — 11/7 r01·r04·r06, 11/9 r01·r02 (MANIFEST candidates/notice)."""
+    files = sorted((recorded_dir / "candidates" / "notice").glob("*.json"))
+    assert files, "기록 없음: make record-candidates SOURCE=notice 먼저"
+    return CandidateBatch.model_validate(json.loads(files[-1].read_text("utf-8")))
 
 
 @pytest.fixture(scope="module")

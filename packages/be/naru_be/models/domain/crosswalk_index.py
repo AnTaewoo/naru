@@ -22,7 +22,7 @@ from pyproj import Transformer
 from shapely.strtree import STRtree
 
 from naru_be.config import Settings
-from naru_be.models.domain.road_graph import RoadGraph
+from naru_be.models.domain.road_graph import RoadGraph, RoadPath
 from naru_contracts import RoadClass, SegmentGeom
 
 LngLat = tuple[float, float]
@@ -55,6 +55,11 @@ class Crosswalk:
     lat: float
     x: float  # EPSG:5179
     y: float
+
+
+def road_class_of(road: str | None) -> RoadClass | None:
+    """도로명 접미사 → 등급 (대로 > 로 > 길). 행진 폭(T7.16)도 같은 규칙."""
+    return _road_class_of(road)
 
 
 def _road_class_of(road: str | None) -> RoadClass | None:
@@ -167,13 +172,16 @@ class CrosswalkIndex:
         self, coords: Sequence[LngLat], buffer_m: float | None = None
     ) -> shapely.Polygon:
         """선 → 버퍼(기본 15 m) (EPSG:5179). from_line 이 고르는 모양."""
+        return self.line_of(coords).buffer(buffer_m or self.settings.line_buffer_m)
+
+    def line_of(self, coords: Sequence[LngLat]) -> shapely.LineString:
+        """선 (EPSG:5179) — 행진 경로(T7.16)도 이 선 위에서 잰다."""
         if len(coords) < 2:
             raise ValueError("선은 점이 둘 이상이어야 한다")
-        line = shapely.LineString([_4326_TO_5179.transform(lng, lat) for lng, lat in coords])
-        return line.buffer(buffer_m or self.settings.line_buffer_m)
+        return shapely.LineString([_4326_TO_5179.transform(lng, lat) for lng, lat in coords])
 
-    def area_of_segment(self, seg: SegmentGeom) -> shapely.Polygon:
-        """구간 → 도로 그래프 최단경로 → 등급별 버퍼(대로 25·로 15·길 8 m) (EPSG:5179)."""
+    def line_of_segment(self, seg: SegmentGeom) -> tuple[shapely.LineString, RoadPath]:
+        """구간 → 도로 그래프 최단경로 선(EPSG:5179)과 그 경로(지난 도로명). 한 번만 계산한다."""
         if self.road_graph is None:
             raise ValueError("from_segment에는 RoadGraph가 필요하다")
         points = [
@@ -182,13 +190,21 @@ class CrosswalkIndex:
             (seg.to.lng, seg.to.lat),
         ]
         path = self.road_graph.shortest_path(points, road=seg.road)
+        return self.line_of(path.coords), path
+
+    def buffer_of_segment(self, seg: SegmentGeom) -> float:
+        """등급별 버퍼(대로 25·로 15·길 8 m). road_class 없으면 road 접미사, 그것도 없으면 15 m."""
         road_class = seg.road_class or _road_class_of(seg.road)
-        buffer_m = (
+        return (
             self.settings.road_buffer_m[road_class.value]
             if road_class
             else self.settings.line_buffer_m
         )
-        return self.area_of_line(path.coords, buffer_m)
+
+    def area_of_segment(self, seg: SegmentGeom) -> shapely.Polygon:
+        """구간 → 도로 그래프 최단경로 → 등급별 버퍼 (EPSG:5179)."""
+        line, _ = self.line_of_segment(seg)
+        return line.buffer(self.buffer_of_segment(seg))
 
     def from_point(self, lng: float, lat: float, radius_m: float | None = None) -> set[str]:
         return self.within(self.area_of_point(lng, lat, radius_m))
