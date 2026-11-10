@@ -12,6 +12,7 @@ ErrorCode = Literal[
     "out_of_coverage",
     "geocode_unavailable",  # v0.11 (ADR-011 B) — 카카오 로컬을 못 불렀다, 503
     "too_many_reports",  # v0.14 보충 (T7.15) — 같은 기기·횡단보도 600초 안 다시 제보, 429
+    "not_modeled",  # v0.15 (ADR-015 F) — 행진 확률 모델 대상이 아닌 사건, 404
     "internal",
 ]
 

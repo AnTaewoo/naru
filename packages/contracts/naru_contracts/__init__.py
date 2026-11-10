@@ -48,6 +48,7 @@ from naru_contracts.geocode_api import (
     GeocodeSearchResponse,
     Place,
 )
+from naru_contracts.march_api import MarchKeyframe, MarchQuery, MarchResponse
 from naru_contracts.reports_api import (
     NearestCrosswalk,
     NearestCrosswalkQuery,
@@ -91,6 +92,9 @@ __all__ = [
     "Leg",
     "LegKind",
     "LineGeom",
+    "MarchKeyframe",
+    "MarchQuery",
+    "MarchResponse",
     "NearestCrosswalk",
     "NearestCrosswalkQuery",
     "NearestCrosswalkResponse",
@@ -112,4 +116,5 @@ __all__ = [
     "SummarySegment",
     "Window",
     "ZoneGeom",
+    "[",
 ]

@@ -54,6 +54,7 @@ from naru_contracts import (
 )
 from naru_contracts.enums import ClosureType
 from naru_contracts.errors import ErrorCode
+from naru_contracts.march_api import MarchKeyframe, MarchQuery, MarchResponse
 from naru_contracts.reports_api import (
     NearestCrosswalkQuery,
     NearestCrosswalkResponse,
@@ -84,11 +85,11 @@ def _json(i: int) -> dict[str, Any]:
     return data
 
 
-def test_document_has_twelve_json_blocks() -> None:
-    # §1.1·§1.2·§3.1·§7.1·§7.2·§8.1 은 ### 소제목이라 상위 § 로 잡힌다
+def test_document_has_thirteen_json_blocks() -> None:
+    # §1.1·§1.2·§3.1·§3.2·§7.1·§7.2·§8.1 은 ### 소제목이라 상위 § 로 잡힌다
     assert [s for s, _ in BLOCKS] == [
         *("§1", "§1", "§1", "§1", "§1"),
-        *("§2", "§3", "§3", "§6", "§7", "§7", "§8"),
+        *("§2", "§3", "§3", "§3", "§6", "§7", "§7", "§8"),
     ]
 
 
@@ -163,7 +164,7 @@ def test_route_response_example() -> None:  # §2
 
 
 def test_error_body_example() -> None:  # §6
-    e = ErrorBody.model_validate(_json(8))
+    e = ErrorBody.model_validate(_json(9))
     assert e.error.code == "invalid_query" and e.error.field == "depart_at"
     assert set(ErrorCode.__args__) == {
         "invalid_query",
@@ -173,6 +174,7 @@ def test_error_body_example() -> None:  # §6
         "out_of_coverage",  # v0.9, ADR-011 그래프 밖 — 그래프에 붙일 거리 150 m 초과
         "geocode_unavailable",  # v0.11, ADR-011 B — 카카오 로컬을 못 불렀다 (503)
         "too_many_reports",  # v0.14 보충, T7.15 — 같은 기기·횡단보도 600초 안 다시 제보 (429)
+        "not_modeled",  # v0.15, ADR-015 F — 행진 확률 모델 대상이 아닌 사건 (404)
         "internal",
     }
 
@@ -477,7 +479,7 @@ def test_closure_events_rules() -> None:  # §3.1 — 순서·bbox·개수, 질�
 
 
 def test_geocode_examples() -> None:  # §7 v0.11, ADR-011 B
-    found = GeocodeSearchResponse.model_validate(_json(9))
+    found = GeocodeSearchResponse.model_validate(_json(10))
     kyobo, foundation = found.places
     # 카카오 기록(q=교보빌딩, near 126.98,37.57, 반경 5 km 정확도 순)의 1·2위
     assert (kyobo.id, kyobo.name, kyobo.address) == (
@@ -488,7 +490,7 @@ def test_geocode_examples() -> None:  # §7 v0.11, ADR-011 B
     assert kyobo.coord == (126.9779039768265, 37.5709686446227)  # = route_0745 출발점
     assert foundation.name == "교보재단빌딩"
     assert GeocodeSearchResponse.model_validate(found.model_dump(mode="json")) == found
-    rev = GeocodeReverseResponse.model_validate(_json(10))
+    rev = GeocodeReverseResponse.model_validate(_json(11))
     assert rev.label == "종로구 종로 1" and rev.road_address == "서울특별시 종로구 종로 1"
     assert rev.address == "서울 종로구 종로1가 1"
 
@@ -499,7 +501,7 @@ def test_geocode_rules() -> None:  # §7 — 검색어 2~50자(앞뒤 공백 뺌
     for bad in ("시", "   시  ", "가" * 51):
         with pytest.raises(ValidationError):
             GeocodeSearchQuery.model_validate({"q": bad})
-    place = _json(9)["places"][0]
+    place = _json(10)["places"][0]
     with pytest.raises(ValidationError):
         GeocodeSearchResponse.model_validate({"places": [place] * 11})
     with pytest.raises(ValidationError):
@@ -530,7 +532,7 @@ def test_candidate_summary_rules() -> None:  # §1 v0.12 — 구조화 칸만, �
 
 
 def test_report_nearest_example() -> None:  # §8.1 v0.14 보충 (태우 지시 11/10, T7.15)
-    found = NearestCrosswalkResponse.model_validate(_json(11))
+    found = NearestCrosswalkResponse.model_validate(_json(12))
     cw = found.crosswalk
     assert cw is not None
     # OA-23081.xlsx 행 20198 (연번 20197): 06-0000051345 종로구 교차로명 '교보생명',
@@ -613,3 +615,58 @@ def test_report_rules() -> None:  # §8 — 본문 범위·모양, 응답 시각
     assert counts["06-0000051345"].blocked == 2
     with pytest.raises(ValidationError):
         RecentReportsResponse.model_validate({"counts": {one["ids"]: {"blocked": -1, "open": 0}}})
+
+
+def test_march_example() -> (
+    None
+):  # §3.2 v0.15 (ADR-015 F) — 2026-11-10 기록의 첫 키프레임(표본 2·횡단보도 3)
+    body = MarchResponse.model_validate(_json(8))
+    assert body.event_id == "be5f89a4ebf3" and body.step_s == 60
+    assert body.window.start is not None and body.window.start.utcoffset() is not None
+    (frame,) = body.keyframes
+    assert frame.t == body.window.start and frame.radius_m == 0.0
+    assert len(frame.samples) == 2 and frame.samples[0] == [(126.975854, 37.569443)]
+    assert frame.crosswalks == {"06-0000036391": 1.0, "06-0000023206": 1.0, "06-0000002104": 0.2}
+    assert set(body.crosswalk_points) == set(frame.crosswalks)
+    assert MarchResponse.model_validate(body.model_dump(mode="json")) == body
+
+
+def test_march_rules() -> None:  # §3.2 v0.15 (ADR-015 F, T7.16) — 질의·키프레임·응답 규칙
+    q = MarchQuery.model_validate({"event_id": "be5f89a4ebf3"})  # 11/7 r01 동화면세점 고리 (기록)
+    assert q.from_ is None and q.to is None
+    both = {
+        "event_id": "be5f89a4ebf3",
+        "from": "2026-11-07T12:00:00+09:00",
+        "to": "2026-11-07T13:00:00+09:00",
+    }
+    assert MarchQuery.model_validate(both).to is not None
+    for bad in (
+        {"event_id": "BE5F89A4EBF3"},
+        {"event_id": "be5f89a4ebf3", "from": "2026-11-07T12:00:00"},
+        {**both, "to": "2026-11-07T11:00:00+09:00"},
+        {**both, "step_s": 30},
+    ):
+        with pytest.raises(ValidationError):
+            MarchQuery.model_validate(bad)
+    frame = {
+        "t": "2026-11-07T12:00:00+09:00",
+        "samples": [[[126.976148, 37.569519]]],
+        "center": [126.976148, 37.569519],
+        "radius_m": 0.0,
+        "crosswalks": {"06-0000036391": 1.0, "06-0000002104": 0.2},
+    }
+    assert MarchKeyframe.model_validate(frame).crosswalks["06-0000002104"] == 0.2
+    with pytest.raises(ValidationError, match="0~1"):
+        MarchKeyframe.model_validate({**frame, "crosswalks": {"06-0000036391": 1.2}})
+    with pytest.raises(ValidationError):
+        MarchKeyframe.model_validate({**frame, "radius_m": -1})
+    body = {
+        "event_id": "be5f89a4ebf3",
+        "window": {"start": "2026-11-07T12:00:00+09:00", "end": "2026-11-07T16:00:00+09:00"},
+        "step_s": 60,
+        "crosswalk_points": {"06-0000036391": [126.976907, 37.570128]},
+        "keyframes": [frame],
+    }
+    assert len(MarchResponse.model_validate(body).keyframes) == 1
+    with pytest.raises(ValidationError, match="시작·끝"):
+        MarchResponse.model_validate({**body, "window": {"start": body["window"]["start"]}})

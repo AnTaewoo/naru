@@ -31,6 +31,8 @@ from naru_contracts import (
     GeocodeReverseResponse,
     GeocodeSearchQuery,
     GeocodeSearchResponse,
+    MarchQuery,
+    MarchResponse,
     NearestCrosswalkQuery,
     NearestCrosswalkResponse,
     RecentReportsQuery,
@@ -62,6 +64,8 @@ MODELS = (
     ReportResponse,
     RecentReportsQuery,
     RecentReportsResponse,
+    MarchQuery,
+    MarchResponse,
     ErrorBody,
 )
 OUT_DIR = Path("packages/fe/src/types")
