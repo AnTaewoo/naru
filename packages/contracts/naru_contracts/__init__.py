@@ -48,6 +48,16 @@ from naru_contracts.geocode_api import (
     GeocodeSearchResponse,
     Place,
 )
+from naru_contracts.reports_api import (
+    NearestCrosswalk,
+    NearestCrosswalkQuery,
+    NearestCrosswalkResponse,
+    RecentReportsQuery,
+    RecentReportsResponse,
+    ReportCounts,
+    ReportRequest,
+    ReportResponse,
+)
 from naru_contracts.route import Avoided, Baseline, Leg, RouteQuery, RouteResponse
 
 __all__ = [
@@ -81,10 +91,18 @@ __all__ = [
     "Leg",
     "LegKind",
     "LineGeom",
+    "NearestCrosswalk",
+    "NearestCrosswalkQuery",
+    "NearestCrosswalkResponse",
     "NoticeRef",
     "Place",
     "PlacePoint",
     "PointGeom",
+    "RecentReportsQuery",
+    "RecentReportsResponse",
+    "ReportCounts",
+    "ReportRequest",
+    "ReportResponse",
     "RoadClass",
     "RouteQuery",
     "RouteResponse",
