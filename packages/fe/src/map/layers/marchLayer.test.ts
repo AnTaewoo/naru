@@ -1,5 +1,5 @@
 // 행진 예상 위치 (T7.16) — 기록 응답 march_be5f89a4ebf3(11/7 r01 동화면세점 고리, 12:00~16:00, 키프레임 241)로
-// 보간·소스·색을 검사한다. 기대값은 기록을 열어 확인한 값(첫 키프레임 중심 = 출발점, 13:00 반경 331.5 m)
+// 보간·소스·색을 검사한다. 기대값은 기록을 열어 확인한 값(첫 키프레임 중심 = 출발점, 13:00 반경 235.4 m)
 import { describe, expect, it } from "vitest";
 import { recorded } from "../../test/recorded";
 import type { MarchResponse } from "../../types/contracts";
@@ -43,7 +43,7 @@ describe("marchLayer (T7.16)", () => {
     const mid = (x: number, y: number) => (x + y) / 2;
     expect(frame?.center[0]).toBeCloseTo(mid(Number(a.center[0]), Number(b.center[0])), 9);
     expect(frame?.radiusM).toBeCloseTo(mid(a.radius_m, b.radius_m), 9);
-    expect(a.radius_m).toBe(331.5);
+    expect(a.radius_m).toBe(235.4); // 속도 폭 ±20% (ADR-015 표, 11/10)
     const id = "06-0000002104";
     expect(frame?.p[id]).toBeCloseTo(mid(a.crosswalks[id] ?? 0, b.crosswalks[id] ?? 0), 9);
     expect(frame?.points).toHaveLength(b.samples.reduce((n, s) => n + s.length, 0));
