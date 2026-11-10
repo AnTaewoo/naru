@@ -10,7 +10,8 @@
   06-0000004701 s 238.5 · 여의도역 06-0000023703 s 554.5. 도로 여의대로2길·여의대로·의사당대로·
   여의나루로 → '대로' 16 m → 200/(16x2) = 6.25 m → 하한 100 m
 - 11/7 r04 는 seg1 이 지점(seg1-to)으로만 풀리고 seg2·seg3 이 숭례문오거리에서 갈라진다 → 대상 아님
-P 는 손으로 푼 값(테스트 안 주석) — 표본 u = -1, -0.9 ... 1 (21개), v_i = v(1 + 0.5u).
+P 는 손으로 푼 값(테스트 안 주석) — 표본 u = -1, -0.9 ... 1 (21개), v_i = v(1 + 0.2u)
+(태우 11/10 ①).
 """
 
 from __future__ import annotations
@@ -120,16 +121,22 @@ def test_p_at_hana(hana: MarchProfile, settings: Settings) -> None:
     # 시작: 머리 0. 여의도공원앞 s 238.5 - 선행 300 < 0 → 21/21,
     # 여의도역 554.5 - 300 > 0 → 0 → 하한 0.2
     assert p(YEOUIDO_PARK, start) == 1.0 and p(YEOUIDO_STN, start) == 0.2
-    # 끝: 머리 x_i = 577.8(1 + 0.5u). 여의도역: 254.5 ≤ x < 654.5 ↔ u ∈ [-1.12, 0.265)
-    # → u = -1 ... 0.2 → 13/21
-    assert p(YEOUIDO_STN, end) == pytest.approx(13 / 21)
-    # 여의도공원앞: x < 338.5 ↔ 1 + 0.5u < 0.586 ↔ u < -0.828 → u = -1, -0.9 → 2/21 < 하한 0.2 → 0.2
+    # 끝: 머리 x_i = 577.8(1 + 0.2u) = 462~693. 여의도역: 254.5 ≤ x < 654.5 ↔ u < 0.664
+    # → u = -1 ... 0.6 → 17/21
+    assert p(YEOUIDO_STN, end) == pytest.approx(17 / 21)
+    # 여의도공원앞: x < 338.5 ↔ 1 + 0.2u < 0.586 ↔ u < -2 → 0 → 하한 0.2.
+    # 통제 중 행진이면 하한 0.5 (③)
     assert p(YEOUIDO_PARK, end) == 0.2
+    assert p_at(hana, start, end, YEOUIDO_PARK, end, settings, confirmed=True) == 0.5
+    assert p_at(hana, start, end, YEOUIDO_STN, end, settings, confirmed=True) == pytest.approx(
+        17 / 21
+    )
     # 창 밖은 0, 경로 밖 횡단보도는 None
     assert p(YEOUIDO_STN, start - timedelta(seconds=1)) == 0.0
     assert p(YEOUIDO_STN, end + timedelta(seconds=1)) == 0.0
     assert p_at(hana, start, end, SEJONG_A, start, settings) is None
-    assert (settings.march_samples, settings.march_speed_spread) == (21, 0.5)
+    assert (settings.march_samples, settings.march_speed_spread) == (21, 0.2)
+    assert settings.march_p_floor_confirmed == 0.5
     assert (settings.march_lead_m, settings.march_p_floor, settings.march_p_block) == (
         300,
         0.2,
@@ -147,13 +154,13 @@ def test_keyframes_hana(hana: MarchProfile, settings: Settings) -> None:
     )  # 머리 0, 꼬리 < 0
     assert first.radius_m == 0.0 and first.crosswalks == {YEOUIDO_PARK: 1.0, YEOUIDO_STN: 0.2}
     assert first.center == pytest.approx(hana.path[0], abs=1e-6)
-    # 2분 뒤: 가장 빠른 표본 머리 = 1.5 x 0.0642 x 120 = 11.6 m → 25 m 간격이라 꼬리(0)와 머리 둘
+    # 2분 뒤: 가장 빠른 표본 머리 = 1.2 x 0.0642 x 120 = 9.2 m → 25 m 간격이라 꼬리(0)와 머리 둘
     last = frames[-1]
     assert all(len(pts) == 2 for pts in last.samples) and 0 < last.radius_m < 12
     # 통제 시간 전체 — 1분 간격 151 키프레임, 점은 키프레임당 600 상한
     whole = keyframes(hana, start, end, None, None, settings)
     assert len(whole) == 151 and all(sum(len(s) for s in f.samples) <= 600 for f in whole)
-    # 끝: 가장 느린 표본 머리 288.9 m·꼬리 188.9 → 25 m 간격 5점,
-    # 가장 빠른 머리 866.7(경로 밖)·꼬리 766.7 → 0점
+    # 끝: 가장 느린 표본 머리 462.2 m·꼬리 362.2 → 25 m 간격 5점,
+    # 가장 빠른 머리 693.4(경로 밖)·꼬리 593.4(경로 밖) → 0점
     assert len(whole[-1].samples[0]) == 5 and whole[-1].samples[-1] == ()
     assert keyframes(hana, start, end, end + timedelta(minutes=1), None, settings) == []
