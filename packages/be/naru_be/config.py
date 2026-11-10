@@ -98,6 +98,13 @@ class Settings(BaseSettings):
     march_keyframe_s: int = 60  # 키프레임 간격 (태우 1분)
     march_point_step_m: float = 25.0  # 표본마다 머리~꼬리 점 간격
     march_points_max: int = 600  # 키프레임당 점 상한
+    # 알림 (ADR-014 C, T7.8) — VAPID 키는 .env 의 태우 것(NARU_VAPID_PRIVATE_KEY PEM 또는 raw,
+    # NARU_VAPID_SUBJECT mailto:). 없으면 /push/vapid-public-key 가 503
+    vapid_private_key: SecretStr = SecretStr("")
+    vapid_subject: str = ""
+    watch_saved_max: int = 10  # 구독당 저장 관심 지역 수
+    watch_last_seen_grid_m: float = 150.0  # 마지막 위치는 이 격자로 반올림 (개인정보)
+    watch_last_seen_ttl_h: int = 3  # 마지막 위치는 이 시간 뒤 삭제
     # 공개 피드 (T7.17, INTERFACE §3.3) — 분 단위 캐시, IP 당 분당 요청 상한 (gunicorn 워커마다)
     feed_cache_s: int = 60
     feed_cache_max: int = 64

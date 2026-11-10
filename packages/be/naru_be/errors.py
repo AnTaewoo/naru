@@ -1,7 +1,7 @@
 """BE 도메인 예외 — INTERFACE §6 오류 코드와 1:1. Model 이 던지고 error_view 가 응답으로 만든다.
 
 code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, geocode_unavailable,
-too_many_reports, not_modeled, rate_limited, internal}.
+too_many_reports, not_modeled, rate_limited, push_unavailable, internal}.
 Flask 를 모른다.
 """
 
@@ -61,3 +61,17 @@ class RateLimitedError(NaruError):
 
     code = "rate_limited"
     http_status = 429
+
+
+class NotFoundError(NaruError):
+    """없는 구독·관심 지역 (INTERFACE §9, T7.8)."""
+
+    code = "not_found"
+    http_status = 404
+
+
+class PushUnavailableError(NaruError):
+    """서버에 VAPID 키가 없다 — 알림을 켤 수 없다 (INTERFACE §9, T7.8)."""
+
+    code = "push_unavailable"
+    http_status = 503

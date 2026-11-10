@@ -49,4 +49,6 @@ def _code(code: str) -> ErrorCode:
         return "not_modeled"
     if code == "rate_limited":
         return "rate_limited"
+    if code == "push_unavailable":
+        return "push_unavailable"
     return "internal"

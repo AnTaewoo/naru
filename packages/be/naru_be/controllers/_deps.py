@@ -14,6 +14,7 @@ from naru_be.models.domain.crosswalk_index import CrosswalkIndex
 from naru_be.models.domain.feed import FeedDesk
 from naru_be.models.domain.geocoder import Geocoder
 from naru_be.models.domain.ped_graph import PedGraph
+from naru_be.models.domain.push_desk import PushDesk
 from naru_be.models.domain.reports import ReportDesk
 from naru_be.models.domain.road_graph import RoadGraph
 from naru_be.models.domain.route_planner import RoutePlanner
@@ -34,6 +35,7 @@ class NaruModels:
     bus_intake: BusIntake
     report_desk: ReportDesk  # 통제 제보 (T7.15)
     feed: FeedDesk  # 공개 GeoJSON 피드 (T7.17)
+    push: PushDesk  # 알림 구독·관심 지역 (T7.8)
 
 
 def naru_models() -> NaruModels:
