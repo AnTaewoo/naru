@@ -8,6 +8,8 @@ import {
   hhmm,
   reasonKo,
   reasonType,
+  GRACE_NOTE_KO,
+  inGrace,
   untilKo,
 } from "../i18n/ko";
 import { STATUS_BG, STATUS_COLOR } from "../map/colors";
@@ -80,6 +82,8 @@ export function EvidencePopover({ route }: { route: RouteResponse }) {
   const { closures } = useClosures();
   const { t } = useTime();
   const groups = useMemo(() => evidenceGroups(route.avoided, closures), [route, closures]);
+  // 해제 예정이 지났는데 아직 막힌 사유가 있으면 왜 그런지 한 줄 (태우 11/10)
+  const grace = groups.some((g) => inGrace(g.until, Date.parse(t)));
   return (
     <section className={styles.pop} aria-label="통제 근거">
       {groups.map((g) => (
@@ -117,6 +121,7 @@ export function EvidencePopover({ route }: { route: RouteResponse }) {
           )}
         </article>
       ))}
+      {grace && <p className={styles.grace}>{GRACE_NOTE_KO}</p>}
     </section>
   );
 }

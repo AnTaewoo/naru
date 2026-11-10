@@ -37,6 +37,10 @@ const fc0745 = recordedClosures("closures_0745");
 // T7.6 avoid — 교보빌딩 → 대한문, 마라톤 1구간(adaea2f4cc02)을 피해서 (scripts/record_live_events.py)
 // 04:30·13:30 둘 다 680 s·816.1 m(세종대로사거리·청계광장 횡단보도), 원래 길 674 s·808.3 m,
 // 피한 23206 하나 — 04:30 은 scheduled(시작 전), 13:30 은 released(끝난 뒤), 끝 08:08
+// 08:35 — 1구간(끝 08:08)·출발지(끝 08:30) 둘 다 끝났지만 +30분 안이라 통제 중(BE released_grace):
+// 676 s·811.2 m(광화문(세종문화회관) 지하보도), 원래 길 674 s·808.3 m, 피한 23206·36391 confirmed
+const r0835 = recordedRoute("route_0835");
+const T835 = "2026-03-15T08:35:00+09:00";
 const rAvoid0430 = recordedRoute("route_avoid_0430");
 const rAvoid1330 = recordedRoute("route_avoid_1330");
 const live0745 = recordedLive("closure_events_live_0315_0745").body.events;
@@ -185,6 +189,26 @@ describe("카드·레그·근거 (순수)", () => {
     expect(
       routeNoteKo({ crosswalks: 0, until: null, blocked: false, crossing: null, avoiding: true }),
     ).toBe("이 길은 고른 구역을 지나지 않아요.");
+  });
+
+  it("08:35 — 해제 예정(08:08·08:30)이 지났지만 +30분 안이라 통제 중: '09:00까지 정리 중' (태우 11/10)", () => {
+    const orig = originalCard(r0835);
+    expect(orig).toMatchObject({
+      blocked: true,
+      confirmed: 2,
+      until: "2026-03-15T08:30:00+09:00",
+    });
+    expect(orig && originalFactsKo(orig, T835)).toBe("횡단보도 통제 중 2곳 · 09:00까지 정리 중");
+    expect(orig && originalFactsKo(orig, T745)).toBe("횡단보도 통제 중 2곳 · 08:30 해제");
+    expect(
+      routeNoteKo({
+        ...(orig ?? { crosswalks: 0, until: null, blocked: false }),
+        crossing: routeCrossing(r0835),
+        t: T835,
+      }),
+    ).toBe(
+      "횡단보도 2곳이 09:00까지 정리 중이라 광화문(세종문화회관) 지하보도로 건너는 길을 골랐어요.",
+    );
   });
 
   it("LegList 07:45 — 레그 7행, 이름 있는 지하보도·횡단보도(교차로명, T5.10), 거리는 m 반올림", () => {
@@ -512,5 +536,22 @@ describe("RouteCard — 이 구역 피해서 (T7.6)", () => {
     ).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "빼기" }));
     expect(screen.queryByText(/^피하는 구역/)).toBeNull();
+  });
+});
+
+describe("RouteCard — 정리 중 (태우 11/10)", () => {
+  it("08:35 통제 근거 — 사유마다 '정리 중 · 08:38까지'·'정리 중 · 09:00까지'(해제됨 아님) + 까닭 한 줄", () => {
+    render(
+      <Providers at={T835} route={ready(r0835, T835)}>
+        <RouteCard />
+      </Providers>,
+    );
+    expect(screen.getByText("횡단보도 통제 중 2곳 · 09:00까지 정리 중")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "통제 근거" }));
+    const ev = within(screen.getByRole("region", { name: "통제 근거" }));
+    expect(ev.getByText("정리 중 · 08:38까지")).toBeDefined(); // 1구간 08:08 + 30분
+    expect(ev.getByText("정리 중 · 09:00까지")).toBeDefined(); // 출발지 08:30 + 30분
+    expect(ev.queryByText("해제됨")).toBeNull();
+    expect(ev.getByText("해제 예정 시각 뒤 30분은 현장 정리로 막힌 걸로 봐요")).toBeDefined();
   });
 });

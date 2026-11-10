@@ -18,7 +18,9 @@ import {
   liveTitleKo,
   longRouteKo,
   peopleKo,
+  GRACE_NOTE_KO,
   remainKo,
+  untilKo,
   sourceKo,
   staleWarningKo,
 } from "./ko";
@@ -123,6 +125,19 @@ describe("사건 카드 문구 (T7.5)", () => {
     expect(rowBadgeKo(ev(m, "adaea2f4cc02"), m.atMs)).toBe("23분 뒤 해제"); // 1구간 08:08
     expect(rowBadgeKo(ev(m, "e1d0e06932a8"), m.atMs)).toBe("1시간 27분 뒤 시작");
     expect(rowBadgeKo(ev(a, "be5f89a4ebf3"), a.atMs)).toBe("확인 전");
+  });
+
+  it("해제 예정 뒤 30분은 정리 중 (태우 11/10) — BE 는 끝 + 30분에야 released: 3/15 1구간 끝 08:08", () => {
+    const end = "2026-03-15T08:08:00+09:00"; // 사건 v2 3/15 07:45 adaea2f4cc02 window.end
+    expect(untilKo(end, "2026-03-15T07:45:00+09:00")).toBe("23분 뒤 해제");
+    expect(untilKo(end, "2026-03-15T08:08:00+09:00")).toBe("정리 중 · 08:38까지");
+    expect(untilKo(end, "2026-03-15T08:37:00+09:00")).toBe("정리 중 · 08:38까지");
+    expect(untilKo(end, "2026-03-15T08:38:00+09:00")).toBe("해제됨"); // 끝 + 30분 = released
+    const seg1 = ev(m, "adaea2f4cc02"); // 07:45 기록 — confirmed
+    expect(remainKo(seg1, m.atMs)).toBe("08:08 해제 예정");
+    expect(remainKo(seg1, Date.parse("2026-03-15T08:20:00+09:00"))).toBe("08:38까지 정리 중");
+    expect(rowBadgeKo(seg1, Date.parse("2026-03-15T08:20:00+09:00"))).toBe("정리 중 · 08:38까지");
+    expect(GRACE_NOTE_KO).toBe("해제 예정 시각 뒤 30분은 현장 정리로 막힌 걸로 봐요");
   });
 
   it("시트 제목 — 지금이면 '지금 서울 통제', 아니면 '서울 통제'(날짜·시각은 기준 줄, T7.12)", () => {

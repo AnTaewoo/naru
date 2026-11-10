@@ -3,11 +3,13 @@
 import { useState } from "react";
 import {
   AVOID_KO,
+  GRACE_NOTE_KO,
   TYPE_KO,
   confidenceKo,
   dayKo,
   eventDetailKo,
   eventTitleKo,
+  inGrace,
   kindBadgeKo,
   longRouteKo,
   remainKo,
@@ -65,6 +67,10 @@ export function EventCard({
       <p className={styles.remain} style={{ color: KIND_COLOR[kind] }}>
         {remainKo(event, atMs)}
       </p>
+      {/* 해제 예정이 지났는데 아직 통제 중 — 정리 시간 까닭 (태우 11/10) */}
+      {event.status === "confirmed" && inGrace(event.window.end, atMs) && (
+        <p className={styles.grace}>{GRACE_NOTE_KO}</p>
+      )}
       <dl className={styles.facts}>
         <div>
           <dt>출처</dt>

@@ -140,3 +140,10 @@
   border-color: #2d6bff;
   color: #fff;
 }
+
+/* 정리 시간 까닭 (태우 11/10) */
+.grace {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #777;
+}

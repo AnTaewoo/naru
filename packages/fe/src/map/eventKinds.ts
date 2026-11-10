@@ -21,6 +21,11 @@ export const CHIP_KINDS: readonly ChipKind[] = ["confirmed", "scheduled", "zone"
 
 /** "1시간 안에 시작" — 시작이 at + 60분 안. 이미 시작했는데 근거가 없어 예정인 사건도 여기(진한 주황) */
 export const SOON_MS = 60 * 60_000;
+/**
+ * 해제 예정 시각 뒤 정리 시간 — BE released_grace_min(30분, ARCHITECTURE 상태기계: 종료 + 30분에 released).
+ * 그동안은 아직 통제 중(라우터도 막는다)이라 화면은 "정리 중"이라고 쓴다 (태우 11/10)
+ */
+export const RELEASE_GRACE_MS = 30 * 60_000;
 /** 이보다 낮으면 흐린 회색 점선 — 지도에만, 칩 수에는 안 센다 (라우터 review_confidence 와 같다) */
 export const LOW_CONFIDENCE = 0.7;
 

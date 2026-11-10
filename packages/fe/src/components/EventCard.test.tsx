@@ -80,4 +80,16 @@ describe("EventCard", () => {
     expect(screen.getByText("8곳")).toBeDefined();
     expect(screen.queryByRole("button", { name: "통제 근거 보기" })).toBeNull();
   });
+
+  it("3/15 1구간 08:20 — 해제 예정(08:08)이 지났지만 +30분 안이라 통제 중: '08:38까지 정리 중' + 까닭 (태우 11/10)", () => {
+    render(
+      <EventCard
+        event={eventById(m.body.events, "adaea2f4cc02")}
+        atMs={Date.parse("2026-03-15T08:20:00+09:00")}
+        onClose={() => undefined}
+      />,
+    );
+    expect(screen.getByText("08:38까지 정리 중")).toBeDefined();
+    expect(screen.getByText("해제 예정 시각 뒤 30분은 현장 정리로 막힌 걸로 봐요")).toBeDefined();
+  });
 });

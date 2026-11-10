@@ -6,6 +6,7 @@ import {
   LEG_KO,
   avoidBannerKo,
   distanceKo,
+  graceEndIso,
   eventTitleKo,
   hhmm,
   locateNoteKo,
@@ -109,15 +110,21 @@ export function originalCard(
 
 /**
  * 원래 길 카드 둘째 줄 — "횡단보도 통제 중 2곳 · 08:30 해제", 예정이면 "공지상 통제 시간 1곳 · 현장 확인 전",
- * 피해 달라고 한 구역(T7.6)은 "피한 구역 1곳"(해제 시각 없음)
+ * 피해 달라고 한 구역(T7.6)은 "피한 구역 1곳"(해제 시각 없음). t(경로 시각)에 해제 예정이 지났으면 "09:00까지 정리 중"
  */
-export function originalFactsKo(orig: OriginalCard): string {
+export function originalFactsKo(orig: OriginalCard, t?: string): string {
   const parts: string[] = [];
   if (orig.confirmed > 0) parts.push(`통제 중 ${orig.confirmed}곳`);
   if (orig.scheduled > 0) parts.push(`공지상 통제 시간 ${orig.scheduled}곳 · 현장 확인 전`);
   if (orig.requested > 0) parts.push(`피한 구역 ${orig.requested}곳`);
   if (orig.confirmed + orig.scheduled === 0) return `횡단보도 ${parts.join(" · ")}`;
-  const until = orig.until ? `${hhmm(orig.until)} 해제` : "종료 미정";
+  // 해제 예정이 지났는데 막혀 있으면 정리 시간(30분) — "09:00까지 정리 중" (태우 11/10)
+  const past = orig.until !== null && t !== undefined && Date.parse(t) >= Date.parse(orig.until);
+  const until = !orig.until
+    ? "종료 미정"
+    : past
+      ? `${hhmm(graceEndIso(orig.until))}까지 정리 중`
+      : `${hhmm(orig.until)} 해제`;
   return `횡단보도 ${parts.join(" · ")} · ${until}`;
 }
 
@@ -250,7 +257,7 @@ export function RouteCard() {
                     <span>{orig.distance}</span>
                   </span>
                   <span className={styles.facts}>
-                    <span>{originalFactsKo(orig)}</span>
+                    <span>{originalFactsKo(orig, at ?? t)}</span>
                   </span>
                 </CardPress>
               </article>
@@ -264,6 +271,7 @@ export function RouteCard() {
               crossing: routeCrossing(route),
               requested: orig?.requested ?? 0,
               avoiding: avoid !== null,
+              t: at ?? t,
             })}
           </p>
         </>

@@ -10,7 +10,7 @@ import type {
   Status,
   SummarySegment,
 } from "../types/contracts";
-import { eventKind, kstDay, type ChipKind } from "../map/eventKinds";
+import { RELEASE_GRACE_MS, eventKind, kstDay, type ChipKind } from "../map/eventKinds";
 import type { ExampleKey } from "../map/examples";
 
 export const STATUS_KO: Record<Status, string> = {
@@ -101,11 +101,31 @@ export function windowKo(start: string | null | undefined, end: string | null | 
   return `${hhmm(start)}–${end ? hhmm(end) : "종료 미정"}`;
 }
 
-/** t 기준 남은 시간 문구: "40분 뒤 해제", "2시간 10분 뒤 해제", 지났으면 "해제됨" */
+/** 해제 예정 뒤 정리 시간이 끝나는 시각 (BE: 끝 + 30분에 released) */
+export function graceEndIso(end: string): string {
+  return new Date(Date.parse(end) + RELEASE_GRACE_MS).toISOString();
+}
+
+/** 해제 예정 시각은 지났지만 정리 시간(30분) 안 — 아직 통제 중이다 */
+export function inGrace(end: string | null | undefined, atMs: number): boolean {
+  const e = end ? Date.parse(end) : Number.NaN;
+  return !Number.isNaN(e) && atMs >= e && atMs < e + RELEASE_GRACE_MS;
+}
+
+/** 정리 시간이 왜 있는지 한 줄 (태우 11/10 — "왜 30분 더 못 가지?") */
+export const GRACE_NOTE_KO = "해제 예정 시각 뒤 30분은 현장 정리로 막힌 걸로 봐요";
+
+/**
+ * t 기준 남은 시간 문구: "40분 뒤 해제", "2시간 10분 뒤 해제", 해제 예정이 지났으면 30분은 "정리 중 · 08:38까지",
+ * 그 뒤 "해제됨"
+ */
 export function untilKo(end: string | null | undefined, t: string): string {
   if (!end) return "종료 미정";
-  const diffMin = Math.round((new Date(end).getTime() - new Date(t).getTime()) / 60_000);
-  if (diffMin <= 0) return "해제됨";
+  const ms = Date.parse(end) - Date.parse(t);
+  const diffMin = Math.round(ms / 60_000);
+  if (diffMin <= 0) {
+    return ms > -RELEASE_GRACE_MS ? `정리 중 · ${hhmm(graceEndIso(end))}까지` : "해제됨";
+  }
   if (diffMin < 60) return `${diffMin}분 뒤 해제`;
   const h = Math.floor(diffMin / 60);
   const m = diffMin % 60;
@@ -122,12 +142,17 @@ export function durationKo(ms: number): string {
 }
 
 /**
- * 사건 남은 시간 (T7.5) — 통제 중 "16:00 해제 예정", 예정 "1시간 20분 뒤 시작", 시작 시각이 지났는데 근거가
- * 없어 아직 예정이면 "12:00 시작 · 확인 전", 해제 "13:00 해제"
+ * 사건 남은 시간 (T7.5) — 통제 중 "16:00 해제 예정"(지났으면 정리 시간 "16:30까지 정리 중"), 예정 "1시간 20분 뒤
+ * 시작", 시작 시각이 지났는데 근거가 없어 아직 예정이면 "12:00 시작 · 확인 전", 해제 "13:00 해제"
  */
 export function remainKo(e: Pick<ClosureEvent, "status" | "window">, atMs: number): string {
   const { start, end } = e.window;
-  if (e.status === "confirmed") return end ? `${hhmm(end)} 해제 예정` : "해제 시각 미정";
+  if (e.status === "confirmed") {
+    if (!end) return "해제 시각 미정";
+    return atMs < Date.parse(end)
+      ? `${hhmm(end)} 해제 예정`
+      : `${hhmm(graceEndIso(end))}까지 정리 중`;
+  }
   if (e.status === "released") return end ? `${hhmm(end)} 해제` : "해제";
   if (!start) return "시작 시각 미정";
   const ms = Date.parse(start) - atMs;
@@ -250,6 +275,8 @@ export function routeNoteKo(p: {
   crossing: string | null;
   requested?: number;
   avoiding?: boolean;
+  /** 경로 시각 — 해제 예정(until)이 지났으면 정리 시간 끝까지로 쓴다 (태우 11/10) */
+  t?: string;
 }): string {
   if (p.crosswalks === 0) {
     return p.avoiding
@@ -264,6 +291,10 @@ export function routeNoteKo(p: {
   if (!p.blocked) {
     // 예정만 피했다 — 공지 창 안이라 피했지만 현장 확인은 아직 (ADR-011 A)
     return `횡단보도 ${ruled}곳이 ${until}공지상 통제 시간(현장 확인 전)이라 ${via ?? "피해 가는"} 길을 골랐어요.`;
+  }
+  if (p.until && p.t && Date.parse(p.t) >= Date.parse(p.until)) {
+    const grace = hhmm(graceEndIso(p.until));
+    return `횡단보도 ${ruled}곳이 ${grace}까지 정리 중이라 ${via ?? "돌아가는"} 길을 골랐어요.`;
   }
   return `횡단보도 ${ruled}곳이 ${until}막혀 있어 ${via ?? "돌아가는"} 길을 골랐어요.`;
 }
