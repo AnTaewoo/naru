@@ -17,6 +17,7 @@ from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.orm import Session, sessionmaker
 
 from naru_be.config import Settings
+from naru_be.models.domain.closure_engine import CONFIRMING_EVIDENCE
 from naru_be.models.domain.closure_events import EventWindow, event_id, overlaps, worst
 from naru_be.models.domain.event_area import EventArea
 from naru_be.models.domain.march import MarchProfile, StoredMarch
@@ -400,7 +401,21 @@ class ClosureRepository:
             start, end = to_kst(row.window_start), to_kst(row.window_end)
             if start is None or end is None:
                 return None
-            return StoredMarch(event_id, start, end, MarchProfile.from_json(row.march))
+            e = ClosureStateEntity
+            stmt = select(e).where(
+                e.reason == row.reason,
+                e.window_start == row.window_start,
+                e.window_end == row.window_end,
+            )
+            states = [self._state(r) for r in s.scalars(stmt)]
+        # 통제 중이 될 수 있는 사건 — 엔진 status_of_state 의 confirmable 과 같은 규칙
+        # (창 안이면 통제 중)
+        confirmable = any(
+            st.confidence >= self.settings.confirmed_confidence
+            and any(ev.kind in CONFIRMING_EVIDENCE for ev in st.evidence)
+            for st in states
+        )
+        return StoredMarch(event_id, start, end, MarchProfile.from_json(row.march), confirmable)
 
     @staticmethod
     def _row(

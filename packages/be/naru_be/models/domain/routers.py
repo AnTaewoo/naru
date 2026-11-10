@@ -250,7 +250,8 @@ class TimeDependentRouter(_AStarRouter):
         start, end = state.window.start, state.window.end
         if not counted or start is None or end is None:
             return None
-        return p_at(march, start, end, state.crosswalk_id, at, self.settings)
+        confirmed = status is Status.confirmed
+        return p_at(march, start, end, state.crosswalk_id, at, self.settings, confirmed)
 
     def _closure_cost(self, edge: PedEdge, at: datetime, by_crosswalk: ByCrosswalk) -> float | None:
         """None = 제외(confirmed, 행진 P ≥ march_p_block). 횡단보도마다 예정 비용

@@ -81,7 +81,8 @@ class Settings(BaseSettings):
     crosswalk_road_name_m: float = 20.0
     # 행진 확률 모델 (ADR-015 가정값 표, T7.16) — 근거 없는 값은 11/14 현장 검증 뒤 다시 정한다
     march_samples: int = 21  # 속도 표본 수 (u = -1, -0.9 … 1)
-    march_speed_spread: float = 0.5  # v_i = v(1 ± 0.5u)
+    # ±50% 면 긴 행진(국회대로 9.5 km)에서 P 가 전부 하한으로 눌려(11/10 기록) ±20% (태우 11/10 ①)
+    march_speed_spread: float = 0.2  # v_i = v(1 ± 0.2u)
     march_lead_m: float = 300.0  # 행렬 앞에서 미리 막는 거리
     march_queue_m: float = 200.0  # 인원을 모를 때 행렬 길이
     march_queue_min_m: float = 100.0  # 인원이 적어도 이보다 짧게 보지 않는다
@@ -91,6 +92,7 @@ class Settings(BaseSettings):
         default_factory=lambda: {"대로": 16.0, "로": 10.0, "길": 6.0}
     )
     march_p_floor: float = 0.2  # 공지 창 안 경로 위 최저 P
+    march_p_floor_confirmed: float = 0.5  # 통제 중(돌발이 붙은) 행진의 최저 P (태우 11/10 ③)
     march_p_block: float = 0.8  # 이 이상이면 간선 제외 (confirmed_confidence 와 같은 값)
     march_join_m: float = 50.0  # 앞 구간 끝·다음 시작 사이 이 안이면 이어진 경로
     march_keyframe_s: int = 60  # 키프레임 간격 (태우 1분)

@@ -48,7 +48,12 @@ def blocked_at(
         counted = status is Status.confirmed or (
             status is Status.scheduled and state.confidence >= settings.review_confidence
         )
-        p = p_at(march, start, end, state.crosswalk_id, at, settings) if counted else None
+        confirmed = status is Status.confirmed
+        p = (
+            p_at(march, start, end, state.crosswalk_id, at, settings, confirmed)
+            if counted
+            else None
+        )
         return status if p is not None and p >= settings.march_p_block else None
     if status is Status.confirmed or penalized(state, status, at, settings):
         return status

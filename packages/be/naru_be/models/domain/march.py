@@ -102,6 +102,7 @@ class StoredMarch:
     start: datetime
     end: datetime
     profile: MarchProfile
+    confirmable: bool  # 돌발·시각표 근거가 붙어 창 안이면 통제 중 — 하한이 march_p_floor_confirmed
 
 
 @dataclass(frozen=True)
@@ -216,9 +217,10 @@ def p_at(
     crosswalk_id: str,
     t: datetime,
     settings: Settings,
+    confirmed: bool = False,
 ) -> float | None:
     """그 시각 이 횡단보도가 막혀 있을 확률. 경로 밖 횡단보도면 None, 창 밖이면 0, 창 안은
-    하한 이상."""
+    하한 이상(confirmed = 통제 중 행진이면 march_p_floor_confirmed, 태우 11/10 ③)."""
     s = profile.s.get(crosswalk_id)
     if s is None:
         return None
@@ -227,7 +229,8 @@ def p_at(
     dt = (t - start).total_seconds()
     speeds = _speeds(profile, start, end, settings)
     blocked = sum(1 for v in speeds if _blocked(profile, s, v * dt, settings))
-    return max(blocked / len(speeds), settings.march_p_floor)
+    floor = settings.march_p_floor_confirmed if confirmed else settings.march_p_floor
+    return max(blocked / len(speeds), floor)
 
 
 def _head_tail_points(profile: MarchProfile, head: float, step_m: float) -> tuple[LngLat, ...]:
@@ -248,7 +251,12 @@ def _head_tail_points(profile: MarchProfile, head: float, step_m: float) -> tupl
 
 
 def keyframe_at(
-    profile: MarchProfile, start: datetime, end: datetime, t: datetime, settings: Settings
+    profile: MarchProfile,
+    start: datetime,
+    end: datetime,
+    t: datetime,
+    settings: Settings,
+    confirmed: bool = False,
 ) -> Keyframe:
     dt = (t - start).total_seconds()
     heads = [v * dt for v in _speeds(profile, start, end, settings)]
@@ -270,7 +278,7 @@ def keyframe_at(
     crosswalks = {
         cid: round(p, 3)
         for cid in profile.s
-        if (p := p_at(profile, start, end, cid, t, settings)) is not None
+        if (p := p_at(profile, start, end, cid, t, settings, confirmed)) is not None
     }
     return Keyframe(t, samples, center, round(radius, 1), crosswalks)
 
@@ -282,13 +290,14 @@ def keyframes(
     t0: datetime | None,
     t1: datetime | None,
     settings: Settings,
+    confirmed: bool = False,
 ) -> list[Keyframe]:
-    """[t0, t1] ∩ [시작, 끝] 을 march_keyframe_s 간격으로 (F)."""
+    """[t0, t1] ∩ [시작, 끝] 을 march_keyframe_s 간격으로 (F). confirmed = 통제 중 행진."""
     lo, hi = max(start, t0 or start), min(end, t1 or end)
     out: list[Keyframe] = []
     t = lo
     while t <= hi:
-        out.append(keyframe_at(profile, start, end, t, settings))
+        out.append(keyframe_at(profile, start, end, t, settings, confirmed))
         t += timedelta(seconds=settings.march_keyframe_s)
     return out
 
@@ -303,7 +312,9 @@ def march_result(
     """GET /closures/events/{id}/march 의 Model — 대상이 아니면 NotModeledError(404)."""
     if stored is None:
         raise NotModeledError("행진 확률 모델 대상 사건이 아니다", "event_id")
-    frames = keyframes(stored.profile, stored.start, stored.end, t0, t1, settings)
+    frames = keyframes(
+        stored.profile, stored.start, stored.end, t0, t1, settings, stored.confirmable
+    )
     points = {cid: pt for cid in stored.profile.s if (pt := points_of(cid)) is not None}
     return MarchResult(
         stored.event_id, stored.start, stored.end, settings.march_keyframe_s, points, frames
