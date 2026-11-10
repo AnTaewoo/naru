@@ -3,11 +3,15 @@
 public_key(): .env VAPID 개인키(PEM 또는 raw)에서 브라우저 applicationServerKey(base64url 공개점).
 키가 없으면 PushUnavailableError(503). subscribe(): 같은 endpoint 면 id 그대로 다시 켠다.
 areas(): 만료된 last_seen 은 읽을 때 지운다. add_area(): saved 는 구독당 watch_saved_max 개,
-last_seen 은 하나(바꿔 끼움) — 150 m 격자로 반올림(EPSG:5179)·3시간 뒤 만료. 발송·매칭은 T7.9.
+last_seen 은 하나(바꿔 끼움) — 150 m 격자로 반올림(EPSG:5179)·3시간 뒤 만료.
+dispatch(now) (T7.9): 그 시각 창(진행 중 ~ push_horizon_h) 사건 x 관심 지역 →
+push_dispatcher.plan_sends → push_sends 에 줄 세움 → 때가 된 것을 WebPushSender 로 보내고 상태
+기록, 404·410 이면 구독을 끈다.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from cryptography.hazmat.primitives import serialization
@@ -16,6 +20,11 @@ from pyproj import Transformer
 
 from naru_be.config import Settings
 from naru_be.errors import InvalidQueryError, NotFoundError, PushUnavailableError
+from naru_be.models.domain.closure_engine import ClosureEngine
+from naru_be.models.domain.closure_events import EventWindow
+from naru_be.models.domain.push_dispatcher import WatchCircle, payload_of, plan_sends
+from naru_be.models.domain.web_push import WebPushSender
+from naru_be.models.repositories.closure_repository import ClosureRepository
 from naru_be.models.repositories.push_repository import (
     PushRepository,
     SubscriptionRow,
@@ -36,10 +45,29 @@ def snap_to_grid(lng: float, lat: float, grid_m: float) -> tuple[float, float]:
     return round(float(out_lng), 6), round(float(out_lat), 6)
 
 
+@dataclass(frozen=True)
+class DispatchResult:
+    at: datetime
+    matched: int
+    sent: int
+    failed: int
+    deactivated: int
+
+
 class PushDesk:
-    def __init__(self, repo: PushRepository, settings: Settings) -> None:
+    def __init__(
+        self,
+        repo: PushRepository,
+        settings: Settings,
+        closures: ClosureRepository | None = None,
+        engine: ClosureEngine | None = None,
+        sender: WebPushSender | None = None,
+    ) -> None:
         self.repo = repo
         self.settings = settings
+        self.closures = closures
+        self.engine = engine
+        self.sender = sender or WebPushSender(settings)
 
     def public_key(self) -> str:
         secret = self.settings.vapid_private_key.get_secret_value().strip()
@@ -92,3 +120,42 @@ class PushDesk:
         sub = self._owner(endpoint)
         if self.repo.delete_area(sub.id, area_id) == 0:
             raise NotFoundError("관심 지역이 없다", "id")
+
+    def dispatch(self, now: datetime) -> DispatchResult:
+        """매칭 → 줄 세움 → 때가 된 것 발송 (워커가 60초마다). 사건은 그 시각 ~ push_horizon_h."""
+        assert self.closures is not None and self.engine is not None, (
+            "dispatch 에는 사건 저장소가 필요"
+        )
+        engine = self.engine
+        window = EventWindow(now, now, now + timedelta(hours=self.settings.push_horizon_h))
+        events = self.closures.events(
+            None, None, status_of=lambda st: engine.status_of_state(st, now), window=window
+        )
+        subs = [
+            (keys.id, [WatchCircle(a.lng, a.lat, a.radius_m) for a in areas])
+            for keys, areas in self.repo.subscriptions_with_areas(now)
+        ]
+        planned = plan_sends(events, subs, self.repo.existing_sends(), now, self.settings)
+        matched = self.repo.queue_sends(
+            [(p.subscription_id, p.event_id, p.kind, p.due_at) for p in planned]
+        )
+        by_id = {e.id: e for e in events}
+        sent = failed = 0
+        gone: set[int] = set()
+        for send, keys in self.repo.due_sends(now):
+            event = by_id.get(send.event_id)
+            if (
+                event is None
+            ):  # 줄 설 땐 있었는데 지금 창엔 없는 사건(지워졌거나 끝남) — 보내지 않고 닫는다
+                self.repo.mark_sent(send.id, 0, now)
+                continue
+            status = self.sender.send(keys, payload_of(event, send.kind))
+            self.repo.mark_sent(send.id, status, now)
+            if 200 <= status < 300:
+                sent += 1
+            else:
+                failed += 1
+                if status in (404, 410):
+                    self.repo.deactivate_id(keys.id)
+                    gone.add(keys.id)
+        return DispatchResult(now, matched, sent, failed, len(gone))

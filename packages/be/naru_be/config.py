@@ -105,6 +105,11 @@ class Settings(BaseSettings):
     watch_saved_max: int = 10  # 구독당 저장 관심 지역 수
     watch_last_seen_grid_m: float = 150.0  # 마지막 위치는 이 격자로 반올림 (개인정보)
     watch_last_seen_ttl_h: int = 3  # 마지막 위치는 이 시간 뒤 삭제
+    # 발송 (T7.9) — 밤(22~07시 KST) 에 생긴 '예정' 알림은 07:00 에 모아서, 푸시 TTL
+    push_night_start_h: int = 22
+    push_night_end_h: int = 7
+    push_ttl_s: int = 3600
+    push_horizon_h: int = 24  # 이 시간 안에 시작하는 사건까지 '예정' 알림
     # 공개 피드 (T7.17, INTERFACE §3.3) — 분 단위 캐시, IP 당 분당 요청 상한 (gunicorn 워커마다)
     feed_cache_s: int = 60
     feed_cache_max: int = 64

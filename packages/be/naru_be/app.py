@@ -96,7 +96,7 @@ def build_models(settings: Settings) -> NaruModels:
         BusIntake(BusRepository(sessions)),
         ReportDesk(index, ReportRepository(sessions), settings),
         FeedDesk(repo, engine, index, settings),
-        PushDesk(PushRepository(sessions), settings),
+        PushDesk(PushRepository(sessions), settings, repo, engine),
     )
 
 
@@ -122,6 +122,7 @@ def create_app(settings: Settings | None = None, models: NaruModels | None = Non
     app.register_blueprint(report_controller.bp)
     app.register_blueprint(feed_controller.bp)
     app.register_blueprint(push_controller.bp)
+    app.register_blueprint(push_controller.internal)
     _register_errors(app)
     return app
 

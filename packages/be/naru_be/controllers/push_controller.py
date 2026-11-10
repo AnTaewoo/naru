@@ -2,7 +2,7 @@
 
 GET /push/vapid-public-key · POST·DELETE /push/subscribe · GET·POST /watch-areas ·
 DELETE /watch-areas/<id>. GET·DELETE 의 구독 endpoint 는 헤더 X-Push-Endpoint (주소·접근 로그에
-안 남게).
+안 남게). POST /internal/push/dispatch (워커, 토큰, T7.9) — 매칭·발송 한 바퀴.
 """
 
 from __future__ import annotations
@@ -12,11 +12,19 @@ from datetime import datetime
 from flask import Blueprint, Request, Response, request
 
 from naru_be.controllers._deps import naru_models
+from naru_be.controllers.candidate_controller import require_token
 from naru_be.models.domain.types import KST
 from naru_be.views import push_view
-from naru_contracts import PushSubscription, UnsubscribeRequest, WatchAreaRequest
+from naru_contracts import (
+    PushDispatchRequest,
+    PushSubscription,
+    UnsubscribeRequest,
+    WatchAreaRequest,
+)
 
 bp = Blueprint("push", __name__)
+internal = Blueprint("internal_push", __name__, url_prefix="/internal")
+internal.before_request(require_token)
 ENDPOINT_HEADER = "X-Push-Endpoint"
 
 
@@ -61,3 +69,10 @@ def add_watch_area() -> tuple[Response, int]:
 def remove_watch_area(area_id: int) -> Response:
     naru_models().push.remove_area(endpoint_of(request), area_id)
     return push_view.render_gone()
+
+
+@internal.post("/push/dispatch")
+def dispatch() -> Response:
+    body = PushDispatchRequest.model_validate(request.get_json(silent=True) or {})
+    result = naru_models().push.dispatch(body.at or datetime.now(KST))
+    return push_view.render_dispatch(result)

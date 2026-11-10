@@ -6,8 +6,15 @@ from collections.abc import Sequence
 
 from flask import Response, jsonify
 
+from naru_be.models.domain.push_desk import DispatchResult
 from naru_be.models.repositories.push_repository import SubscriptionRow, WatchAreaRow
-from naru_contracts import SubscribeResponse, VapidPublicKey, WatchArea, WatchAreasResponse
+from naru_contracts import (
+    PushDispatchResponse,
+    SubscribeResponse,
+    VapidPublicKey,
+    WatchArea,
+    WatchAreasResponse,
+)
 from naru_contracts.push_api import WatchKind
 
 
@@ -44,3 +51,10 @@ def render_areas(areas: Sequence[WatchAreaRow]) -> Response:
 
 def render_gone() -> Response:
     return Response(status=204)
+
+
+def render_dispatch(r: DispatchResult) -> Response:
+    body = PushDispatchResponse(
+        at=r.at, matched=r.matched, sent=r.sent, failed=r.failed, deactivated=r.deactivated
+    )
+    return jsonify(body.model_dump(mode="json"))
