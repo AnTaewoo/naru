@@ -95,3 +95,10 @@
   font-size: 11px;
   color: #aaa;
 }
+
+/* 최근 1시간 제보 (T7.15) — 기록만이라 근거 칸들보다 작게 */
+.reports {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: #555;
+}

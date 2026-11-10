@@ -83,6 +83,22 @@
   --pin: #e5322d;
 }
 
+/* 통제 제보 횡단보도 (T7.15) — 지금 지도 '1시간 안' 주황과 같은 색 */
+.pinReport {
+  --pin: #ef6c00;
+}
+
+/* 통제 제보 버튼 (T7.15) — 컨트롤 묶음 안 글자 버튼 (maplibre 의 29px 정사각 버튼보다 구체적으로) */
+:global(.maplibregl-ctrl-group) .reportBtn {
+  width: auto;
+  min-width: 29px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ef6c00;
+}
+
 .pinLabel {
   padding: 4px 10px;
   border-radius: 6px;

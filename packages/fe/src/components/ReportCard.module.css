@@ -1,0 +1,120 @@
+.card {
+  padding: 4px 20px 16px;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.head {
+  flex: 1;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e1e1e;
+}
+
+.field {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fff5dc;
+  color: #ef6c00;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f1f1;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  color: #444;
+  cursor: pointer;
+}
+
+.name {
+  margin: 8px 0 0;
+  font-size: 16px;
+  color: #1e1e1e;
+}
+
+.name b {
+  font-weight: 700;
+}
+
+.where {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  color: #666;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.blocked,
+.open,
+.retry {
+  flex: 1;
+  height: 46px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.blocked {
+  border: 1px solid #e5322d;
+  background: #e5322d;
+  color: #fff;
+}
+
+.open {
+  border: 1px solid #1f9d55;
+  background: #1f9d55;
+  color: #fff;
+}
+
+.blocked:disabled,
+.open:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.retry {
+  width: 100%;
+  margin-top: 10px;
+  border: 1px solid #2d6bff;
+  background: #fff;
+  color: #2d6bff;
+}
+
+.done {
+  margin: 12px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f9d55;
+}
+
+.error {
+  margin: 12px 0 0;
+  font-size: 14px;
+  color: #c4320a;
+}
+
+.note {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: #777;
+}
