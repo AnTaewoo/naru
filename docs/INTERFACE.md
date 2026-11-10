@@ -227,7 +227,7 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 }
 ```
 - 2026-11-10 기록 `naru_api/march_be5f89a4ebf3.json`(11/7 r01 동화면세점 앞 → 종로1R → 동화면세점 앞, 50,000명, 12:00~16:00)의 첫 키프레임 — 표본 21개 중 2개, 횡단보도 13곳 중 3곳만 남긴 것. 시작 시각이라 머리가 출발점에 있고(점 하나씩, 반경 0), 출발점에서 300 m(`march_lead_m`) 안의 세종대로사거리 둘은 P 1.0, 1 km 뒤 종로구청입구는 하한 0.2.
-- `keyframes[]`: `t` 시각(시각 순) · `samples` 표본(속도)별 머리~꼬리 점 `[lng, lat]`(경로 위 `march_point_step_m` 25 m 간격, 키프레임당 `march_points_max` 600 상한 — 넘으면 간격을 넓힌다) · `center` 그 점들의 가운데 · `radius_m` 그 점들이 퍼진 반경(표시용) · `crosswalks` 경로 위 횡단보도 id → 그 시각 막혀 있을 확률 0~1(창 안 하한 `march_p_floor` 0.2, 라우터가 쓰는 값과 같다).
+- `keyframes[]`: `t` 시각(시각 순) · `samples` 표본(속도)별 머리~꼬리 점 `[lng, lat]`(경로 위 `march_point_step_m` 25 m 간격, 키프레임당 `march_points_max` 600 상한 — 넘으면 간격을 넓힌다) · `center` 그 점들의 가운데 · `radius_m` 그 점들이 퍼진 반경(표시용) · `crosswalks` 경로 위 횡단보도 id → 그 시각 막혀 있을 확률 0~1(창 안 하한 `march_p_floor` 0.2, 통제 중 행진은 `march_p_floor_confirmed` 0.5 — 라우터가 쓰는 값과 같다).
 - `crosswalk_points`: 경로 위 횡단보도 id → `[lng, lat]`. FE 가 P 색을 칠할 점.
 - FE 문구는 "공지 일정 기준 예상 위치" — 실제 추적처럼 보이는 말은 쓰지 않는다. 두 키프레임 사이는 FE 가 보간한다.
 - `ETag`(본문 sha1)·`If-None-Match` → 304, `Cache-Control: no-cache` (§3.1 과 같다).
@@ -247,7 +247,7 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 ## §5 상태별 라우팅 반응 (엔진·라우터·FE 공통 규칙)
 ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, 예정 +300초, 30분, 붙임 150 m)은 `naru_be/config.py` 상수. 바꾸면 이 문서와 ARCHITECTURE 표도 같이.
 - (v0.9, ADR-011 A) `scheduled`(확신도 ≥ 0.7)는 횡단보도에 닿는 시각이 공지 창 안일 때만 그 횡단보도마다 +300초(`scheduled_penalty_s`) — 하드 차단이 아니라 페널티. 창 밖(시작 전·끝난 뒤)은 보통. `confirmed`는 차단. FE 는 `avoided[].status` 로 confirmed "통제 중" / scheduled "공지상 통제 시간 · 현장 확인 전"을 나눈다.
-- (v0.15, ADR-015 E) 행진 확률 모델 대상 사건(§3.2)의 경로 위 횡단보도는 `scheduled`든 `confirmed`든 창 전체 대신 그 시각 P(t, s): 비용 = P × 300초, P ≥ 0.8(`march_p_block`)이면 차단, 창 밖은 P 0. 비용이 붙은 횡단보도도 `avoided` 에 그 시각 상태로.
+- (v0.15, ADR-015 E) 행진 확률 모델 대상 사건(§3.2)의 경로 위 횡단보도는 `scheduled`든 `confirmed`든 창 전체 대신 그 시각 P(t, s): 비용 = P × 300초, P ≥ 0.8(`march_p_block`)이면 차단, 창 밖은 P 0, 창 안 하한은 예정 0.2·통제 중 0.5. 비용이 붙은 횡단보도도 `avoided` 에 그 시각 상태로.
 
 ## §6 오류 응답 (Flask)
 ```json
