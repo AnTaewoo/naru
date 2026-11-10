@@ -52,7 +52,7 @@ Task 하나를 끝까지 하고, **보고하고, 멈춘다.** 태우가 "다음"
 1. **BE는 MVC, 의존은 controllers → views → models 아래로만.** Controller는 검증 → Model → View 3줄, Model은 Flask를 모르고, View는 DB를 모른다. `.importlinter`가 강제
 2. **AI ↔ BE 직접 import 금지.** 경계는 HTTP + `naru_contracts`. `.importlinter`가 강제
 3. **모델은 좌표를 만들지 않는다.** Claude는 문장 안의 표현(spans)과 구간(segments: from/to/via/road)만 낸다. 좌표는 `naru_ai.notice.resolver`(지명사전·카카오 기록), 선은 BE `CrosswalkIndex.from_segment`(도로 그래프 최단경로 + 도로 등급별 버퍼)
-4. **Next.js는 화면만.** Route Handler·Server Actions에 로직 금지. BE 호출은 `/api/*` rewrites. `'use client'` 경계는 `providers.tsx`·`NaruApp.tsx` 둘
+4. **Next.js는 화면만.** Route Handler·Server Actions에 로직 금지. BE 호출은 `/api/*` rewrites. `'use client'` 경계는 `providers.tsx`·`NaruApp.tsx`·`DataAsOf.tsx`(/licenses 데이터 기준 시각, T7.13) 셋
 5. 공간 연산은 Python에서. MySQL은 결과 저장소. `ST_*` 안 씀
 6. FE 타입은 `make schema`로 생성. 손으로 안 씀
 7. 시간은 tz-aware, DB UTC. 좌표는 `[lng, lat]`, 미터 계산은 EPSG:5179. enum 코드값 영어, 한국어는 FE `i18n/ko.ts`에서만
