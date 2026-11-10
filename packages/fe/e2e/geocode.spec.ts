@@ -1,6 +1,7 @@
 // T5.8 주소·검색 — iPhone 13 크기. BE 는 카카오 기록 재생(NARU_GEOCODE_SOURCE=recorded)으로 띄운다:
 // 검색 '교보빌딩' 1위 광화문교보빌딩·'덕수궁' 3위 덕수궁 대한문(= recorded route_0745 출발·도착),
-// 주소 교보빌딩 "종로구 종로 1"·대한문 "중구 세종대로 99". 기록에 없는 요청은 503 → 화면은 대체 문구
+// 주소 교보빌딩 "종로구 종로 1"·대한문 "중구 세종대로 99". 기록에 없는 요청은 503 → 화면은 대체 문구.
+// T7.14 — 홈 검색 줄을 누르면 지도 이동(줌 17)·이름 핀·장소 카드([출발][도착][☆ 저장]), 칸 검색도 지도 이동
 import { devices, expect, test, type Page } from "@playwright/test";
 import { recorded } from "../src/test/recorded";
 import { consoleErrors, ownErrors } from "./helpers";
@@ -41,8 +42,20 @@ test("홈 검색 '교보빌딩' → 출발, 도착 칸 '덕수궁' → 대한문
   expect(near.split(",").map((x) => Number(x).toFixed(2))).toEqual(["37.57", "126.98"]);
   const results = page.getByRole("list", { name: "검색 결과" });
   await expect(results.getByRole("listitem")).toHaveCount(10);
-  await page.getByRole("button", { name: "광화문교보빌딩 출발" }).click();
+  // 줄마다 지도 가운데부터 거리 (T7.14) — 광화문교보빌딩 387m (측지선 386.6 m)
+  await expect(results.getByRole("listitem").first()).toContainText("387m");
+  // 줄을 누르면 그 장소 — 지도는 줌 17 로 그리로, 이름 핀, 시트는 장소 카드 (T7.14)
+  await page.getByRole("button", { name: "광화문교보빌딩 서울 종로구 종로 1" }).click();
+  await expect(page.getByRole("img", { name: "광화문교보빌딩 위치" })).toBeVisible();
+  const card = page.getByRole("article", { name: "광화문교보빌딩" });
+  await expect(card).toContainText("서울 종로구 종로 1");
+  const zoom = () => Number(new URL(page.url()).hash.split("/")[0]?.slice(5));
+  await expect.poll(zoom).toBeGreaterThan(16.9);
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: "test-results/iphone13-t714-place.png" });
+  await card.getByRole("button", { name: "출발" }).click();
   await expect(page.getByRole("button", { name: "출발 광화문교보빌딩" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "광화문교보빌딩 위치" })).toHaveCount(0); // 출발 핀으로
   await page.getByRole("button", { name: "도착 지도를 눌러 도착을 고르세요" }).click();
   await page.getByRole("searchbox", { name: "도착 검색" }).fill("덕수궁");
   await expect(
@@ -55,6 +68,52 @@ test("홈 검색 '교보빌딩' → 출발, 도착 칸 '덕수궁' → 대한문
   await page.waitForTimeout(2000); // 지도 맞춤·타일
   await page.screenshot({ path: "test-results/iphone13-t58-route.png" });
   expect(ownErrors(errors)).toEqual([]);
+});
+
+test("검색한 장소 핀은 카드를 닫거나·지도를 누르거나·다른 곳을 검색하면 사라진다, ☆ 저장은 빈 검색칸에 (T7.14)", async ({
+  page,
+}) => {
+  await page.goto(`/?${T}#map=15/37.5675/126.9775`);
+  const box = page.getByRole("searchbox", { name: "장소·주소 검색" });
+  const pick = async () => {
+    await box.fill("교보빌딩");
+    await page.getByRole("button", { name: "광화문교보빌딩 서울 종로구 종로 1" }).click();
+    await expect(page.getByRole("img", { name: "광화문교보빌딩 위치" })).toBeVisible();
+  };
+  const pin = page.getByRole("img", { name: "광화문교보빌딩 위치" });
+  await pick();
+  await page.getByRole("button", { name: "장소 닫기" }).click();
+  await expect(pin).toHaveCount(0);
+  await pick();
+  await page.waitForTimeout(1200); // 줌 17 이동이 끝난 뒤
+  await tapMap(page, 0.15, 0.3);
+  await expect(pin).toHaveCount(0);
+  await pick();
+  await page.getByRole("button", { name: "☆ 저장" }).click();
+  await expect(page.getByRole("button", { name: "★ 저장됨" })).toBeVisible();
+  await box.fill("덕수");
+  await expect(pin).toHaveCount(0);
+  await box.fill("");
+  await box.blur();
+  await box.focus();
+  const saved = page.getByRole("list", { name: "저장한 장소" });
+  await expect(saved).toContainText("광화문교보빌딩");
+  await saved.getByRole("button", { name: "광화문교보빌딩 서울 종로구 종로 1" }).click();
+  await expect(pin).toBeVisible();
+});
+
+test("출발·도착 칸 검색으로 고른 곳도 지도가 그리로(줌 17) — 출발 교보빌딩 (T7.14)", async ({
+  page,
+}) => {
+  await page.goto(`/?${T}#map=15/37.5675/126.9775`);
+  await page.getByRole("button", { name: "길찾기" }).click();
+  await page.getByRole("button", { name: /^출발 / }).click();
+  await page.getByRole("searchbox", { name: "출발 검색" }).fill("교보빌딩");
+  await page.getByRole("button", { name: "광화문교보빌딩 서울 종로구 종로 1" }).click();
+  await expect(page.getByRole("button", { name: "출발 광화문교보빌딩" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "출발 지점" })).toBeVisible();
+  const zoom = () => Number(new URL(page.url()).hash.split("/")[0]?.slice(5));
+  await expect.poll(zoom).toBeGreaterThan(16.9);
 });
 
 test("주소창 출발·도착 → 칸에 도로명 주소, 좌표는 안 보인다", async ({ page }) => {

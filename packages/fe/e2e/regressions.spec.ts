@@ -71,7 +71,7 @@ test("④ 3/15 07:45 공유 링크 — 날짜·시각·출발·도착이 그대�
   expect(ownErrors(errors)).toEqual([]);
 });
 
-test("⑤ 이 구역 피해서 길찾기 — 1구간 카드 버튼 → 길찾기 '피하는 구역', ?avoid= 공유 링크는 23206 을 비켜 816m (T7.6)", async ({
+test("⑤ 이 구역 피해서 길찾기 — 3/15 13:30 1구간 카드 버튼 → 길찾기 시트 맨 위 '피하는 구역' (T7.6)", async ({
   page,
 }) => {
   const errors = consoleErrors(page);
@@ -80,7 +80,16 @@ test("⑤ 이 구역 피해서 길찾기 — 1구간 카드 버튼 → 길찾기
   await card.getByRole("button", { name: "이 구역 피해서 길찾기" }).click();
   const sheet = page.getByRole("region", { name: "길찾기 결과" });
   await expect(sheet).toContainText(`피하는 구역 · ${SEG1}`);
+  expect(ownErrors(errors)).toEqual([]);
+});
+
+// 한 테스트에서 페이지를 다시 열면 받던 타일 요청이 끊겨 "Failed to fetch" 가 찍힌다 — 공유 링크는 따로
+test("⑤ 공유 링크 ?avoid= — 3/15 13:30 교보빌딩 → 대한문이 1구간 23206 을 비켜 816m, 원래 길 '피한 구역' (T7.6)", async ({
+  page,
+}) => {
+  const errors = consoleErrors(page);
   await page.goto(`/?t=2026-03-15T13:30:00%2B09:00&${od745}&avoid=adaea2f4cc02`);
+  const sheet = page.getByRole("region", { name: "길찾기 결과" });
   await expect(page.getByRole("article", { name: "가장 빠른 길" })).toContainText("816m");
   const orig = page.getByRole("article", { name: "원래 길" });
   await expect(orig).toContainText("피한 구역");
