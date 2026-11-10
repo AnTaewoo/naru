@@ -1,0 +1,70 @@
+.card {
+  padding: 4px 20px 16px;
+}
+
+.top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.name {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: #1e1e1e;
+}
+
+.close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f1f1;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  color: #444;
+  cursor: pointer;
+}
+
+.address {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.primary,
+.save {
+  flex: 1;
+  height: 42px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary {
+  border: 1px solid #2d6bff;
+  background: #2d6bff;
+  color: #fff;
+}
+
+.save {
+  border: 1px solid #e6e6e6;
+  background: #fff;
+  color: #2d6bff;
+}
+
+.save[aria-pressed="true"] {
+  background: #eaf1ff;
+}
