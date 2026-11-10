@@ -208,29 +208,46 @@ test("달력으로 날짜를 바꾸면 그날 같은 시각 — 11/7 07:45 → 3
   await expect(sheet).toContainText("마라톤 1구간 세종대로 사거리~숭례문 오거리");
 });
 
-test("예시로 보기 — 국회대로 행진을 누르면 11/9 12:00, 지도가 그 행진 구역으로 (T7.11)", async ({
+test("예시 칩 — 11/9 국회대로 행진을 누르면 11/9 12:00·그 행진 카드, 지도는 행진 전체 (T7.11 → T7.14)", async ({
   page,
 }) => {
   await page.goto(HOME);
   const sheet = page.getByRole("region", { name: SHEET });
-  const examples = sheet.getByRole("region", { name: "예시로 보기" });
-  await examples.getByRole("button", { name: /국회대로 행진/ }).click();
-  await expect(page.getByLabel("날짜")).toHaveValue("2026-11-09");
+  const chips = sheet.getByRole("group", { name: "예시로 보기" });
+  await chips.getByRole("button", { name: "11/9 국회대로 행진" }).click();
+  // TOPIS 통제지도 1109233 ccaa9980c6ac — 12:00 엔 돌발 연결로 통제 중 (T7.3)
+  const card = page.getByRole("article", { name: "국회의사당앞 → 효자동삼거리 행진" });
+  await expect(card).toContainText("통제 중");
   await expect(sheet).toContainText("11월 9일 12:00 기준");
-  // TOPIS 통제지도 1109233 — 12:00 엔 돌발 연결로 통제 중 (T7.3)
-  await expect(sheet.getByRole("region", { name: "이 시각" })).toContainText(
-    "국회의사당앞 → 효자동삼거리 행진",
-  );
-  // 9.5 km 행진 bbox(examples.ts)에 절반 시트 위로 맞춤 — 다 담으면 11.6 이라 구역이 그려지는 12 로
+  // 카드를 열면 사건 범위로(T7.5 ?event= 와 같다) — 9.5 km 행진 전체가 절반 시트 위에, 줌 12 아래는 고른 윤곽
   const zoom = () => Number(new URL(page.url()).hash.split("/")[0]?.slice(5));
-  await expect.poll(zoom).toBeGreaterThanOrEqual(12);
-  expect(zoom()).toBeLessThan(13);
-  await expect(page.getByRole("region", { name: "지도", exact: true })).toHaveAttribute(
-    "data-band",
-    "area",
-  );
+  await expect.poll(zoom).toBeLessThan(12);
   await page.waitForTimeout(1500);
   await page.screenshot({ path: "test-results/live-map-example.png" });
+});
+
+test("예시 칩은 시트를 접어도 보인다 — 3/15 서울마라톤 → 3/15 07:45·1구간 카드 (T7.14)", async ({
+  page,
+}) => {
+  await page.goto(HOME);
+  const sheet = page.getByRole("region", { name: SHEET });
+  await sheet.getByRole("button", { name: "시트 높이" }).click(); // 절반 → 접힘
+  await expect(sheet).toHaveAttribute("data-stage", "collapsed");
+  await page.waitForTimeout(500); // 높이 전환(200ms)이 끝난 뒤 잰다 — 접힌 시트 96px
+  const chip = sheet
+    .getByRole("group", { name: "예시로 보기" })
+    .getByRole("button", { name: "3/15 서울마라톤" });
+  const c = await chip.boundingBox();
+  const s = await sheet.boundingBox();
+  expect(c).not.toBeNull();
+  expect(s?.height).toBe(96);
+  expect((c?.y ?? 0) + (c?.height ?? 0)).toBeLessThanOrEqual((s?.y ?? 0) + (s?.height ?? 0));
+  await page.screenshot({ path: "test-results/live-map-collapsed-chips.png" });
+  await chip.click();
+  await expect(
+    page.getByRole("article", { name: "마라톤 1구간 세종대로 사거리~숭례문 오거리" }),
+  ).toBeVisible();
+  await expect(sheet).toContainText("3월 15일 07:45 기준");
 });
 
 test("11/8 12:00 그 시각 통제 없음 — 한 줄 + 내일·지난 통제, 지난 행 → 그 시작 시각·카드·지도, 지금으로 돌아가기 (T7.12)", async ({
@@ -244,6 +261,13 @@ test("11/8 12:00 그 시각 통제 없음 — 한 줄 + 내일·지난 통제, �
   await expect(sheet.getByRole("region", { name: "이 시각" })).toContainText(
     "이 시각 서울에 걸린 통제가 없어요",
   );
+  // 빈 안내 밑에 예시를 크게 한 번 더 (T7.14)
+  await expect(
+    sheet
+      .getByRole("region", { name: "이 시각" })
+      .getByRole("group", { name: "예시로 보기" })
+      .getByRole("button"),
+  ).toHaveCount(3);
   await fullSheet(page, SHEET);
   const upcoming = sheet.getByRole("region", { name: "다가오는 통제" });
   await expect(upcoming.getByRole("group", { name: "내일" }).getByRole("button")).toHaveCount(5);

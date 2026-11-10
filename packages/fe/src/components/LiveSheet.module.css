@@ -178,8 +178,9 @@
 }
 
 /* 예시로 보기 (T7.11) — 시트 맨 아래, 누르면 그 날짜·시각 + 지도를 그 통제 구역에 */
+/* 지금 통제가 없을 때 빈 안내 밑 큰 예시 버튼 (T7.11 → T7.14) */
 .examples {
-  padding-bottom: 12px;
+  padding-bottom: 8px;
 }
 
 .example {
@@ -213,8 +214,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin: 0 0 6px;
-  padding: 8px 12px;
+  margin: 0 0 4px;
+  padding: 6px 12px;
   border-radius: 10px;
   background: #eaf1ff;
   font-size: 13.5px;
@@ -254,4 +255,33 @@
 
 .stale::before {
   content: "⚠ ";
+}
+
+/* 예시 칩 한 줄 (T7.14) — 제목 바로 아래, 가로로 넘긴다. 접힌 시트(96px)에서도 보이게 낮게 */
+.chipRow {
+  display: flex;
+  gap: 6px;
+  margin: 2px -20px 2px;
+  padding: 0 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chipRow::-webkit-scrollbar {
+  display: none;
+}
+
+.exampleChip {
+  flex: none;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid #d9e3fb;
+  border-radius: 14px;
+  background: #f4f7ff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2d6bff;
+  white-space: nowrap;
+  cursor: pointer;
 }

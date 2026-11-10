@@ -25,7 +25,7 @@ import {
   sheetSections,
   type ListedEvent,
 } from "../map/eventKinds";
-import { EXAMPLES } from "../map/examples";
+import { EXAMPLES, type Example } from "../map/examples";
 import { asBbox4, useClosureDispatch, useClosures } from "../state/ClosureProvider";
 import { useRouteDispatch } from "../state/RouteProvider";
 import { isNowAt, kstIso, useTime, useTimeDispatch } from "../state/TimeProvider";
@@ -105,6 +105,22 @@ export function LiveSheet() {
     if (e.window.start) timeDispatch({ type: "set", t: e.window.start });
     dispatch({ type: "select", id: e.id });
   };
+  // 예시 (T7.11 → T7.14) — 그 날짜·시각 + 지도를 그 구역에 + 그 사건 카드(찾으면 카드 맞춤이 이긴다)
+  const showExample = (x: Example) => {
+    timeDispatch({ type: "set", t: x.t });
+    dispatch({ type: "frame", bbox: x.bbox });
+    dispatch({ type: "select", id: x.event });
+  };
+  const bigExamples = (
+    <div role="group" aria-label="예시로 보기" className={styles.examples}>
+      {EXAMPLES.map((x) => (
+        <button key={x.key} type="button" className={styles.example} onClick={() => showExample(x)}>
+          <b>{EXAMPLE_KO[x.key].title}</b>
+          <span>{EXAMPLE_KO[x.key].sub}</span>
+        </button>
+      ))}
+    </div>
+  );
   const backToNow = () => {
     timeDispatch({ type: "set", t: kstIso(Date.now()), live: true });
     dispatch({ type: "select", id: null });
@@ -156,6 +172,19 @@ export function LiveSheet() {
         <>
           <div className={styles.pad}>
             {banner || <div className={styles.title}>{title}</div>}
+            {/* 예시 칩 한 줄 (T7.14) — 제목 바로 아래, 시트를 접어도 보인다 */}
+            <div role="group" aria-label="예시로 보기" className={styles.chipRow}>
+              {EXAMPLES.map((x) => (
+                <button
+                  key={x.key}
+                  type="button"
+                  className={styles.exampleChip}
+                  onClick={() => showExample(x)}
+                >
+                  {EXAMPLE_KO[x.key].chip}
+                </button>
+              ))}
+            </div>
             <div className={styles.sub}>
               {subtitle}
               {loading && !eventsError && <span className={styles.loading}> · 불러오는 중</span>}
@@ -201,7 +230,12 @@ export function LiveSheet() {
                 <span>{sections.now.length}</span>
               </h3>
               {sections.now.map((r) => row(r, (e) => dispatch({ type: "select", id: e.id })))}
-              {sections.now.length === 0 && <p className={styles.empty}>{nowEmptyKo(live)}</p>}
+              {sections.now.length === 0 && (
+                <>
+                  <p className={styles.empty}>{nowEmptyKo(live)}</p>
+                  {bigExamples}
+                </>
+              )}
             </section>
             {sections.upcoming.length > 0 && (
               <section aria-label={SECTION_KO.upcoming}>
@@ -230,24 +264,6 @@ export function LiveSheet() {
                 )}
               </section>
             )}
-            {/* 예시로 보기 (T7.11) — 그 날짜·시각으로 옮기고 지도를 그 통제 구역에 */}
-            <section aria-label="예시로 보기" className={styles.examples}>
-              <h3 className={styles.groupHead}>예시로 보기</h3>
-              {EXAMPLES.map((x) => (
-                <button
-                  key={x.key}
-                  type="button"
-                  className={styles.example}
-                  onClick={() => {
-                    timeDispatch({ type: "set", t: x.t });
-                    dispatch({ type: "frame", bbox: x.bbox });
-                  }}
-                >
-                  <b>{EXAMPLE_KO[x.key].title}</b>
-                  <span>{EXAMPLE_KO[x.key].sub}</span>
-                </button>
-              ))}
-            </section>
           </div>
         </>
       )}

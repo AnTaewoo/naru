@@ -269,21 +269,42 @@ describe("LiveSheet — 행·카드·구 칩·묶음 (T7.5)", () => {
   });
 });
 
-describe("LiveSheet — 예시로 보기 (T7.11)", () => {
-  it("시트 맨 아래 셋, 누르면 그 날짜·시각으로", () => {
+describe("LiveSheet — 예시 칩 (T7.11 → T7.14 테스터 피드백)", () => {
+  it("제목 바로 아래 칩 한 줄 — 누르면 그 날짜·시각 + 그 사건 카드(3/15 마라톤 1구간), 맨 아래 예시 칸은 없다", () => {
     render(
-      <Providers live={live1109}>
+      <Providers live={live1109} catalog={catalog1107}>
         <LiveSheet />
       </Providers>,
     );
-    const examples = within(screen.getByRole("region", { name: "예시로 보기" }));
-    expect(examples.getAllByRole("button").map((b) => b.textContent)).toEqual([
+    expect(screen.queryByRole("region", { name: "예시로 보기" })).toBeNull();
+    const chips = within(screen.getByRole("group", { name: "예시로 보기" }));
+    expect(chips.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "3/15 서울마라톤",
+      "11/7 광화문 집회",
+      "11/9 국회대로 행진",
+    ]);
+    act(() => {
+      fireEvent.click(chips.getByRole("button", { name: "3/15 서울마라톤" }));
+    });
+    // 넓은 창 기록 11/7 15:30 에 3/15 마라톤 1구간 adaea2f4cc02 가 지난 통제로 있다 — 카드
+    expect(
+      screen.getByRole("article", { name: "마라톤 1구간 세종대로 사거리~숭례문 오거리" }),
+    ).toBeDefined();
+    expect(screen.getByText("3월 15일 07:45 기준")).toBeDefined();
+  });
+
+  it("그 시각 걸린 통제가 없으면 빈 안내 밑에 같은 예시를 크게 한 번 더 (11/8 12:00)", () => {
+    render(
+      <Providers live={null} catalog={catalog1108}>
+        <LiveSheet />
+      </Providers>,
+    );
+    const big = within(section("이 시각").getByRole("group", { name: "예시로 보기" }));
+    expect(big.getAllByRole("button").map((b) => b.textContent)).toEqual([
       "2026 서울마라톤3월 15일 07:45 광화문",
       "광화문 집회·행진11월 7일 15:00 세종대로",
       "국회대로 행진11월 9일 12:00",
     ]);
-    fireEvent.click(examples.getByRole("button", { name: /2026 서울마라톤/ }));
-    expect(screen.getByLabelText<HTMLInputElement>("날짜").value).toBe("2026-03-15");
-    expect(screen.getByText("07:45")).toBeDefined();
+    expect(screen.getAllByRole("group", { name: "예시로 보기" })).toHaveLength(2); // 칩 줄 + 큰 버튼
   });
 });
