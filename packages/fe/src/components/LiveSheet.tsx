@@ -41,14 +41,28 @@ import { TimeSlider } from "./TimeSlider";
 
 /** 지난 통제는 처음에 이만큼, 나머지는 "더 보기" (태우 11/10) */
 const PAST_FIRST = 5;
+/** 행진 예상 위치 재생 (T7.16) — 통제 시간 전체를 이 초에, 이 간격으로 */
+const PLAY_SECONDS = 12;
+const PLAY_TICK_MS = 100;
 
 // 서울 통제 시트 (T7.5 → T7.12 세 묶음, ADR-014 A) — 하단 시트 기본. (지금이 아니면 "M월 D일 HH:MM 기준 ·
 // 지금으로 돌아가기") 제목·부제 → 시간표·슬라이더 → 구 칩 → 지금(통제 중·1시간 안) · 다가오는 통제(날짜별) ·
 // 지난 통제(최근 5 + 더 보기) → 예시로 보기. 목록은 t 앞뒤 365일 넓은 창(catalog, 아직이면 지도 사건).
 // 지금 행은 카드, 다가오는·지난 행은 그 시작 시각으로 옮기고 카드. 0.7 미만은 목록에 없다(지도에서 고른 묶음엔 있다)
 export function LiveSheet() {
-  const { events, eventsAt, eventsError, truncated, bbox, selected, picked, catalog, catalogAt } =
-    useClosures();
+  const {
+    events,
+    eventsAt,
+    eventsError,
+    truncated,
+    bbox,
+    selected,
+    picked,
+    catalog,
+    catalogAt,
+    march,
+    playMs,
+  } = useClosures();
   const dispatch = useClosureDispatch();
   const timeDispatch = useTimeDispatch();
   const routeDispatch = useRouteDispatch();
@@ -68,6 +82,23 @@ export function LiveSheet() {
   const fromList = selected ? catalog?.find((e) => e.id === selected) : undefined;
   const card: ClosureEvent | null = fromMap ?? fromList ?? null;
   const cardAtMs = fromMap ? atMs : listAtMs;
+  // 행진 예상 위치 재생 (T7.16) — 통제 시간 전체를 PLAY_SECONDS 에, 네트워크 없이 시각만 옮긴다
+  const marchBody = card && march?.id === card.id ? march.body : null;
+  useEffect(() => {
+    if (playMs === null || !marchBody?.window.start || !marchBody.window.end) return;
+    const start = Date.parse(marchBody.window.start);
+    const end = Date.parse(marchBody.window.end);
+    const perTick = ((end - start) / PLAY_SECONDS) * (PLAY_TICK_MS / 1000);
+    const timer = setInterval(() => {
+      const next = playMs + perTick;
+      dispatch({ type: "play", ms: next >= end ? null : next });
+    }, PLAY_TICK_MS);
+    return () => clearInterval(timer);
+  }, [playMs, marchBody, dispatch]);
+  const togglePlay = () => {
+    if (!marchBody?.window.start) return;
+    dispatch({ type: "play", ms: playMs === null ? Date.parse(marchBody.window.start) : null });
+  };
   // 지도·?event=·목록으로 카드나 묶음을 열면(제보 시작도) 접힌 시트를 절반으로
   const reporting = report !== null;
   useEffect(() => {
@@ -175,6 +206,9 @@ export function LiveSheet() {
             atMs={cardAtMs}
             onClose={() => dispatch({ type: "select", id: null })}
             onAvoid={() => routeDispatch({ type: "avoid", id: card.id })}
+            march={marchBody}
+            playMs={playMs}
+            onPlay={togglePlay}
           />
         </>
       ) : (

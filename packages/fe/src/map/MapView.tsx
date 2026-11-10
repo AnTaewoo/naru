@@ -12,7 +12,7 @@ import {
   type IControl,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { SHEET_COLLAPSED_PX, stageHeight } from "../components/BottomSheet";
 import { MAP_LOCALE_KO, MAP_OUTSIDE_KO, REPORT_KO } from "../i18n/ko";
 import {
@@ -24,6 +24,7 @@ import {
 } from "../state/ClosureProvider";
 import { fieldModeFromLocation } from "../state/report";
 import { POSITION_OPTIONS, useRoute, useRouteDispatch } from "../state/RouteProvider";
+import { useTime } from "../state/TimeProvider";
 import type { ClosureEvent, FeatureCollection, RouteResponse, Status } from "../types/contracts";
 import {
   AREA_MIN_ZOOM,
@@ -40,6 +41,19 @@ import {
   closureLayers,
   closurePoints,
 } from "./layers/closureLayer";
+import {
+  MARCH_CIRCLE_SOURCE_ID,
+  MARCH_CROSSWALK_SOURCE_ID,
+  MARCH_HEAT_SOURCE_ID,
+  MARCH_LAYER_IDS,
+  frameAt,
+  marchCircle,
+  marchCrosswalkPoints,
+  marchHeatPoints,
+  marchLayers,
+  marchSource,
+  type MarchFrame,
+} from "./layers/marchLayer";
 import {
   ROUTE_AVOIDED_SOURCE_ID,
   ROUTE_BASELINE_SOURCE_ID,
@@ -309,7 +323,9 @@ export function MapView({ visible }: MapViewProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const loaded = useRef(false);
-  const { closures, bbox, coverage, events, eventsAt, selected, frame, catalog } = useClosures();
+  const { closures, bbox, coverage, events, eventsAt, selected, frame, catalog, march, playMs } =
+    useClosures();
+  const { t } = useTime();
   const dispatch = useClosureDispatch();
   const { route, from, to, active, view, place, focus, report } = useRoute();
   // 원래 길 카드를 골랐나 (T5.11) — 피한 통제가 없으면 원래 길도 없다
@@ -340,6 +356,12 @@ export function MapView({ visible }: MapViewProps) {
   const framed = useRef(false);
   // 줌 3단계 (T7.4) — e2e 가 data-band 로 본다
   const [band, setBand] = useState<ZoomBand>(zoomBand(START_ZOOM));
+  // 행진 예상 위치 (T7.16) — 고른 행진 사건의 그 시각(재생 중이면 재생 시각) 프레임. e2e 가 data-march 로 본다
+  const marchBody = march && march.id === selected ? march.body : null;
+  const marchFrame = useMemo<MarchFrame | null>(
+    () => (marchBody ? frameAt(marchBody, playMs ?? Date.parse(t)) : null),
+    [marchBody, playMs, t],
+  );
 
   useEffect(() => {
     if (!container.current) return;
@@ -408,15 +430,24 @@ export function MapView({ visible }: MapViewProps) {
         type: "geojson",
         data: avoidedPoints(null, { type: "FeatureCollection", features: [] }),
       });
+      map.addSource(MARCH_HEAT_SOURCE_ID, marchSource(marchHeatPoints(null)));
+      map.addSource(MARCH_CIRCLE_SOURCE_ID, marchSource(marchCircle(null)));
+      map.addSource(MARCH_CROSSWALK_SOURCE_ID, marchSource(marchHeatPoints(null)));
       // 아래부터: 사건 구역 → 예정 구역 → 원래 길 점선 → 경로 실선 → 터널 → (원래 길 보기의 원) →
       // 통제 점 → 사건 클러스터·점 → 입구 마커
       for (const layer of layers.filter((l) => below.has(l.id))) map.addLayer(layer);
+      // 행진 예상 위치(T7.16) — 사건 구역 위, 경로·통제 점 아래 (횡단보도 P 점은 통제 점 위)
+      const marchAll = marchLayers();
+      for (const layer of marchAll.filter((l) => l.id !== MARCH_LAYER_IDS.crosswalk))
+        map.addLayer(layer);
       for (const layer of zoneLayers()) map.addLayer(layer);
       for (const layer of baselineLayers()) map.addLayer(layer);
       for (const layer of routeLayers()) map.addLayer(layer);
       for (const layer of crossingLayers()) map.addLayer(layer);
       for (const layer of avoidedLayers()) map.addLayer(layer);
       for (const layer of closureLayers()) map.addLayer(layer);
+      for (const layer of marchAll.filter((l) => l.id === MARCH_LAYER_IDS.crosswalk))
+        map.addLayer(layer);
       for (const layer of layers.filter((l) => !below.has(l.id))) map.addLayer(layer);
       for (const layer of entranceLayers()) map.addLayer(layer);
       loaded.current = true;
@@ -567,6 +598,24 @@ export function MapView({ visible }: MapViewProps) {
       : null;
   }, [reportCw]);
 
+  // 행진 예상 위치 (T7.16) — 프레임이 바뀌면 세 소스만 갱신(React 는 레이어를 다시 그리지 않는다)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const run = () => {
+      const heat = map.getSource(MARCH_HEAT_SOURCE_ID);
+      if (heat instanceof GeoJSONSource) void heat.setData(marchHeatPoints(marchFrame));
+      const circle = map.getSource(MARCH_CIRCLE_SOURCE_ID);
+      if (circle instanceof GeoJSONSource) void circle.setData(marchCircle(marchFrame));
+      const cws = map.getSource(MARCH_CROSSWALK_SOURCE_ID);
+      if (cws instanceof GeoJSONSource && marchBody)
+        void cws.setData(marchCrosswalkPoints(marchBody, marchFrame));
+      else if (cws instanceof GeoJSONSource) void cws.setData(marchHeatPoints(null));
+    };
+    if (loaded.current) run();
+    else map.once("load", run);
+  }, [marchBody, marchFrame]);
+
   // 사건·칩이 바뀌면 사건 소스만 갱신 (T7.4)
   useEffect(() => {
     eventsRef.current = { events: events ?? [], atMs };
@@ -716,6 +765,7 @@ export function MapView({ visible }: MapViewProps) {
         role="region"
         aria-label="지도"
         data-band={band}
+        data-march={marchFrame ? marchFrame.points.length : 0}
       />
       {!ready && (
         <div className={styles.loading} role="status" aria-label="지도 불러오는 중">
