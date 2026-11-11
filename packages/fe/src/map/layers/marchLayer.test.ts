@@ -31,7 +31,10 @@ describe("marchLayer (T7.16)", () => {
     expect(frame?.p["06-0000002104"]).toBe(0.2);
     expect(probabilityAt(body, T("12:00:00"))).toBe(1.0);
     expect(probabilityAt(body, T("12:00:00"), "06-0000002104")).toBe(0.2);
-    expect(marchCircle(frame).features).toHaveLength(0); // 반경 0 이면 원 없음
+    // 반경 0 이어도 원은 최소 250 m 로 그린다 (태우 11/11 — 슬라이더 시각의 군집이 크게) + 글로우용 중심 점
+    const circle = marchCircle(frame);
+    expect(circle.features.map((f) => f.geometry.type)).toEqual(["Polygon", "Point"]);
+    expect(circle.features[0]?.properties.radius_m).toBe(250);
   });
 
   it("13:00:30 — 13:00·13:01 키프레임 사이 보간(중심·반경·P 선형, 점은 가까운 13:01)", () => {
@@ -48,7 +51,11 @@ describe("marchLayer (T7.16)", () => {
     expect(frame?.p[id]).toBeCloseTo(mid(a.crosswalks[id] ?? 0, b.crosswalks[id] ?? 0), 9);
     expect(frame?.points).toHaveLength(b.samples.reduce((n, s) => n + s.length, 0));
     const circle = marchCircle(frame);
-    expect(circle.features[0]?.geometry.coordinates[0]).toHaveLength(65);
+    const poly = circle.features[0]?.geometry;
+    expect(poly?.type === "Polygon" ? poly.coordinates[0] : []).toHaveLength(65);
+    // 퍼짐 237.4 m < 최소 250 m → 원은 250 m (CIRCLE_MIN_M)
+    expect(circle.features[0]?.properties.radius_m).toBe(Math.max(frame?.radiusM ?? 0, 250));
+    expect(circle.features[0]?.properties.radius_m).toBe(250);
   });
 
   it("창 밖은 null → 확률 0, 소스는 빈 컬렉션; 끝 시각은 마지막 키프레임", () => {

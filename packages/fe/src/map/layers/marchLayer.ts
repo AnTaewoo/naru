@@ -1,6 +1,7 @@
 // 순수 함수: 행진 키프레임(/closures/events/{id}/march, INTERFACE §3.2) → 그 시각의 예상 위치(두 키프레임
-// 사이 보간) → MapLibre 소스·레이어 (ADR-015 G, T7.16). heatmap(표본이 겹칠수록 진하게), 중심 원(테두리 + 옅은
-// 채움), 경로 위 횡단보도 P 6단계 색. 공간 연산은 원 폴리곤(표시용)뿐 — 값은 BE 키프레임 그대로
+// 사이 보간) → MapLibre 소스·레이어 (ADR-015 G, T7.16). heatmap(표본이 겹칠수록 진하게), 예상 위치 원(크게 —
+// 최소 250 m·화면 최소 26 px, 채움·테두리 + 중심 글로우; 태우 11/11 "슬라이더 시각의 군집이 크게"), 경로 위
+// 횡단보도 P 6단계 색. 공간 연산은 원 폴리곤(표시용)뿐 — 값은 BE 키프레임 그대로
 import type {
   ExpressionSpecification,
   GeoJSONSourceSpecification,
@@ -14,6 +15,7 @@ export const MARCH_CIRCLE_SOURCE_ID = "naru-march-circle";
 export const MARCH_CROSSWALK_SOURCE_ID = "naru-march-crosswalks";
 export const MARCH_LAYER_IDS = {
   heat: "naru-march-heat",
+  circleGlow: "naru-march-circle-glow",
   circleFill: "naru-march-circle-fill",
   circleLine: "naru-march-circle-line",
   crosswalk: "naru-march-crosswalk",
@@ -114,31 +116,48 @@ export function marchHeatPoints(frame: MarchFrame | null): PointCollection {
 }
 
 const M_PER_DEG_LAT = 111_320;
+/** 원 최소 반경(m) — 행렬 200 m + 여유. 표본 퍼짐이 이보다 작아도(출발 직후) 이만큼은 그린다 (태우 11/11 "크게") */
+export const CIRCLE_MIN_M = 250;
+/** 화면에서 원이 이보다 작게 보이지 않게(px) — 축소해도 군집이 보이게 */
+export const CIRCLE_MIN_PX = 26;
+/** 줌 0 에서 1 px 당 m (위도 37.55, 서울) — 미터 반경을 px 로 */
+const M_PER_PX_Z0 = 156_543.03 * Math.cos((37.55 * Math.PI) / 180);
 
-/** 중심 원 폴리곤(64 꼭짓점) — 표시용. 반경이 0 이면 그리지 않는다 */
-export function marchCircle(frame: MarchFrame | null): {
+export interface CircleCollection {
   type: "FeatureCollection";
   features: {
     type: "Feature";
-    geometry: { type: "Polygon"; coordinates: LngLat[][] };
-    properties: Record<string, never>;
+    geometry: { type: "Polygon"; coordinates: LngLat[][] } | { type: "Point"; coordinates: LngLat };
+    properties: { radius_m: number };
   }[];
-} {
-  if (!frame || frame.radiusM <= 0) return EMPTY;
+}
+const EMPTY_CIRCLE: CircleCollection = { type: "FeatureCollection", features: [] };
+
+/** 예상 위치 원 — 폴리곤(64 꼭짓점, 반경 max(퍼짐, 250 m)) + 중심 점(글로우 레이어용, radius_m). 프레임이 없으면 비움 */
+export function marchCircle(frame: MarchFrame | null): CircleCollection {
+  if (!frame) return EMPTY_CIRCLE;
+  const radiusM = Math.max(frame.radiusM, CIRCLE_MIN_M);
   const [lng, lat] = frame.center;
-  const dLat = frame.radiusM / M_PER_DEG_LAT;
-  const dLng = frame.radiusM / (M_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
+  const dLat = radiusM / M_PER_DEG_LAT;
+  const dLng = radiusM / (M_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
   const ring: LngLat[] = [];
   for (let k = 0; k <= 64; k += 1) {
     const a = (k / 64) * 2 * Math.PI;
     ring.push([lng + dLng * Math.cos(a), lat + dLat * Math.sin(a)]);
   }
+  const properties = { radius_m: radiusM };
   return {
     type: "FeatureCollection",
     features: [
-      { type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties: {} },
+      { type: "Feature", geometry: { type: "Polygon", coordinates: [ring] }, properties },
+      { type: "Feature", geometry: { type: "Point", coordinates: frame.center }, properties },
     ],
   };
+}
+
+/** 줌 z 에서 radius_m 을 px 로 — 최소 CIRCLE_MIN_PX. 줌 식은 interpolate 의 입력으로만 쓸 수 있어 단계마다 max */
+function glowRadius(z: number): ExpressionSpecification {
+  return ["max", CIRCLE_MIN_PX, ["*", ["get", "radius_m"], 2 ** z / M_PER_PX_Z0]];
 }
 
 /** P 6단계 — 0.2 미만(하한, 옅은 회색) · 0.35 · 0.5 · 0.65 · 0.8 미만 · 0.8 이상(차단, 빨강) */
@@ -202,7 +221,7 @@ const HEAT_RAMP: ExpressionSpecification = [
   "rgba(229, 50, 45, 0.95)",
 ];
 
-/** 레이어 4장 — heatmap, 중심 원 채움·테두리, 횡단보도 P 점 (고른 행진 사건에만 데이터가 있다) */
+/** 레이어 5장 — heatmap, 예상 위치 원(글로우·채움·테두리), 횡단보도 P 점 (고른 행진 사건에만 데이터가 있다) */
 export function marchLayers(): LayerSpecification[] {
   return [
     {
@@ -211,23 +230,52 @@ export function marchLayers(): LayerSpecification[] {
       source: MARCH_HEAT_SOURCE_ID,
       paint: {
         "heatmap-weight": 1,
-        "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 11, 0.6, 16, 1.4],
-        "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 11, 8, 16, 22],
+        "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 11, 0.9, 16, 1.8],
+        "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 11, 14, 16, 40],
         "heatmap-color": HEAT_RAMP,
         "heatmap-opacity": 0.85,
+      },
+    },
+    {
+      // 축소해도 보이는 군집 — 미터 반경을 px 로, 최소 26 px, 가장자리는 흐리게
+      id: MARCH_LAYER_IDS.circleGlow,
+      type: "circle",
+      source: MARCH_CIRCLE_SOURCE_ID,
+      filter: ["==", ["geometry-type"], "Point"],
+      paint: {
+        "circle-color": COLORS.soon,
+        "circle-opacity": 0.28,
+        "circle-blur": 0.5,
+        "circle-radius": [
+          "interpolate",
+          ["exponential", 2],
+          ["zoom"],
+          9,
+          glowRadius(9),
+          12,
+          glowRadius(12),
+          14,
+          glowRadius(14),
+          16,
+          glowRadius(16),
+          18,
+          glowRadius(18),
+        ],
       },
     },
     {
       id: MARCH_LAYER_IDS.circleFill,
       type: "fill",
       source: MARCH_CIRCLE_SOURCE_ID,
-      paint: { "fill-color": COLORS.soon, "fill-opacity": 0.08 },
+      filter: ["==", ["geometry-type"], "Polygon"],
+      paint: { "fill-color": COLORS.soon, "fill-opacity": 0.22 },
     },
     {
       id: MARCH_LAYER_IDS.circleLine,
       type: "line",
       source: MARCH_CIRCLE_SOURCE_ID,
-      paint: { "line-color": COLORS.soon, "line-width": 2, "line-dasharray": [2, 2] },
+      filter: ["==", ["geometry-type"], "Polygon"],
+      paint: { "line-color": COLORS.soon, "line-width": 3, "line-opacity": 0.9 },
     },
     {
       id: MARCH_LAYER_IDS.crosswalk,
