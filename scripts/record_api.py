@@ -61,6 +61,9 @@ GEOCODE_POINTS = (
 )
 GEOCODE_NEAR = (126.9775, 37.5675)  # FE 지도 기본 중심 = ClosureProvider DEFAULT_BBOX 가운데
 GEOCODE_QUERIES = ("교보빌딩", "덕수궁", "시청")
+# 태우 실서버 검색(2026-11-11 11:26, 운영 로그) — 지도 가운데가 과천 쪽이라 반경 5 km 안 0건.
+# 그 뒤로 near 검색은 반경 안 앞 5개 + 서울 전체(rect)로 채운다 → 서울 전체 기록도 검색어마다
+GEOCODE_FAR_QUERY, GEOCODE_FAR_NEAR = "용산", (126.99, 37.42)
 SECRETS: list[str] = []  # 응답 본문에 키가 섞여 와도(카카오 401이 그랬다) 기록에는 남기지 않는다
 
 
@@ -240,10 +243,13 @@ def record_kakao(
 
 
 def record_geocode(client: httpx.Client, settings: Settings, out: Path) -> None:
-    """BE Geocoder 재생용 (호출 7회, 이미 있으면 건너뜀). 이름은 BE 의 record_name."""
+    """BE Geocoder 재생용 (호출 12회, 이미 있으면 건너뜀). 이름은 BE 의 record_name."""
     key = need(settings.kakao_rest_key, "KAKAO_REST_KEY")
     calls = [(COORD2ADDRESS, coord2address_params(lng, lat)) for lng, lat in GEOCODE_POINTS]
     calls += [(KEYWORD, keyword_params(q, GEOCODE_NEAR)) for q in GEOCODE_QUERIES]
+    calls += [(KEYWORD, keyword_params(GEOCODE_FAR_QUERY, GEOCODE_FAR_NEAR))]
+    wide = (*GEOCODE_QUERIES, GEOCODE_FAR_QUERY)
+    calls += [(KEYWORD, keyword_params(q, None, seoul=True)) for q in wide]
     for endpoint, params in calls:
         path = out / "kakao" / "local" / record_name(endpoint, params)
         if path.exists():

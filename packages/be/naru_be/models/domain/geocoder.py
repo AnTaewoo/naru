@@ -22,6 +22,10 @@ from naru_be.models.repositories.kakao_local import (
 from naru_contracts import GeocodeReverseResponse, Place
 from naru_contracts.geocode_api import SEARCH_LIMIT
 
+# near 가 있을 때 반경 안(정확도 순) 결과를 앞에 두는 수 — 나머지는 서울 전체에서 채운다.
+# 지도 가운데가 멀어도(2026-11-11 태우 실서버 '용산', 가운데 과천 쪽) 빈 목록이 되지 않게
+NEAR_TAKE = 5
+
 
 class _Kakao(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -64,8 +68,16 @@ class Geocoder:
         self._source = source
 
     def search(self, q: str, near: tuple[float, float] | None) -> list[Place]:
-        """키워드 검색 (near = [lng, lat], 있으면 반경 안 정확도 순). 최대 SEARCH_LIMIT 개."""
-        body = self._parse(_KeywordBody, KEYWORD, keyword_params(q, near))
+        """키워드 검색, 최대 SEARCH_LIMIT 개. near([lng, lat])가 있으면 반경 안 정확도 순 앞
+        NEAR_TAKE 개 + 서울 전체(SEOUL_RECT) 정확도 순에서 겹치지 않는 것(태우 11/11 — 가까운 것
+        먼저, 먼 것도 알려 준다). 없으면 전국 정확도 순."""
+        if near is None:
+            docs = self._documents(keyword_params(q, None))
+        else:
+            docs = self._documents(keyword_params(q, near))[:NEAR_TAKE]
+            seen = {d.id for d in docs}
+            wide = self._documents(keyword_params(q, None, seoul=True))
+            docs += [d for d in wide if d.id not in seen]
         return [
             Place(
                 id=d.id,
@@ -73,8 +85,11 @@ class Geocoder:
                 address=d.road_address_name or d.address_name,
                 coord=(d.x, d.y),
             )
-            for d in body.documents[:SEARCH_LIMIT]
+            for d in docs[:SEARCH_LIMIT]
         ]
+
+    def _documents(self, params: Mapping[str, str]) -> list[_KakaoPlace]:
+        return self._parse(_KeywordBody, KEYWORD, params).documents
 
     def reverse(self, lng: float, lat: float) -> GeocodeReverseResponse:
         """좌표 → 도로명·지번 주소. label 은 도로명(없으면 지번)에서 시·도를 뺀 것."""

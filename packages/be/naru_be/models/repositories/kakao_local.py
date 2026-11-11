@@ -28,6 +28,10 @@ KEYWORD_SIZE = 10  # 한 번에 받을 장소 수 (카카오 1~15)
 # 2026-11-08 기록: '교보빌딩' 1위 "투데이세차 광화문점", '시청' 1위 전자담배 가게,
 # 본건물·서울시청은 10위 밖
 NEAR_RADIUS_M = 5000
+# 서울 전체 검색(카카오 rect "좌측X,좌측Y,우측X,우측Y" = w,s,e,n) — OA-23081 횡단보도
+# 21,775곳(EPSG:5186)의 범위 lng 126.7981~127.1831 · lat 37.4345~37.6921 을 소수 2자리
+# 바깥으로 넓힌 것 = 나루가 길을 내는 범위. near 반경 안 결과 뒤를 여기서 채운다 (태우 11/11)
+SEOUL_RECT = "126.79,37.43,127.19,37.70"
 USER_AGENT = "NaruBot/0.1 (+https://naru.antaewoo.com)"  # ADR-011 E
 
 
@@ -35,15 +39,22 @@ class KakaoUnavailableError(Exception):
     """키 없음·카카오 오류·시간 초과·기록 없음. Geocoder 가 geocode_unavailable 로 바꾼다."""
 
 
-def keyword_params(q: str, near: tuple[float, float] | None) -> dict[str, str]:
-    """키워드 검색. near([lng, lat])가 있으면 반경 NEAR_RADIUS_M 안에서 정확도 순.
+def keyword_params(
+    q: str, near: tuple[float, float] | None, *, seoul: bool = False
+) -> dict[str, str]:
+    """키워드 검색. near([lng, lat])가 있으면 반경 NEAR_RADIUS_M 안에서 정확도 순, seoul 이면
+    서울 전체(SEOUL_RECT)에서 정확도 순, 둘 다 아니면 전국. 둘을 같이 주지 않는다.
 
     near 는 소수 2자리(약 1 km)로 — 지도가 조금 움직여도 같은 요청(기록·재생 이름)이고, 카카오에
     보내는 위치도 그만큼만 정확하다.
     """
+    if near is not None and seoul:
+        raise ValueError("near 와 seoul 은 같이 쓰지 않는다")
     params = {"query": q, "size": str(KEYWORD_SIZE)}
     if near is not None:
         params |= {"x": f"{near[0]:.2f}", "y": f"{near[1]:.2f}", "radius": str(NEAR_RADIUS_M)}
+    elif seoul:
+        params["rect"] = SEOUL_RECT
     return params
 
 

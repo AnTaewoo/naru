@@ -292,7 +292,7 @@ ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, �
 BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKAO_REST_KEY` 에만 — 브라우저·응답·로그에 없다. FE 는 `/api/geocode/*` 로만 부른다.
 
 ### §7.1 `GET /geocode/search?q=&near=lat,lng`
-- `q`: 앞뒤 공백을 뺀 2~50자. `near`(선택) `"lat,lng"` — 있으면 그 점 반경 5 km 안에서 정확도 순(BE 가 near 를 소수 2자리, 약 1 km 로 맞춘다), 없으면 전국 정확도 순. 최대 10개, 없으면 `"places": []`
+- `q`: 앞뒤 공백을 뺀 2~50자. `near`(선택) `"lat,lng"` — 있으면 그 점 반경 5 km 안 정확도 순 **앞 5개**, 그 뒤는 서울 전체(횡단보도 범위 rect 126.79,37.43,127.19,37.70) 정확도 순에서 겹치지 않는 것으로 채운다(BE 가 near 를 소수 2자리, 약 1 km 로 맞춘다. 지도 가운데가 멀어도 빈 목록이 아니다 — 태우 11/11). 없으면 전국 정확도 순. 최대 10개, 없으면 `"places": []`
 ```json
 {
   "places": [
@@ -407,3 +407,4 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 | 2026-11-10 | v0.15 (보충) | §3.3 `GET /closures/feed?at=` 공개 GeoJSON 피드(횡단보도·사건 구역·행진 경로, 사건 칸·상태·확신도·P, 분 캐시·IP 분당 60회), §6 `rate_limited`(429) | 태우 지시 (11/10, T7.17 — 이력만) |
 | 2026-11-10 | v0.15 (보충) | §9 알림 구독·관심 지역 `GET /push/vapid-public-key`·`POST·DELETE /push/subscribe`·`GET·POST /watch-areas`·`DELETE /watch-areas/{id}`(endpoint 는 헤더 X-Push-Endpoint, last_seen 150 m 격자·3시간, saved 10개), §6 `push_unavailable`(503). 표 0008 | 태우 승인 (ADR-014 C) |
 | 2026-11-11 | v0.15 (보충) | §9.4 `POST /internal/push/dispatch`(워커 60초, 매칭 규칙·밤 07:00·푸시 본문·404/410 끔) | 태우 승인 (ADR-014 C) |
+| 2026-11-11 | v0.15 (보충) | §7.1 `near` 검색 = 반경 5 km 안 앞 5개 + 서울 전체 정확도 순으로 채움(겹침 제외, 최대 10 그대로) — 지도 가운데가 멀면 빈 목록이던 것(운영 '용산' 0건) | 태우 지시 (11/11, T5.8 수정 — 이력만) |

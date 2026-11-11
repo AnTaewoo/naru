@@ -28,9 +28,10 @@ def local_dir(recorded_dir: Path) -> Path:
 
 
 def test_every_record_is_named_by_its_request(local_dir: Path) -> None:
-    # 역지오코딩 4 + 키워드 3 (scripts/record_api.py GEOCODE_*) + 처음 기록한 거리순 키워드 3(안 씀)
+    # 역지오코딩 4 + 키워드 near 3 (scripts/record_api.py GEOCODE_*) + 처음 기록한 거리순 3(안 씀)
+    # + 2026-11-11 서울 전체 rect 4·멀리 near 1 (MANIFEST "recorded/kakao/local")
     files = sorted(local_dir.glob("*.json"))
-    assert len(files) == 10
+    assert len(files) == 15
     for f in files:
         text = f.read_text("utf-8")
         doc = json.loads(text)
@@ -60,3 +61,14 @@ def test_recorded_replays_and_missing_is_unavailable(local_dir: Path) -> None:
     # 기록 안 한 점(잠실, 태우 실서버 요청)은 재생할 게 없다 — 지어내지 않고 실패
     with pytest.raises(KakaoUnavailableError):
         src.get(COORD2ADDRESS, coord2address_params(127.0980, 37.5133))
+
+
+def test_seoul_wide_shape() -> None:
+    # 서울 전체는 rect 하나(near 와 같이 못 쓴다) — 기록 9da3f3aa…(교보빌딩 rect) 의 params 와 같다
+    assert keyword_params("교보빌딩", None, seoul=True) == {
+        "query": "교보빌딩",
+        "size": "10",
+        "rect": "126.79,37.43,127.19,37.70",
+    }
+    with pytest.raises(ValueError):
+        keyword_params("교보빌딩", (126.98, 37.57), seoul=True)

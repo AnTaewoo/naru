@@ -4,6 +4,9 @@
 교보빌딩 점 → 도로명 "서울특별시 종로구 종로 1"·지번 "서울 종로구 종로1가 1", 세종대로 건너기 도착점
 (태우 실서버 요청) → 도로명 없음·지번 "서울 중구 남대문로2가 9-9", 키워드 반경 5 km 정확도 순 1위
 교보빌딩 → 광화문교보빌딩 24020019, 덕수궁 → 덕수궁 10305191, 시청 → 서울특별시청 8430129.
+2026-11-11 기록(태우 "멀리 있는 것도 알려 줘야지"): near 반경 5 km 안 앞 5개 뒤를 서울 전체(rect)
+정확도 순으로 채운다 — `9da3f3aa…`(교보빌딩 rect)·`3090ce42…`(시청 rect)·`dc7b93c1…`(용산 rect)·
+`a4cfa6ef…`(용산 near 126.99,37.42 = 태우 실서버 검색 11:26 의 지도 가운데 — 0건).
 """
 
 from collections.abc import Iterator
@@ -48,6 +51,33 @@ def test_search_near_center_is_relevance_within_radius(geocoder: Geocoder) -> No
     assert geocoder.search("시청", CENTER)[0].name == "서울특별시청"
     # 지도가 조금 움직여도(소수 2자리 같음) 같은 요청 — 같은 결과
     assert geocoder.search("교보빌딩", (126.9791, 37.5718))[0].id == "24020019"
+
+
+def test_search_near_puts_radius_first_then_seoul_wide(geocoder: Geocoder) -> None:
+    places = geocoder.search("교보빌딩", CENTER)
+    assert [p.name for p in places[:5]] == [  # 4826147a 0~4 (반경 5 km 정확도 순)
+        "광화문교보빌딩",
+        "교보재단빌딩",
+        "교보생명빌딩",
+        "광화문교보빌딩 교보컨벤션홀",
+        "교보문고사옥",
+    ]
+    assert [p.name for p in places[5:]] == [  # 9da3f3aa 0·2·3·4·5 — 1·8 은 앞 5개와 같은 id 라 뺌
+        "교보타워",
+        "교보증권빌딩",
+        "교보생명 상계동사옥",
+        "교보생명빌딩",
+        "교보생명 영등포사옥",
+    ]
+    assert places[5].address == "서울 서초구 강남대로 465" and len({p.id for p in places}) == 10
+    # 태우 실서버 검색(11/11 11:26) — 지도 가운데가 과천 쪽이라 반경 안 0건. 전엔 빈 목록이었다
+    far = geocoder.search("용산", (126.99, 37.42))
+    assert [p.name for p in far[:3]] == ["이태원거리", "YTN서울타워", "노들섬"]  # dc7b93c1 0~2
+    assert len(far) == 10
+    # 시청 — 뒤 5개는 서울 전체 rect 라 경기 시청이 들어오고(3090ce42 1~4·6) 부산·제주는 없다
+    names = [p.name for p in geocoder.search("시청", CENTER)]
+    assert names[:2] == ["서울특별시청", "시청역 1호선"]
+    assert names[5:] == ["고양시청", "광명시청", "구리시청", "남양주시청 제2청사", "시청앞주유소"]
 
 
 def test_reverse_road_then_jibun_label(geocoder: Geocoder) -> None:
