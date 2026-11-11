@@ -109,7 +109,7 @@
 | `map/MapView.tsx` | client | `useRef(maplibre.Map)`, `source.setData()` |
 | `map/layers/{closure,route,zone,event}Layer.ts` | 순수 함수 | contracts → MapLibre source. event = 지금 지도 사건 중심점(클러스터)·구역 (T7.4) |
 | `map/eventKinds.ts` | 순수 함수 | 사건 종류(통제 중·1시간 안·예정·예정 구역·해제)·칩 수·목록 순서·줌 3단계 (T7.4) |
-| `app/manifest.ts` · `public/sw.js` · `push/usePush.ts` · `push/store.ts` | PWA·알림 (T7.7, T7.10) | 매니페스트(설치), 서비스워커(push → showNotification, 클릭 → `/?event=`), 지원 판정·등록·권한·구독(VAPID 공개키 → pushManager.subscribe → §9)·관심 지역(watch/unwatch 사건 중심 500 m, 내 위치 켰을 때만 last_seen) 훅. 상태는 Provider 없이 모듈 스토어 + `useSyncExternalStore`(ADR-014 D) — endpoint·라벨은 localStorage. 화면은 `PushSetup`(목록·빼기·알림 끄기·개인정보 한 줄)·`EventCard` ☆ |
+| `app/manifest.ts` · `public/sw.js` · `push/usePush.ts` · `push/store.ts` | PWA·알림 (T7.7, T7.10) | 매니페스트(설치), 서비스워커(push → showNotification, 클릭 → `/?event=`), 지원 판정·등록·권한·구독(VAPID 공개키 → pushManager.subscribe → §9)·관심 지역(watch/unwatch 장소 카드의 자리 500 m — 사건 카드 ☆는 태우 11/11 뺌, 내 위치 켰을 때만 last_seen) 훅. 상태는 Provider 없이 모듈 스토어 + `useSyncExternalStore`(ADR-014 D) — endpoint·라벨은 localStorage. 화면은 `PushSetup`(목록·빼기·알림 끄기·개인정보 한 줄)·`PlaceCard` ☆ |
 | `map/layers/marchLayer.ts` | 순수 함수 | 행진 키프레임(§3.2) → 그 시각 프레임(두 키프레임 사이 보간) → heatmap·중심 원·횡단보도 P 6단계 소스. 재생은 ClosureProvider `playMs`(네트워크 없음) (T7.16) |
 | `components/TimeSlider` · `LegList` · `EvidencePopover` · `Footer` | client | |
 
