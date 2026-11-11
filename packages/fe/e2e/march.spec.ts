@@ -1,6 +1,6 @@
 // T7.16 행진 예상 위치 — iPhone 13. 실제 앱(임시 스택 naru_test, BE 0007): 11/7 r01 동화면세점 고리(be5f89a4ebf3,
-// 12:00~16:00, 기록 march_be5f89a4ebf3)를 13:00 에 열면 카드에 "이 시각 막혀 있을 확률 100%"(세종대로사거리) +
-// 재생, 지도에 heatmap 점(data-march). r04(2e930ec6deeb)는 갈라진 행진이라 404 → 줄 없음
+// 12:00~16:00, 기록 march_be5f89a4ebf3)를 13:00 에 열면 카드에 "이 시각 막혀 있을 확률 100%"(세종대로사거리),
+// 지도에 heatmap 점(data-march). 시각은 카드 위 슬라이더로(재생 버튼은 11/11 뺌). r04(2e930ec6deeb)는 갈라진 행진이라 404 → 줄 없음
 import { devices, expect, test } from "@playwright/test";
 import { consoleErrors, ownErrors } from "./helpers";
 
@@ -15,7 +15,7 @@ test.use({
 
 const R01 = "be5f89a4ebf3";
 
-test("13:00 동화면세점 고리 — 확률 100%·공지 일정 기준 예상 위치, 지도에 예상 위치 점, 재생 → 정지 → 끝나면 다시 재생", async ({
+test("13:00 동화면세점 고리 — 확률 100%·공지 일정 기준 예상 위치, 지도에 예상 위치 점, 카드 위 슬라이더로 10분 뒤 → 13:10 기준, 재생 버튼 없음", async ({
   page,
 }) => {
   const errors = consoleErrors(page);
@@ -29,13 +29,17 @@ test("13:00 동화면세점 고리 — 확률 100%·공지 일정 기준 예상 
   await expect
     .poll(async () => Number(await map.getAttribute("data-march")), { timeout: 15_000 })
     .toBeGreaterThan(0);
-  await card.getByRole("button", { name: "예상 위치 재생" }).click();
-  await expect(card.getByRole("button", { name: "정지" })).toBeVisible();
-  await expect(card).toContainText("통제 시간 전체를 12초에");
-  // 통제 시간 전체를 12초에 — 끝나면 저절로 멈춘다
-  await expect(card.getByRole("button", { name: "예상 위치 재생" })).toBeVisible({
-    timeout: 20_000,
-  });
+  await expect(card.getByRole("button", { name: /재생/ })).toHaveCount(0);
+  // 카드를 연 채 슬라이더(기준 시각)가 보이고, 10분 뒤로 옮기면 기준 줄이 13:10, 예상 위치 점은 그대로 있다
+  await expect(page.getByRole("slider", { name: "기준 시각" })).toBeVisible();
+  await page.getByRole("button", { name: "10분 뒤" }).click();
+  await expect(page.getByRole("region", { name: "서울 통제" })).toContainText(
+    "11월 7일 13:10 기준",
+  );
+  await expect(card).toContainText("막혀 있을 확률");
+  await expect
+    .poll(async () => Number(await map.getAttribute("data-march")), { timeout: 15_000 })
+    .toBeGreaterThan(0);
   expect(ownErrors(errors)).toEqual([]);
 });
 

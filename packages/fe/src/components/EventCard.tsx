@@ -33,8 +33,6 @@ export function EventCard({
   onClose,
   onAvoid,
   march = null,
-  playMs = null,
-  onPlay,
 }: {
   event: ClosureEvent;
   atMs: number;
@@ -43,15 +41,10 @@ export function EventCard({
   onAvoid?: () => void;
   /** 행진 예상 위치 키프레임 (T7.16) — 대상이 아니면 null */
   march?: MarchResponse | null;
-  /** 재생 중인 시각 — 확률은 이 시각으로 */
-  playMs?: number | null;
-  /** 재생·정지 (T7.16) */
-  onPlay?: () => void;
-  /** ☆ 이 근처 알림 받기 (T7.10) — 사건 중심 500 m. 없으면(중심 없음) 버튼을 안 그린다 */
 }) {
   const [open, setOpen] = useState(false);
   const kind = eventKind(event, atMs);
-  const probability = march ? probabilityAt(march, playMs ?? atMs) : null;
+  const probability = march ? probabilityAt(march, atMs) : null;
   const title = eventTitleKo(event);
   const detail = eventDetailKo(event);
   const route = longRouteKo(event);
@@ -88,20 +81,7 @@ export function EventCard({
           <p className={styles.probability} style={{ color: pColor(probability) }}>
             {marchProbabilityKo(probability)}
           </p>
-          <p className={styles.basis}>
-            {MARCH_KO.basis}
-            {playMs !== null && ` · ${MARCH_KO.playing}`}
-          </p>
-          {onPlay && (
-            <button
-              type="button"
-              className={styles.play}
-              aria-pressed={playMs !== null}
-              onClick={onPlay}
-            >
-              {playMs !== null ? MARCH_KO.stop : MARCH_KO.play}
-            </button>
-          )}
+          <p className={styles.basis}>{MARCH_KO.basis}</p>
         </div>
       )}
       {/* 해제 예정이 지났는데 아직 통제 중 — 정리 시간 까닭 (태우 11/10) */}

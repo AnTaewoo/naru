@@ -325,7 +325,7 @@ export function MapView({ visible }: MapViewProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const loaded = useRef(false);
-  const { closures, bbox, coverage, events, eventsAt, selected, frame, catalog, march, playMs } =
+  const { closures, bbox, coverage, events, eventsAt, selected, frame, catalog, march } =
     useClosures();
   const { t } = useTime();
   const api = useNaruApi();
@@ -359,11 +359,11 @@ export function MapView({ visible }: MapViewProps) {
   const framed = useRef(false);
   // 줌 3단계 (T7.4) — e2e 가 data-band 로 본다
   const [band, setBand] = useState<ZoomBand>(zoomBand(START_ZOOM));
-  // 행진 예상 위치 (T7.16) — 고른 행진 사건의 그 시각(재생 중이면 재생 시각) 프레임. e2e 가 data-march 로 본다
+  // 행진 예상 위치 (T7.16) — 고른 행진 사건의 슬라이더 시각 프레임. e2e 가 data-march 로 본다
   const marchBody = march && march.id === selected ? march.body : null;
   const marchFrame = useMemo<MarchFrame | null>(
-    () => (marchBody ? frameAt(marchBody, playMs ?? Date.parse(t)) : null),
-    [marchBody, playMs, t],
+    () => (marchBody ? frameAt(marchBody, Date.parse(t)) : null),
+    [marchBody, t],
   );
 
   useEffect(() => {

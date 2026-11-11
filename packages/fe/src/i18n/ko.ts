@@ -411,9 +411,6 @@ export const MAP_OUTSIDE_KO = "내 위치는 아직 길찾기 범위(서울) 밖
 /** 행진 예상 위치 (T7.16, ADR-015 G) — 공지 일정으로 계산한 값, 실제 추적처럼 보이는 말은 쓰지 않는다 */
 export const MARCH_KO = {
   basis: "공지 일정 기준 예상 위치",
-  play: "예상 위치 재생",
-  stop: "정지",
-  playing: "통제 시간 전체를 12초에",
 } as const;
 
 export function marchProbabilityKo(p: number): string {

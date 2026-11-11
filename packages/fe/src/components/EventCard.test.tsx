@@ -96,39 +96,18 @@ describe("EventCard", () => {
     expect(screen.getByText("해제 예정 시각 뒤 30분은 현장 정리로 막힌 걸로 봐요")).toBeDefined();
   });
 
-  it("행진 확률 모델 사건(T7.16) — 13:00 '이 시각 막혀 있을 확률 100%'(세종대로사거리), 재생 버튼, 재생 중 문구", () => {
+  it("행진 확률 모델 사건(T7.16) — 13:00 '이 시각 막혀 있을 확률 100%'(세종대로사거리), 11:00 은 0%, 재생 버튼 없음(태우 11/11)", () => {
     const event = eventById(
       recordedLive("closure_events_catalog_1107_1530").body.events,
       "be5f89a4ebf3",
     );
-    let plays = 0;
     const at = Date.parse("2026-11-07T13:00:00+09:00");
     const { rerender } = render(
-      <EventCard
-        event={event}
-        atMs={at}
-        onClose={() => undefined}
-        march={march}
-        onPlay={() => (plays += 1)}
-      />,
+      <EventCard event={event} atMs={at} onClose={() => undefined} march={march} />,
     );
     expect(screen.getByText("이 시각 막혀 있을 확률 100%")).toBeDefined();
     expect(screen.getByText("공지 일정 기준 예상 위치")).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "예상 위치 재생" }));
-    expect(plays).toBe(1);
-    // 재생 중 — 12:00 시각(출발점)으로: 종로구청입구 등은 0.2 지만 가장 높은 P 는 1.0, 버튼은 정지
-    rerender(
-      <EventCard
-        event={event}
-        atMs={at}
-        onClose={() => undefined}
-        march={march}
-        playMs={Date.parse("2026-11-07T12:00:00+09:00")}
-        onPlay={() => undefined}
-      />,
-    );
-    expect(screen.getByRole("button", { name: "정지" })).toBeDefined();
-    expect(screen.getByText(/통제 시간 전체를 12초에/)).toBeDefined();
+    expect(screen.queryByRole("button", { name: /재생/ })).toBeNull();
     // 창 밖(11:00)은 0%
     rerender(
       <EventCard
@@ -139,7 +118,6 @@ describe("EventCard", () => {
       />,
     );
     expect(screen.getByText("이 시각 막혀 있을 확률 0%")).toBeDefined();
-    expect(screen.queryByRole("button", { name: "예상 위치 재생" })).toBeNull(); // onPlay 없음
     // 대상이 아닌 사건(march null)은 줄이 없다
     rerender(<EventCard event={event} atMs={at} onClose={() => undefined} march={null} />);
     expect(screen.queryByText(/막혀 있을 확률/)).toBeNull();

@@ -54,8 +54,6 @@ export interface ClosureState {
   frame: { bbox: Bbox4; seq: number } | null;
   /** 고른 행진 사건의 예상 위치 키프레임 (T7.16). 받은 사건 id 와 응답(대상 아니면 null) */
   march: { id: string; body: MarchResponse | null } | null;
-  /** 예상 위치 재생 중인 시각(ms) — 네트워크 없이 지도·카드만 이 시각으로. null = 재생 아님 */
-  playMs: number | null;
 }
 
 /** [minLng, minLat, maxLng, maxLat] */
@@ -100,8 +98,7 @@ export type ClosureAction =
   | { type: "pick"; ids: string[] }
   | { type: "unpick" }
   | { type: "frame"; bbox: Bbox4 }
-  | { type: "receiveMarch"; id: string; body: MarchResponse | null }
-  | { type: "play"; ms: number | null };
+  | { type: "receiveMarch"; id: string; body: MarchResponse | null };
 
 export const EMPTY_CLOSURES: FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -168,7 +165,6 @@ export function initialClosureState(partial: Partial<ClosureState> = {}): Closur
     picked: null,
     frame: null,
     march: null,
-    playMs: null,
     ...partial,
   };
 }
@@ -210,11 +206,9 @@ export function closureReducer(state: ClosureState, action: ClosureAction): Clos
     case "select":
       if (state.selected === action.id) return state;
       // 다른 사건을 열면 예상 위치·재생은 그 사건 것이 아니다
-      return { ...state, selected: action.id, playMs: null, march: action.id ? state.march : null };
+      return { ...state, selected: action.id, march: action.id ? state.march : null };
     case "receiveMarch":
       return action.id === state.selected ? { ...state, march: action } : state;
-    case "play":
-      return state.playMs === action.ms ? state : { ...state, playMs: action.ms };
     case "pick": {
       const [only, ...more] = action.ids;
       if (only === undefined) return state;
