@@ -440,7 +440,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - 산출: 공개 GET 하나(/api/internal 밖) — 시각 t 기준 FeatureCollection(횡단보도·구간 geometry, 이벤트명·출처·시작·종료·상태·확신도, 행진이면 P), 기존 통제 조회 로직 재사용, 응답 캐시·요청 제한, README "데이터 피드" 절(예시 요청·필드)
 
 ### T7.18 TOPIS 공지 아카이브 깊이 확인 (T-D) — 조사만
-- status: TODO
+- status: DOING
 - depends: T7.10 (B 뒤 — 태우 11/10 "PWA 알림도 중요 기능"). 결과 문서는 `docs/data/topis_archive.md`(guard 허용 경로, 태우 "알아서")
 - 산출: 공지 게시판 목록 마지막 페이지 → 가장 오래된 공지 날짜·총 건수(요청 몇 건, robots, NaruBot, 본문 수집 없음), 같은 기간 구조화 돌발 기록의 공식 경로(OA-22861 중단). 결과 문서 — 몇 년치인지, 공지 원문과 구조화 기록을 짝지어 라벨을 만들 수 있는지
 
@@ -465,7 +465,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - 산출: created·confirmed → blocks·≥ 0.7 → STRtree → (구독, 사건, 종류) 한 번 → 22~07 created 는 07시 → pywebpush(410·404 끔). 워커 `push` 60초 → `POST /internal/push/dispatch`
 
 ### T7.10 알림 → 카드, ☆ 이 근처 알림 받기, 관심 지역 관리
-- status: DOING
+- status: DONE
 - depends: T7.9
 - 산출: 알림 클릭 → 사건 카드, 장소 카드 ☆(검색해 고른 자리 반경 500 m — 사건 카드 ☆는 태우 11/11 뺌: 사건이 생긴 뒤에야 누를 수 있어서), 관심 지역 목록·삭제, last_seen. 운영에서 태우 실제 구독으로 끝에서 끝
 - PC-7B (T7.10 뒤): 태우 PC Chrome·폰에 실제 통제 알림이 오고 눌러서 카드
