@@ -440,7 +440,7 @@ LLM은 ADR-007로 확정(Claude API). 로컬 사후학습·현장 데이터는 �
 - 산출: 공개 GET 하나(/api/internal 밖) — 시각 t 기준 FeatureCollection(횡단보도·구간 geometry, 이벤트명·출처·시작·종료·상태·확신도, 행진이면 P), 기존 통제 조회 로직 재사용, 응답 캐시·요청 제한, README "데이터 피드" 절(예시 요청·필드)
 
 ### T7.18 TOPIS 공지 아카이브 깊이 확인 (T-D) — 조사만
-- status: DOING
+- status: DONE
 - depends: T7.10 (B 뒤 — 태우 11/10 "PWA 알림도 중요 기능"). 결과 문서는 `docs/data/topis_archive.md`(guard 허용 경로, 태우 "알아서")
 - 산출: 공지 게시판 목록 마지막 페이지 → 가장 오래된 공지 날짜·총 건수(요청 몇 건, robots, NaruBot, 본문 수집 없음), 같은 기간 구조화 돌발 기록의 공식 경로(OA-22861 중단). 결과 문서 — 몇 년치인지, 공지 원문과 구조화 기록을 짝지어 라벨을 만들 수 있는지
 
