@@ -256,32 +256,3 @@
 .stale::before {
   content: "⚠ ";
 }
-
-/* 예시 칩 한 줄 (T7.14) — 제목 바로 아래, 가로로 넘긴다. 접힌 시트(96px)에서도 보이게 낮게 */
-.chipRow {
-  display: flex;
-  gap: 6px;
-  margin: 2px -20px 2px;
-  padding: 0 20px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.chipRow::-webkit-scrollbar {
-  display: none;
-}
-
-.exampleChip {
-  flex: none;
-  height: 28px;
-  padding: 0 12px;
-  border: 1px solid #d9e3fb;
-  border-radius: 14px;
-  background: #f4f7ff;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: #2d6bff;
-  white-space: nowrap;
-  cursor: pointer;
-}

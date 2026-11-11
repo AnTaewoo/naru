@@ -6,7 +6,7 @@ import type { PushStore } from "../push/store";
 import { usePush } from "../push/usePush";
 import styles from "./PushSetup.module.css";
 
-// 통제 알림 칸 (T7.7 → T7.10, ADR-014 C) — 시트 맨 아래. 권한은 버튼으로만. 구독되면 관심 지역 목록(사건 카드의
+// 통제 알림 칸 (T7.7 → T7.10, ADR-014 C) — 시트 맨 아래. 권한은 버튼으로만. 구독되면 관심 지역 목록(장소 카드의
 // ☆로 더한 곳·마지막 위치)·빼기·알림 끄기·개인정보 한 줄. iPhone 브라우저 탭은 홈 화면 안내
 export interface PushSetupProps {
   store: PushStore;

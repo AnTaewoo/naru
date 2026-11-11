@@ -65,4 +65,17 @@ describe("PlaceCard (T7.14)", () => {
     fireEvent.click(screen.getByRole("button", { name: "장소 닫기" }));
     expect(screen.getByLabelText("길찾기 상태").textContent).toBe("false - -");
   });
+
+  it("☆ 이 근처 알림 받기 (T7.10, 태우 11/11 — 사건 카드 대신 장소에서) — 알림을 못 켜는 환경(vitest 의 jsdom 엔 Push API 가 없다)이면 누를 때 까닭 한 줄, 서버 요청 없음", () => {
+    render(
+      <Providers>
+        <PlaceCard />
+      </Providers>,
+    );
+    const star = screen.getByRole("button", { name: "☆ 이 근처 알림 받기" });
+    expect(star.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(star);
+    expect(screen.getByRole("status").textContent).toBe("이 브라우저는 알림을 지원하지 않아요");
+    expect(screen.getByRole("button", { name: "☆ 이 근처 알림 받기" })).toBeDefined();
+  });
 });

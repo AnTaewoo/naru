@@ -144,32 +144,4 @@ describe("EventCard", () => {
     rerender(<EventCard event={event} atMs={at} onClose={() => undefined} march={null} />);
     expect(screen.queryByText(/막혀 있을 확률/)).toBeNull();
   });
-
-  it("☆ 이 근처 알림 받기 (T7.10) — 누르면 onToggle, 받는 중이면 ★ 눌림, 안내 줄", () => {
-    const event = eventById(n.body.events, "ccaa9980c6ac");
-    let toggled = 0;
-    const { rerender } = render(
-      <EventCard
-        event={event}
-        atMs={n.atMs}
-        onClose={() => undefined}
-        watch={{ watched: false, busy: false, note: null, onToggle: () => (toggled += 1) }}
-      />,
-    );
-    fireEvent.click(screen.getByRole("button", { name: "☆ 이 근처 알림 받기" }));
-    expect(toggled).toBe(1);
-    rerender(
-      <EventCard
-        event={event}
-        atMs={n.atMs}
-        onClose={() => undefined}
-        watch={{ watched: true, busy: false, note: "iPhone 안내", onToggle: () => undefined }}
-      />,
-    );
-    const on = screen.getByRole("button", { name: "★ 이 근처 알림 받는 중" });
-    expect(on.getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByRole("status").textContent).toBe("iPhone 안내");
-    rerender(<EventCard event={event} atMs={n.atMs} onClose={() => undefined} />);
-    expect(screen.queryByRole("button", { name: /이 근처 알림/ })).toBeNull();
-  });
 });
