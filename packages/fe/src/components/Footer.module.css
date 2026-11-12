@@ -1,0 +1,18 @@
+.footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--naru-border);
+  color: var(--naru-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.footer a {
+  color: inherit;
+}
+
+/* 모바일에선 숨긴다 — 고지 링크는 하단 시트 맨 아래 줄에 있다 (T5.6, T5.12) */
+@media (max-width: 640px) {
+  .footer {
+    display: none;
+  }
+}

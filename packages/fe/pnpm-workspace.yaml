@@ -1,0 +1,5 @@
+# pnpm 12 설정 (package.json 의 pnpm 필드는 더 이상 안 읽는다). 빌드 스크립트 허용 목록
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true

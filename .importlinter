@@ -1,0 +1,60 @@
+# 패키지·계층 의존 규칙 — `make check`의 `lint-imports`가 강제한다 (CONVENTIONS §1, §4.1)
+[importlinter]
+root_packages =
+    naru_contracts
+    naru_ai
+    naru_be
+include_external_packages = True
+
+[importlinter:contract:ai-be-independent]
+name = AI와 BE는 서로 import하지 않는다 (경계는 HTTP + naru_contracts)
+type = independence
+modules =
+    naru_ai
+    naru_be
+
+[importlinter:contract:contracts-is-leaf]
+name = naru_contracts는 우리 패키지를 import하지 않는다
+type = forbidden
+source_modules =
+    naru_contracts
+forbidden_modules =
+    naru_ai
+    naru_be
+
+[importlinter:contract:be-mvc-layers]
+name = BE MVC — controllers → views → models (아래로만)
+type = layers
+layers =
+    naru_be.controllers
+    naru_be.views
+    naru_be.models
+
+[importlinter:contract:models-no-flask]
+name = Model은 Flask를 모른다
+type = forbidden
+source_modules =
+    naru_be.models
+forbidden_modules =
+    flask
+
+[importlinter:contract:views-no-db]
+name = View는 DB를 직접 만지지 않는다
+type = forbidden
+source_modules =
+    naru_be.views
+forbidden_modules =
+    sqlalchemy
+allow_indirect_imports = True
+
+[importlinter:contract:controllers-thin]
+name = Controller는 DB·공간·그래프 라이브러리를 직접 쓰지 않는다
+type = forbidden
+source_modules =
+    naru_be.controllers
+forbidden_modules =
+    sqlalchemy
+    shapely
+    geopandas
+    networkx
+allow_indirect_imports = True

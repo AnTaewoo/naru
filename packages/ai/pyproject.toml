@@ -1,0 +1,28 @@
+[project]
+name = "naru-ai"
+version = "0.5.0"
+description = "Naru AI 워커 — 공지 파싱(Claude API)·코스·신호 → ClosureCandidate"
+requires-python = ">=3.12"
+dependencies = [
+  "naru-contracts",
+  "pydantic>=2.9",
+  "pydantic-settings>=2.5",
+  "httpx>=0.27",
+  "anthropic>=0.40",
+  "shapely>=2.0",
+  "pyproj>=3.6",
+  "geopandas>=1.0",  # T7.19 주요 121장소 영역 shp (raw/citydata_areas_*)
+  "gpxpy>=1.6",
+  "pdfplumber>=0.11",
+  "openpyxl>=3.1",
+]
+
+[tool.uv.sources]
+naru-contracts = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["naru_ai"]

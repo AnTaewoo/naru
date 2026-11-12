@@ -1,0 +1,27 @@
+# Naru 운영 (T5.3) — make serve: MySQL → 마이그레이션 → Next 빌드 → gunicorn(127.0.0.1:5050) → Next standalone
+# (127.0.0.1:3050). 공개는 nginx 가 3050 하나만 프록시한다. 워커는 따로(deploy/naru-worker.service). 설치·바꾼 뒤:
+#   sudo cp deploy/naru.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart naru
+# Restart=always (태우 2026-11-09) — 11/9 18:14 재시작 때 첫 시도는 Next 빌드 ENOENT, 자동 재시도는 5050·3050 이
+# 쓰이는 중이라 서버가 못 떴고 make serve 의 trap 'kill 0' 이 SIGTERM 으로 끝나 systemd 가 정상 종료로 보고 멈췄다
+# (18:14~18:54 502). always 면 끝난 방식과 상관없이 5초 뒤 다시 띄운다. systemctl stop 으로 멈춘 건 그대로 둔다
+[Unit]
+Description=Naru (make serve, port 3050)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=antaewoo
+Group=antaewoo
+WorkingDirectory=/home/antaewoo/workspace/naru
+Environment=HOME=/home/antaewoo
+Environment=PATH=/home/antaewoo/miniconda3/bin:/home/antaewoo/.nvm/versions/node/v18.20.7/bin:/home/antaewoo/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStartPre=/usr/bin/docker compose -f /home/antaewoo/workspace/naru/docker-compose.yml up -d mysql
+ExecStart=/usr/bin/make serve
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

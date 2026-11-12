@@ -1,0 +1,60 @@
+.app {
+  position: relative;
+  flex: 1;
+  min-height: 70vh;
+  height: calc(100dvh - 41px);
+  overflow: hidden;
+  background: #e9ecef;
+}
+
+/* 모바일은 푸터가 없으니 화면 전체 (T5.6) */
+@media (max-width: 640px) {
+  .app {
+    height: 100dvh;
+  }
+}
+
+/* 지도 컨트롤(확대·출처)은 위에 뜬 UI 아래로 — 홈은 길찾기 바·칩 아래(시안 01 의 오른쪽 버튼 자리),
+   길찾기는 출발·도착 패널 아래. 출처 글자가 칩·패널에 가리지 않게 */
+.app[data-mode="home"] :global(.maplibregl-ctrl-top-right) {
+  top: 104px;
+}
+
+.app[data-mode="route"] :global(.maplibregl-ctrl-top-right) {
+  top: 116px; /* 출발·도착 패널 108px 아래 (탭 줄 숨김, T5.10) */
+}
+
+/* 통제 제보 버튼(T7.15)은 홈에서만 — 제보 카드는 홈 시트에 뜬다 */
+.app[data-mode="route"] :global(.naru-report-ctrl) {
+  display: none;
+}
+
+/* 하단 시트 "전체"의 윗변 — 위에 떠 있는 UI 바로 아래 (T5.6, BottomSheet 가 읽는다) */
+.app[data-mode="home"] {
+  --sheet-top: 112px;
+}
+
+.app[data-mode="route"] {
+  --sheet-top: 112px; /* 출발·도착 패널 108px 아래 (T5.10) */
+}
+
+.mapLoading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--naru-muted);
+  font-size: 14px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

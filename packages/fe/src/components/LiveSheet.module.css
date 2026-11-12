@@ -1,0 +1,258 @@
+.pad {
+  padding: 0 20px;
+}
+
+.title {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.sub {
+  font-size: 13.5px;
+  color: #666;
+  margin-top: 3px;
+}
+
+.loading {
+  color: #999;
+}
+
+.error {
+  color: #e5322d;
+}
+
+.rows {
+  margin-top: 10px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 행 = 버튼 — 누르면 사건 카드 (T7.5) */
+.row {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  /* minmax(0, 1fr): 긴 제목(nowrap)이 칸을 넓혀 오른쪽 배지를 밀어내지 않게 */
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 20px;
+}
+
+.row:active {
+  background: #f7f7f7;
+}
+
+.row + .row {
+  border-top: 1px solid #f1f1f1;
+}
+
+.ico {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+/* 파서 제목은 길다 — 두 줄까지 (T5.9) */
+.rowTitle {
+  font-size: 15px;
+  font-weight: 600;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  max-width: 100%;
+  line-height: 1.35;
+}
+
+.rowSub {
+  font-size: 13px;
+  color: #666;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowText {
+  display: block;
+  min-width: 0;
+}
+
+.badge {
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 16px 20px;
+  color: #999;
+  font-size: 14px;
+}
+
+/* 행 둘째 줄 — 인원 · 도로 (T5.9) */
+.rowDetail {
+  display: block;
+  font-size: 13px;
+  color: #444;
+}
+
+/* 지금 서울 통제 묶음 (T7.5) — 통제 중 → 1시간 안 시작 → 오늘 → 내일 */
+.groupHead {
+  margin: 0;
+  padding: 12px 20px 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #666;
+}
+
+.groupHead span {
+  margin-left: 4px;
+  color: #999;
+}
+
+/* 구 칩 (T6.9) — 지도 화면과 겹치는 사건의 구 먼저 */
+.chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 10px 20px 2px;
+  scrollbar-width: none;
+}
+
+.chip {
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 15px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+}
+
+.chip[aria-pressed="true"] {
+  border-color: #1e1e1e;
+  background: #1e1e1e;
+  color: #fff;
+}
+
+/* 지도에서 고른 묶음 (T7.5) — "여기 통제 N건 · 전체 보기" */
+.picked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px 2px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.back {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2d6bff;
+  cursor: pointer;
+}
+
+/* 예시로 보기 (T7.11) — 시트 맨 아래, 누르면 그 날짜·시각 + 지도를 그 통제 구역에 */
+/* 지금 통제가 없을 때 빈 안내 밑 큰 예시 버튼 (T7.11 → T7.14) */
+.examples {
+  padding-bottom: 8px;
+}
+
+.example {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: calc(100% - 40px);
+  margin: 6px 20px 0;
+  padding: 10px 12px;
+  border: 1px solid #e6e6e6;
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.example b {
+  font-size: 14px;
+}
+
+.example span {
+  font-size: 12.5px;
+  color: #666;
+}
+
+/* 지금이 아닌 시각을 볼 때 시트 맨 위 (T7.12) — "11월 7일 15:00 기준 · 지금으로 돌아가기", 목록에선 제목 자리 */
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 4px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: #eaf1ff;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e1e1e;
+}
+
+/* 다가오는 통제 날짜 머리 (T7.12) */
+.dayHead {
+  margin: 0;
+  padding: 6px 20px 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #888;
+}
+
+/* 지난 통제 더 보기 (T7.12) */
+.more {
+  margin: 4px 20px 0;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #2d6bff;
+  cursor: pointer;
+}
+
+/* 통제 정보 멈춤 경고 (T7.13) — TOPIS 돌발을 30분 넘게 못 받았을 때만, 슬라이더 위 한 줄 */
+.stale {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #b45309;
+}
+
+.stale::before {
+  content: "⚠ ";
+}

@@ -1,0 +1,40 @@
+.mini {
+  position: relative;
+  height: 60px;
+  margin: 10px 20px 0;
+}
+
+.tr {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 16px;
+  height: 4px;
+  border-radius: 2px;
+  background: #ececec;
+}
+
+.bar {
+  position: absolute;
+  height: 5px;
+  border-radius: 3px;
+  opacity: 0.9;
+}
+
+.now {
+  position: absolute;
+  top: 4px;
+  width: 2px;
+  height: 30px;
+  background: #1e1e1e;
+  transform: translateX(-1px);
+}
+
+.ax {
+  position: absolute;
+  top: 36px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: #999;
+  font-variant-numeric: tabular-nums;
+}

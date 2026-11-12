@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<style>
+  :root{--ink:#1b1b1b;--mute:#5f6670;--line:#d6d9de;--blocks:#c62828;--none:#2e7d32;--unk:#e65100}
+  *{box-sizing:border-box}
+  body{margin:0;background:#fff;font-family:"Noto Sans CJK KR",sans-serif;color:var(--ink);width:1600px;word-break:keep-all;padding:40px 48px}
+  h1{font-size:28px;margin:0 0 6px;font-weight:800}
+  .sub{font-size:16px;color:var(--mute);margin:0 0 24px}
+  .cols{display:grid;grid-template-columns:1fr 1.75fr 1fr;gap:20px;align-items:start}
+  .card{border:2px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+  .hd{padding:14px 18px;color:#fff;font-size:22px;font-weight:800;display:flex;justify-content:space-between;align-items:baseline}
+  .hd small{font-size:14px;font-weight:500;opacity:.92}
+  .b .hd{background:var(--blocks)} .n .hd{background:var(--none)} .u .hd{background:var(--unk)}
+  .bd{padding:14px 18px;font-size:15.5px;line-height:1.55}
+  .when{font-weight:700;margin-bottom:6px}
+  ul{margin:0;padding-left:18px} li{margin:2px 0}
+  .out{margin-top:12px;padding:10px 12px;background:#f4f5f7;border-radius:8px;font-size:14.5px;color:#30353b}
+  table{border-collapse:collapse;width:100%;font-size:15px}
+  th,td{border-top:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top}
+  th{font-size:13px;color:var(--mute);font-weight:600;border-top:none;padding-top:0}
+  td.r{font-weight:700;white-space:nowrap;color:var(--none)}
+  td.c{font-family:"DejaVu Sans Mono",monospace;font-size:12.5px;color:var(--mute);white-space:nowrap}
+  .foot{margin-top:20px;font-size:14.5px;color:var(--mute);display:flex;gap:28px}
+  .foot b{color:var(--ink)}
+</style></head><body>
+<h1>통제 여부 판단 (impact)</h1>
+<p class="sub">공지에 "통제"라는 말이 있어도 걷는 사람과 상관없는 경우가 많습니다. 공지마다 먼저 이 통제가 횡단보도를 막는지 셋 중 하나로 정합니다.</p>
+<div class="cols">
+  <div class="card b">
+    <div class="hd">막음 <small>blocks</small></div>
+    <div class="bd">
+      <div class="when">사람이 차도를 건널 수 없음</div>
+      <ul>
+        <li>행진 (→, ↔), 도로 점거</li>
+        <li>차도를 차지한 집회 (N개 차로 점유)</li>
+        <li>전 차로 · 편도 전 차로 통제</li>
+        <li>두 지점 사이에 늘어선 집회 + 차로</li>
+        <li>마라톤 · 달리기 코스</li>
+        <li>보행로 폐쇄 · 보도 공사</li>
+      </ul>
+      <div class="out">횡단보도를 골라 상태를 매기고 길찾기에 씁니다</div>
+    </div>
+  </div>
+  <div class="card n">
+    <div class="hd">상관없음 <small>none · 이유 8가지</small></div>
+    <div class="bd">
+      <table>
+        <tr><th>이유</th><th>값</th><th>예</th></tr>
+        <tr><td class="r">자동차 전용도로</td><td class="c">motorway</td><td>올림픽대로, 강변북로, 터널, 고가 — 횡단보도가 없음</td></tr>
+        <tr><td class="r">차 없는 거리</td><td class="c">car_free</td><td>잠수교, 덕수궁길 — 차만 막고 사람은 다님</td></tr>
+        <tr><td class="r">보도·광장 집회</td><td class="c">sidewalk</td><td>"인도", "광장" — 차도를 차지하지 않음</td></tr>
+        <tr><td class="r">차량 조치만</td><td class="c">vehicle_measure</td><td>가변차로, 버스 우회, 정류소 폐쇄</td></tr>
+        <tr><td class="r">공사</td><td class="c">construction</td><td>"2차로 시설물보수 부분통제" — 차로 일부만</td></tr>
+        <tr><td class="r">해제 안내</td><td class="c">released</td><td>"통제 해제", "해산", "소통 재개"</td></tr>
+        <tr><td class="r">안내만</td><td class="c">info_only</td><td>경찰 배치, 안내 문자, 지난 일 설명</td></tr>
+        <tr><td class="r">미확정</td><td class="c">unconfirmed</td><td>"통제될 수 있다", "검토 중"</td></tr>
+      </table>
+      <div class="out">지도에 올리지 않습니다. 시간·구간은 그대로 기록해서 해제 처리와 검증에 씁니다</div>
+    </div>
+  </div>
+  <div class="card u">
+    <div class="hd">모름 <small>unknown</small></div>
+    <div class="bd">
+      <div class="when">장소는 있는데 차도를 차지하는지 모름</div>
+      <ul>
+        <li>"교보빌딩 정문 앞 집회"</li>
+        <li>"광화문광장 300명"</li>
+        <li>"강남역 10번 출구 앞"</li>
+      </ul>
+      <div class="out"><b>버리지 않습니다.</b> 장소가 도로에서 30m 안이거나 여러 장소가 도로를 둘러싸면 막는 것으로 봅니다. 그래도 확신도가 0.65 이하라 지도에만 표시하고 길찾기에는 쓰지 않습니다</div>
+    </div>
+  </div>
+</div>
+<div class="foot">
+  <div><b>원칙</b> 공지에 없는 도로·지점·끝점을 만들지 않습니다 · 한 공지에 여러 건이면 합치지 않습니다 · 시간은 "14시경"만 앞뒤 10분 넓힙니다</div>
+</div>
+</body></html>

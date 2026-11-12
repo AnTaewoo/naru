@@ -1,0 +1,9 @@
+.next
+dist
+node_modules
+pnpm-lock.yaml
+playwright-report
+test-results
+src/types/contracts.d.ts
+src/types/contracts.schema.json
+next-env.d.ts

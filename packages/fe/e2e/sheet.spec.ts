@@ -1,0 +1,74 @@
+// T5.6 하단 시트 + 지도 맞춤 — iPhone 13 크기(보이는 영역 390×664). 경로·통제 입력은 recorded naru_api 와 같은 DB:
+// route_0745 질의(교보빌딩 앞 → 대한문), closure_events 의 3/15 1구간(07:20~08:08, 횡단보도 6곳)
+import { devices, expect, test } from "@playwright/test";
+import { recorded } from "../src/test/recorded";
+import { consoleErrors, ownErrors } from "./helpers";
+
+const iphone = devices["iPhone 13"];
+test.use({
+  viewport: iphone.viewport,
+  deviceScaleFactor: iphone.deviceScaleFactor,
+  isMobile: iphone.isMobile,
+  hasTouch: iphone.hasTouch,
+  userAgent: iphone.userAgent,
+});
+
+const q = recorded("route_0745").query ?? {};
+const od = `from=${q["from"] ?? ""}&to=${q["to"] ?? ""}`;
+
+test("경로를 찾으면 시트가 접히고(96px) 출발·도착 핀이 시트 위 화면 안에 보인다, 푸터 없음", async ({
+  page,
+}) => {
+  const errors = consoleErrors(page);
+  await page.goto(`/?t=2026-03-15T07:45:00+09:00&${od}`);
+  const sheet = page.getByRole("region", { name: "길찾기 결과" });
+  await expect(page.getByRole("article", { name: "가장 빠른 길" })).toContainText("12분");
+  await expect(sheet).toHaveAttribute("data-stage", "collapsed");
+  await page.waitForTimeout(2000); // 화면 맞춤 애니메이션·타일
+  const box = await sheet.boundingBox();
+  expect(Math.round(box?.height ?? 0)).toBe(96);
+  for (const name of ["출발 지점", "도착 지점"]) {
+    const pin = await page.getByRole("img", { name }).boundingBox();
+    expect(pin).not.toBeNull();
+    expect(pin?.y ?? -1).toBeGreaterThan(0);
+    expect((pin?.y ?? 0) + (pin?.height ?? 0)).toBeLessThanOrEqual(box?.y ?? 0);
+  }
+  await expect(page.getByRole("contentinfo")).toBeHidden(); // 모바일 푸터 숨김 (고지는 지도 출처 칸)
+  // 경로 종류가 하나라 탭 줄이 없고 출발·도착 패널은 108px (T5.10) — 시트 '전체'·지도 컨트롤 기준
+  await expect(page.getByRole("tablist")).toHaveCount(0);
+  const panel = await page.getByRole("region", { name: "출발·도착" }).boundingBox();
+  expect(Math.round(panel?.height ?? 0)).toBe(108);
+  await expect(page.getByRole("status", { name: "지도 불러오는 중" })).toHaveCount(0);
+  await page.screenshot({ path: "test-results/iphone13-t56-route.png" });
+  expect(ownErrors(errors)).toEqual([]);
+});
+
+test("손잡이 — 탭은 접힘↔절반, 위로 끌면 전체, 아래로 끌면 접힘, 끌어도 글자가 선택되지 않는다", async ({
+  page,
+}) => {
+  await page.goto(`/?t=2026-03-15T07:45:00+09:00&${od}`);
+  const sheet = page.getByRole("region", { name: "길찾기 결과" });
+  await expect(sheet).toHaveAttribute("data-stage", "collapsed");
+  const grip = sheet.getByRole("button", { name: "시트 높이" });
+  await grip.click();
+  await expect(sheet).toHaveAttribute("data-stage", "half");
+  // 높이 전환(200ms)이 끝난 뒤 끈다 — 끌기는 지금 보이는 높이에서 시작한다
+  const settled = async (px: number) =>
+    expect.poll(async () => Math.round((await sheet.boundingBox())?.height ?? 0)).toBe(px);
+  await settled(332); // iPhone 13 보이는 높이 664 의 절반
+  const drag = async (dy: number) => {
+    const b = await grip.boundingBox();
+    const x = (b?.x ?? 0) + (b?.width ?? 0) / 2;
+    const y = (b?.y ?? 0) + (b?.height ?? 0) / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + dy, { steps: 12 });
+    await page.mouse.up();
+  };
+  await drag(-250); // 절반(332) → 582 쯤 → 전체(664 − 출발·도착 패널 위 112 = 552, T5.10)
+  await expect(sheet).toHaveAttribute("data-stage", "full");
+  expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
+  await settled(552); // 손잡이가 패널 아래에 있어 다시 잡을 수 있다
+  await drag(450); // 전체 → 38 → 접힘(96)
+  await expect(sheet).toHaveAttribute("data-stage", "collapsed");
+});

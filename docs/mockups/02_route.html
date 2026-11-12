@@ -1,0 +1,217 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>나루 — 길찾기</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"><style>
+:root{--blue:#2d6bff;--bluebg:#eaf1ff;--ink:#1e1e1e;--ink2:#666;--ink3:#999;--line:#e6e6e6;--stop:#e5322d;--stopbg:#fdecec;--slow:#f5a300;--slowbg:#fff5dc;--zone:#7a5cf0;--ok:#1f9d55;--okbg:#e6f6ec}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Pretendard,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:var(--ink);background:#eceef1;-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;white-space:nowrap}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.stage{min-height:100vh;display:flex;gap:56px;justify-content:center;align-items:center;padding:36px 20px;flex-wrap:wrap}
+.phone{width:414px;height:868px;border-radius:52px;background:#0f1113;padding:12px;box-shadow:0 40px 80px -30px rgba(0,0,0,.45);flex:none}
+.scr{position:relative;width:390px;height:844px;border-radius:42px;overflow:hidden;background:#f2f0ec}
+.scr > svg.map{position:absolute;inset:0;width:390px;height:844px}
+svg text{font-family:Pretendard,-apple-system,"Apple SD Gothic Neo",sans-serif}
+.sbar{position:absolute;top:0;left:0;right:0;height:46px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 30px 6px;font-size:15px;font-weight:600;z-index:5}
+.search{position:absolute;top:54px;left:12px;right:12px;height:50px;background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.14);display:flex;align-items:center;gap:10px;padding:0 6px 0 14px;z-index:4}
+.search .ph{flex:1;color:var(--ink3);font-size:16px}
+.search .go{width:40px;height:40px;border-radius:8px;background:var(--blue);display:grid;place-items:center}
+.chips{position:absolute;top:114px;left:12px;right:0;display:flex;gap:6px;overflow:hidden;z-index:4}
+.chip{flex:none;height:32px;padding:0 12px;border-radius:16px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.14);display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:500}
+.chip.on{background:var(--ink);color:#fff}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--stop)}
+.fab{position:absolute;right:12px;width:42px;height:42px;border-radius:8px;background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.18);display:grid;place-items:center;z-index:4}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;box-shadow:0 -2px 14px rgba(0,0,0,.12);z-index:4;padding:8px 0 26px}
+.handle{width:38px;height:4px;border-radius:2px;background:#d6d6d6;margin:0 auto 12px}
+.sh-pad{padding:0 20px}
+.sh-title{font-size:19px;font-weight:700}
+.sh-sub{font-size:13.5px;color:var(--ink2);margin-top:3px}
+.hr{height:8px;background:#f4f4f5;margin:14px 0}
+.row{display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:center;padding:11px 20px}
+.row + .row{border-top:1px solid #f1f1f1}
+.ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center}
+.row b{font-size:15px;font-weight:600;display:block}
+.row span{font-size:13px;color:var(--ink2)}
+.row em{font-style:normal;font-size:13px;font-weight:600}
+.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 7px;border-radius:4px;vertical-align:1px}
+.badge.stop{background:var(--stopbg);color:var(--stop)}.badge.slow{background:var(--slowbg);color:#a86d00}.badge.zone{background:#efeafe;color:var(--zone)}.badge.blue{background:var(--bluebg);color:var(--blue)}.badge.gray{background:#f0f0f0;color:#777}.badge.ok{background:var(--okbg);color:var(--ok)}
+.mini{position:relative;height:30px;margin:8px 20px 0}
+.mini .tr{position:absolute;left:0;right:0;top:9px;height:8px;border-radius:4px;background:#f0f0f0}
+.mini .b{position:absolute;top:9px;height:8px;border-radius:4px}
+.mini .now{position:absolute;top:2px;width:2px;height:22px;background:var(--ink)}
+.mini .ax{position:absolute;top:20px;font-size:11px;color:var(--ink3);transform:translateX(-50%)}
+.rpanel{position:absolute;top:46px;left:0;right:0;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.1);z-index:4;padding:6px 12px 0}
+.od{display:grid;grid-template-columns:28px 1fr 36px;gap:0 6px;align-items:center}
+.od .f{height:42px;border-radius:8px;background:#f5f6f8;display:flex;align-items:center;padding:0 12px;font-size:15.5px;margin:3px 0}
+.od .f small{color:var(--ink3);font-size:12px;margin-right:8px;font-weight:600}
+.modes{display:flex;gap:2px;margin-top:6px}
+.modes button{flex:1;padding:10px 0 9px;font-size:13.5px;color:var(--ink2);border-bottom:2.5px solid transparent;display:flex;flex-direction:column;align-items:center;gap:2px}
+.modes button b{font-size:14px;color:var(--ink)}
+.modes button[aria-selected=true]{border-color:var(--blue);color:var(--blue)}
+.modes button[aria-selected=true] b{color:var(--blue)}
+.cards{display:flex;gap:10px;overflow:hidden;padding:2px 16px 0}
+.card{flex:none;width:300px;border:1.5px solid var(--line);border-radius:12px;padding:14px 16px;text-align:left}
+.card.sel{border-color:var(--blue);box-shadow:0 0 0 3px var(--bluebg)}
+.card .t{font-size:28px;font-weight:800;letter-spacing:-.03em}
+.card .t small{font-size:15px;font-weight:600;margin-left:1px}
+.card .t span{font-size:14px;font-weight:500;color:var(--ink2);margin-left:8px}
+.facts{display:flex;gap:12px;margin-top:8px;font-size:13px;color:var(--ink2)}
+.facts b{color:var(--ink);font-weight:600}
+.card.blocked .t{color:#b5b5b5;text-decoration:line-through}
+.note{margin:10px 16px 0;padding:11px 12px;border-radius:10px;background:var(--stopbg);font-size:13.5px;color:#9b1c18;display:flex;gap:8px;align-items:flex-start}
+.cta{display:flex;gap:8px;padding:14px 16px 0}
+.cta button{height:50px;border-radius:10px;font-size:16px;font-weight:700}
+.cta .pri{flex:1;background:var(--blue);color:#fff}
+.cta .sec{width:110px;background:#f2f3f5}
+.acts{display:flex;justify-content:space-around;padding:14px 8px 4px}
+.acts button{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12.5px;color:#333;width:80px}
+.acts .c{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center}
+.acts .c.pri{background:var(--blue);border-color:var(--blue)}
+.big{font-size:24px;font-weight:800;letter-spacing:-.03em;margin-top:10px}
+.big small{font-size:14px;font-weight:600;color:var(--stop);margin-left:6px}
+.ev{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;font-size:13.5px;padding:0 20px;align-items:center}
+.ev .t{color:var(--ink3);font-variant-numeric:tabular-nums}
+.conf{height:6px;border-radius:3px;background:#eee;margin:10px 20px 0;position:relative}
+.conf i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--stop)}
+.lbl{font-size:13px;font-weight:700;color:#444;padding:0 20px;margin-bottom:8px}
+.side{max-width:330px}
+.side h1{font-size:24px;font-weight:800;letter-spacing:-.03em}
+.side p{font-size:15px;color:#555;margin-top:10px;line-height:1.6}
+.side ul{margin-top:18px;list-style:none;display:grid;gap:12px;font-size:14px;color:#333;line-height:1.5}
+.side li{display:grid;grid-template-columns:22px 1fr;gap:8px}
+.side svg{margin-top:2px}
+.side nav{margin-top:28px;display:flex;gap:6px}
+.side nav a{font-size:14px;padding:7px 14px;border-radius:999px;background:#fff;color:#333;text-decoration:none;border:1px solid #ddd}
+.side nav a[aria-current]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.side .fine{font-size:12px;color:#888;margin-top:20px}
+@media (max-width:480px){.stage{padding:0}.phone{border-radius:0;padding:0;width:390px;height:844px;box-shadow:none}.scr{border-radius:0}.side{padding:20px}}
+@media (prefers-reduced-motion:no-preference){.flow{animation:flow 1.4s linear infinite}@keyframes flow{to{stroke-dashoffset:-24}}}
+</style></head><body><div class="stage"><div class="phone"><div class="scr"><svg class="map" viewBox="185.0 -122.2 580.0 1255.1" preserveAspectRatio="xMidYMid meet" role="img" aria-label="광화문~시청 일대 지도 (모식도)"><defs>
+ <pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="9" height="9" fill="#7a5cf0" fill-opacity=".06"/><line x1="0" y1="0" x2="0" y2="9" stroke="#7a5cf0" stroke-opacity=".45" stroke-width="1.6"/></pattern>
+ <pattern id="course" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(-35)"><rect width="14" height="14" fill="#e5322d" fill-opacity=".10"/><line x1="0" y1="0" x2="0" y2="14" stroke="#e5322d" stroke-opacity=".25" stroke-width="5"/></pattern>
+ <filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="1" stdDeviation="1.4" flood-opacity=".28"/></filter>
+</defs><rect x="-400" y="-400" width="1800" height="1800" fill="#f2f0ec"/>
+<rect x="0" y="85" width="290" height="110" rx="2" fill="#e9e5df"/>
+<rect x="10" y="95" width="270" height="90" rx="2" fill="#e1dcd4"/>
+<rect x="310" y="85" width="135" height="110" rx="2" fill="#e9e5df"/>
+<rect x="320" y="95" width="115" height="90" rx="2" fill="#e1dcd4"/>
+<rect x="0" y="215" width="290" height="135" rx="2" fill="#e9e5df"/>
+<rect x="10" y="225" width="270" height="115" rx="2" fill="#e1dcd4"/>
+<rect x="310" y="215" width="130" height="135" rx="2" fill="#e9e5df"/>
+<rect x="320" y="225" width="110" height="115" rx="2" fill="#e1dcd4"/>
+<rect x="500" y="85" width="130" height="110" rx="2" fill="#e9e5df"/>
+<rect x="510" y="95" width="110" height="90" rx="2" fill="#e1dcd4"/>
+<rect x="650" y="85" width="350" height="110" rx="2" fill="#e9e5df"/>
+<rect x="660" y="95" width="330" height="90" rx="2" fill="#e1dcd4"/>
+<rect x="500" y="215" width="130" height="135" rx="2" fill="#e9e5df"/>
+<rect x="510" y="225" width="110" height="115" rx="2" fill="#e1dcd4"/>
+<rect x="650" y="215" width="350" height="135" rx="2" fill="#e9e5df"/>
+<rect x="660" y="225" width="330" height="115" rx="2" fill="#e1dcd4"/>
+<rect x="0" y="382" width="140" height="190" rx="2" fill="#e9e5df"/>
+<rect x="10" y="392" width="120" height="170" rx="2" fill="#e1dcd4"/>
+<rect x="160" y="382" width="130" height="80" rx="2" fill="#e9e5df"/>
+<rect x="170" y="392" width="110" height="60" rx="2" fill="#e1dcd4"/>
+<rect x="500" y="382" width="130" height="38" rx="2" fill="#e9e5df"/>
+<rect x="510" y="392" width="110" height="18" rx="2" fill="#e1dcd4"/>
+<rect x="500" y="462" width="130" height="110" rx="2" fill="#e9e5df"/>
+<rect x="510" y="472" width="110" height="90" rx="2" fill="#e1dcd4"/>
+<rect x="650" y="382" width="100" height="38" rx="2" fill="#e9e5df"/>
+<rect x="660" y="392" width="80" height="18" rx="2" fill="#e1dcd4"/>
+<rect x="770" y="382" width="230" height="38" rx="2" fill="#e9e5df"/>
+<rect x="780" y="392" width="210" height="18" rx="2" fill="#e1dcd4"/>
+<rect x="650" y="462" width="100" height="110" rx="2" fill="#e9e5df"/>
+<rect x="660" y="472" width="80" height="90" rx="2" fill="#e1dcd4"/>
+<rect x="770" y="462" width="230" height="110" rx="2" fill="#e9e5df"/>
+<rect x="780" y="472" width="210" height="90" rx="2" fill="#e1dcd4"/>
+<rect x="0" y="600" width="140" height="180" rx="2" fill="#e9e5df"/>
+<rect x="10" y="610" width="120" height="160" rx="2" fill="#e1dcd4"/>
+<rect x="500" y="600" width="130" height="180" rx="2" fill="#e9e5df"/>
+<rect x="510" y="610" width="110" height="160" rx="2" fill="#e1dcd4"/>
+<rect x="650" y="600" width="100" height="180" rx="2" fill="#e9e5df"/>
+<rect x="660" y="610" width="80" height="160" rx="2" fill="#e1dcd4"/>
+<rect x="770" y="600" width="230" height="180" rx="2" fill="#e9e5df"/>
+<rect x="780" y="610" width="210" height="160" rx="2" fill="#e1dcd4"/>
+<rect x="160" y="800" width="300" height="200" rx="2" fill="#e9e5df"/>
+<rect x="170" y="810" width="280" height="180" rx="2" fill="#e1dcd4"/>
+<rect x="500" y="800" width="250" height="200" rx="2" fill="#e9e5df"/>
+<rect x="510" y="810" width="230" height="180" rx="2" fill="#e1dcd4"/>
+<rect x="-400" y="-400" width="1800" height="455" fill="#d6ead0"/>
+<rect x="160" y="600" width="262" height="180" fill="#d6ead0"/>
+<rect x="370" y="470" width="78" height="100" rx="38" fill="#d6ead0"/>
+<rect x="310" y="470" width="50" height="70" rx="3" fill="#dcd6cd"/>
+<path d="M500,442 C600,448 700,432 800,446 S950,440 1100,444" stroke="#aad6f5" stroke-width="16" fill="none" stroke-linecap="round"/>
+<path d="M300,70 V585" stroke="#d9d4cc" stroke-width="16" fill="none"/>
+<path d="M640,70 V1000" stroke="#d9d4cc" stroke-width="16" fill="none"/>
+<path d="M-300,205 H440" stroke="#d9d4cc" stroke-width="14" fill="none"/>
+<path d="M500,205 H1300" stroke="#d9d4cc" stroke-width="14" fill="none"/>
+<path d="M760,365 V1000" stroke="#d9d4cc" stroke-width="14" fill="none"/>
+<path d="M150,365 V1000" stroke="#d9d4cc" stroke-width="14" fill="none"/>
+<path d="M480,790 H800" stroke="#d9d4cc" stroke-width="14" fill="none"/>
+<path d="M470,62 V600 L432,720 L405,1000" stroke="#e8c76a" stroke-width="49" fill="none"/>
+<path d="M-300,70 H1300" stroke="#e8c76a" stroke-width="33" fill="none"/>
+<path d="M-300,365 H470" stroke="#e8c76a" stroke-width="33" fill="none"/>
+<path d="M470,365 H1300" stroke="#e8c76a" stroke-width="33" fill="none"/>
+<path d="M470,585 H1300" stroke="#e8c76a" stroke-width="29" fill="none"/>
+<path d="M-300,585 H470" stroke="#e8c76a" stroke-width="27" fill="none"/>
+<path d="M300,70 V585" stroke="#fff" stroke-width="14" fill="none"/>
+<path d="M640,70 V1000" stroke="#fff" stroke-width="14" fill="none"/>
+<path d="M-300,205 H440" stroke="#fff" stroke-width="12" fill="none"/>
+<path d="M500,205 H1300" stroke="#fff" stroke-width="12" fill="none"/>
+<path d="M760,365 V1000" stroke="#fff" stroke-width="12" fill="none"/>
+<path d="M150,365 V1000" stroke="#fff" stroke-width="12" fill="none"/>
+<path d="M480,790 H800" stroke="#fff" stroke-width="12" fill="none"/>
+<path d="M470,62 V600 L432,720 L405,1000" stroke="#ffe9a8" stroke-width="46" fill="none"/>
+<path d="M-300,70 H1300" stroke="#ffe9a8" stroke-width="30" fill="none"/>
+<path d="M-300,365 H470" stroke="#ffe9a8" stroke-width="30" fill="none"/>
+<path d="M470,365 H1300" stroke="#ffe9a8" stroke-width="30" fill="none"/>
+<path d="M470,585 H1300" stroke="#ffe9a8" stroke-width="26" fill="none"/>
+<path d="M-300,585 H470" stroke="#ffe9a8" stroke-width="24" fill="none"/>
+<rect x="451" y="92" width="38" height="250" rx="6" fill="#e3efd9" stroke="#cfe0c4"/>
+<g fill="#7a7f86" font-size="12">
+  <text x="470" y="34" text-anchor="middle" font-size="13" font-weight="600" fill="#4f7a45">경복궁</text>
+  <text x="375" y="282" text-anchor="middle">세종문화회관</text><text x="565" y="290" text-anchor="middle">교보빌딩</text>
+  <text x="565" y="404" text-anchor="middle">청계광장</text><text x="409" y="525" text-anchor="middle" fill="#4f7a45">서울광장</text>
+  <text x="335" y="510" text-anchor="middle">서울시청</text><text x="290" y="700" text-anchor="middle" font-size="13" font-weight="600" fill="#4f7a45">덕수궁</text>
+  <text x="565" y="530" text-anchor="middle">프레스센터</text><text x="880" y="452" fill="#4f8fbf">청계천</text>
+  <g font-size="11" fill="#a08a4a" font-weight="600"><text x="200" y="369" text-anchor="middle">새문안로</text><text x="860" y="369" text-anchor="middle">종로</text>
+  <text x="860" y="589" text-anchor="middle">을지로</text><text x="200" y="589" text-anchor="middle">서소문로</text></g>
+  <text x="470" y="250" text-anchor="middle" transform="rotate(-90 470 250)" font-size="11" fill="#a08a4a" font-weight="600">세종대로</text>
+ </g><path d="M470,62 V600 L432,720 L405,1000" stroke="url(#course)" stroke-width="56" fill="none"/>
+<rect x="496" y="378" width="140" height="92" rx="10" fill="url(#hatch)" stroke="#7a5cf0" stroke-dasharray="6 4" stroke-width="1.5"/>
+<rect x="449" y="388" width="3.5" height="14" fill="#e5322d"/><rect x="455" y="388" width="3.5" height="14" fill="#e5322d"/><rect x="461" y="388" width="3.5" height="14" fill="#e5322d"/><rect x="467" y="388" width="3.5" height="14" fill="#e5322d"/><rect x="473" y="388" width="3.5" height="14" fill="#e5322d"/><rect x="479" y="388" width="3.5" height="14" fill="#e5322d"/><rect x="485" y="388" width="3.5" height="14" fill="#e5322d"/><g filter="url(#sh)"><circle cx="506" cy="395" r="10" fill="#e5322d" stroke="#fff" stroke-width="2"/><path d="M502,391 l8,8 M510,391 l-8,8" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></g>
+<rect x="449" y="463" width="3.5" height="14" fill="#e5322d"/><rect x="455" y="463" width="3.5" height="14" fill="#e5322d"/><rect x="461" y="463" width="3.5" height="14" fill="#e5322d"/><rect x="467" y="463" width="3.5" height="14" fill="#e5322d"/><rect x="473" y="463" width="3.5" height="14" fill="#e5322d"/><rect x="479" y="463" width="3.5" height="14" fill="#e5322d"/><rect x="485" y="463" width="3.5" height="14" fill="#e5322d"/><g filter="url(#sh)"><circle cx="506" cy="470" r="10" fill="#e5322d" stroke="#fff" stroke-width="2"/><path d="M502,466 l8,8 M510,466 l-8,8" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></g>
+<rect x="449" y="553" width="3.5" height="14" fill="#e5322d"/><rect x="455" y="553" width="3.5" height="14" fill="#e5322d"/><rect x="461" y="553" width="3.5" height="14" fill="#e5322d"/><rect x="467" y="553" width="3.5" height="14" fill="#e5322d"/><rect x="473" y="553" width="3.5" height="14" fill="#e5322d"/><rect x="479" y="553" width="3.5" height="14" fill="#e5322d"/><rect x="485" y="553" width="3.5" height="14" fill="#e5322d"/><g filter="url(#sh)"><circle cx="506" cy="560" r="10" fill="#e5322d" stroke="#fff" stroke-width="2"/><path d="M502,556 l8,8 M510,556 l-8,8" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></g>
+<rect x="449" y="618" width="3.5" height="14" fill="#e5322d"/><rect x="455" y="618" width="3.5" height="14" fill="#e5322d"/><rect x="461" y="618" width="3.5" height="14" fill="#e5322d"/><rect x="467" y="618" width="3.5" height="14" fill="#e5322d"/><rect x="473" y="618" width="3.5" height="14" fill="#e5322d"/><rect x="479" y="618" width="3.5" height="14" fill="#e5322d"/><rect x="485" y="618" width="3.5" height="14" fill="#e5322d"/><g filter="url(#sh)"><circle cx="506" cy="625" r="10" fill="#e5322d" stroke="#fff" stroke-width="2"/><path d="M502,621 l8,8 M510,621 l-8,8" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></g>
+<rect x="449" y="338" width="3.5" height="14" fill="#bdbdbd"/><rect x="455" y="338" width="3.5" height="14" fill="#bdbdbd"/><rect x="461" y="338" width="3.5" height="14" fill="#bdbdbd"/><rect x="467" y="338" width="3.5" height="14" fill="#bdbdbd"/><rect x="473" y="338" width="3.5" height="14" fill="#bdbdbd"/><rect x="479" y="338" width="3.5" height="14" fill="#bdbdbd"/><rect x="485" y="338" width="3.5" height="14" fill="#bdbdbd"/>
+<rect x="553" y="350" width="14" height="3.5" fill="#f5a300"/><rect x="553" y="356" width="14" height="3.5" fill="#f5a300"/><rect x="553" y="362" width="14" height="3.5" fill="#f5a300"/><rect x="553" y="368" width="14" height="3.5" fill="#f5a300"/><rect x="553" y="374" width="14" height="3.5" fill="#f5a300"/><g filter="url(#sh)"><path d="M560,323 l11,19 h-22 z" fill="#f5a300" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><rect x="559" y="329" width="2.2" height="7" fill="#fff"/><rect x="559" y="338" width="2.2" height="2.2" fill="#fff"/></g>
+<g filter="url(#sh)"><rect x="503" y="367" width="18" height="18" rx="4" fill="#2d6bff" stroke="#fff" stroke-width="1.5"/><path d="M507,373 h3 v3 h3 v3 h3" stroke="#fff" stroke-width="1.7" fill="none"/></g>
+<g filter="url(#sh)"><rect x="419" y="367" width="18" height="18" rx="4" fill="#2d6bff" stroke="#fff" stroke-width="1.5"/><path d="M423,373 h3 v3 h3 v3 h3" stroke="#fff" stroke-width="1.7" fill="none"/></g>
+<g filter="url(#sh)"><rect x="503" y="589" width="18" height="18" rx="4" fill="#2d6bff" stroke="#fff" stroke-width="1.5"/><path d="M507,595 h3 v3 h3 v3 h3" stroke="#fff" stroke-width="1.7" fill="none"/></g>
+<g filter="url(#sh)"><rect x="419" y="589" width="18" height="18" rx="4" fill="#2d6bff" stroke="#fff" stroke-width="1.5"/><path d="M423,595 h3 v3 h3 v3 h3" stroke="#fff" stroke-width="1.7" fill="none"/></g>
+<g><circle cx="410" cy="352" r="8" fill="#fff" stroke="#996cac" stroke-width="3"/><text x="398" y="356" text-anchor="end" font-size="12" font-weight="700" fill="#5d3f6b" stroke="#fff" stroke-width="3.5" paint-order="stroke">광화문역</text></g>
+<g><circle cx="410" cy="610" r="8" fill="#fff" stroke="#996cac" stroke-width="3"/><text x="398" y="614" text-anchor="end" font-size="12" font-weight="700" fill="#5d3f6b" stroke="#fff" stroke-width="3.5" paint-order="stroke">시청역</text></g><path d="M512,330 V625 H428 L428,652" stroke="#fff" stroke-width="8" fill="none" stroke-linecap="round" opacity=".9"/>
+<path d="M512,330 V625 H428 L428,652" stroke="#6b6f76" stroke-width="4.5" stroke-dasharray="1 9" stroke-linecap="round" fill="none"/>
+<path d="M512,330 V376 M428,376 V652" stroke="#fff" stroke-width="12" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M512,330 V376 M428,376 V652" stroke="#2d6bff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M512,376 H428" stroke="#16357f" stroke-width="13" fill="none" stroke-linecap="round"/>
+<path class="flow" d="M512,376 H428" stroke="#9cc0ff" stroke-width="4" stroke-dasharray="9 3" fill="none"/><g filter="url(#sh)"><path d="M512,330 l-7,-10 h-15 a5,5 0 0 1 -5,-5 v-18 a5,5 0 0 1 5,-5 h44 a5,5 0 0 1 5,5 v18 a5,5 0 0 1 -5,5 h-15 z" fill="#2d6bff"/><text x="512" y="309" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">출발</text></g><circle cx="512" cy="330" r="4" fill="#fff" stroke="#2d6bff" stroke-width="2.5"/><g filter="url(#sh)"><path d="M428,652 l-7,-10 h-15 a5,5 0 0 1 -5,-5 v-18 a5,5 0 0 1 5,-5 h44 a5,5 0 0 1 5,5 v18 a5,5 0 0 1 -5,5 h-15 z" fill="#222"/><text x="428" y="631" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">도착</text></g><circle cx="428" cy="652" r="4" fill="#fff" stroke="#222" stroke-width="2.5"/><g filter="url(#sh)"><rect x="317.6" y="487" width="122.39999999999999" height="26" rx="13" fill="#16357f"/><text x="378.8" y="504.5" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">지하보도로 건너요</text></g><g filter="url(#sh)"><rect x="522" y="535" width="99.2" height="26" rx="13" fill="#6b6f76"/><text x="571.6" y="552.5" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">원래 길 막힘</text></g></svg><div class="sbar"><span class="num">8:40</span><span style="display:flex;gap:6px;align-items:center;font-size:13px">5G<svg width="26" height="13" viewBox="0 0 26 13"><rect x=".5" y=".5" width="22" height="12" rx="3.5" stroke="#1e1e1e" fill="none" opacity=".5"/><rect x="2.5" y="2.5" width="15" height="8" rx="2" fill="#1e1e1e"/><rect x="23.5" y="4" width="2" height="5" rx="1" fill="#1e1e1e" opacity=".5"/></svg></span></div>
+<section class="rpanel">
+ <div class="od">
+  <button aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M14 4 7 11l7 7" stroke="#222" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="f"><small>출발</small>교보빌딩 앞</div><button aria-label="출발·도착 바꾸기" rowspan="2" style="grid-row:1/3;grid-column:3"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M7 4v14m0 0-3-3m3 3 3-3M15 18V4m0 0-3 3m3-3 3 3" stroke="#777" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  <span></span><div class="f"><small>도착</small>덕수궁 대한문</div>
+ </div>
+ <div class="modes" role="tablist">
+  <button role="tab" aria-selected="true"><svg width="20" height="20" viewBox="0 0 20 20"><circle cx="11" cy="3.5" r="2" fill="#2d6bff"/><path d="M9.5 7 7 11.5h3l1-2 1.5 2.5V18M9 12l-2.5 6M12 9l3 2" stroke="#2d6bff" stroke-width="1.9" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><b class="num">15분</b>가장 빠른 길</button>
+  <button role="tab" aria-selected="false"><svg width="20" height="20" viewBox="0 0 20 20"><rect x="3.5" y="2.5" width="13" height="15" rx="2" stroke="#999" stroke-width="1.7" fill="none"/><path d="M7 8l3-3 3 3M7 12l3 3 3-3" stroke="#999" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><b class="num">19분</b>계단 없는 길</button>
+  <button role="tab" aria-selected="false"><svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" stroke="#999" stroke-width="1.7" fill="none"/><path d="M10 6v4l3 2" stroke="#999" stroke-width="1.7" fill="none" stroke-linecap="round"/></svg><b class="num">09:20</b>기다렸다 출발</button>
+ </div>
+</section>
+<button class="fab" style="bottom:326px" aria-label="내 위치"><svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="6" stroke="#2d6bff" stroke-width="2" fill="none"/><circle cx="11" cy="11" r="2.4" fill="#2d6bff"/><path d="M11 1.5v3M11 17.5v3M1.5 11h3M17.5 11h3" stroke="#2d6bff" stroke-width="2" stroke-linecap="round"/></svg></button>
+<section class="sheet" style="height:312px"><div class="handle"></div>
+ <div class="cards">
+  <div class="card sel"><div><span class="badge blue">가장 빠름</span></div><div class="t num">15<small>분</small><span>1.1km · 09:01 도착</span></div>
+   <div class="facts"><span>지하보도 <b>1</b></span><span>횡단보도 <b>1</b></span><span>계단 <b>2</b></span></div></div>
+  <div class="card blocked"><div><span class="badge stop">지금 못 감</span></div><div class="t num">12<small>분</small><span>0.9km</span></div>
+   <div class="facts"><span>대한문 앞 횡단보도 통제 · 09:20 해제</span></div></div>
+ </div>
+ <div class="note"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M5 5l8 8M13 5l-8 8" stroke="#e5322d" stroke-width="2.4" stroke-linecap="round"/></svg><span>세종대로 횡단보도 4곳이 <b>09:20까지</b> 막혀 있어 광화문역 지하보도로 건너는 길을 골랐어요.</span></div>
+ <div class="cta"><button class="sec">경로 상세</button><button class="pri">안내 시작</button></div>
+</section></div></div><aside class="side"><h1>길찾기 결과</h1><p>출발·도착 패널과 하단 경로 카드는 카카오맵 길찾기와 같은 구조입니다. 카드엔 시간과 함께 지하보도·횡단보도·계단 수를 적고, 막힌 원래 길도 지우지 않고 보여 줍니다.</p><ul><li><svg width="18" height="18" viewBox="0 0 18 18"><path d="M2 9h14" stroke="#2d6bff" stroke-width="5" stroke-linecap="round"/></svg><span><b>파란 실선</b> — 지금 갈 수 있는 가장 빠른 길</span></li><li><svg width="18" height="18" viewBox="0 0 18 18"><path d="M2 9h14" stroke="#16357f" stroke-width="8"/><path d="M2 9h14" stroke="#9cc0ff" stroke-width="3" stroke-dasharray="5 2"/></svg><span><b>남색 터널</b> — 지하보도로 길을 건너는 구간</span></li><li><svg width="18" height="18" viewBox="0 0 18 18"><path d="M3 9h13" stroke="#6b6f76" stroke-width="3.5" stroke-dasharray="1 6" stroke-linecap="round"/></svg><span><b>회색 점선</b> — 원래 최단 경로. 통제 때문에 지금은 못 갑니다</span></li><li><svg width="20" height="20" viewBox="0 0 20 20"><rect x="3.5" y="2.5" width="13" height="15" rx="2" stroke="#2d6bff" stroke-width="1.7" fill="none"/><path d="M7 8l3-3 3 3M7 12l3 3 3-3" stroke="#2d6bff" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>카카오맵의 자동차·대중교통·도보 탭 자리에 <b>가장 빠른 길 / 계단 없는 길 / 기다렸다 출발</b>을 둡니다</span></li></ul><nav><a href="01_home.html">지도 홈</a><a href="02_route.html" aria-current=page>길찾기</a><a href="03_closure.html">통제 상세</a></nav><p class="fine">예시 데이터로 만든 화면입니다. 지도는 모식도라 실제 축척·출구 위치와 다릅니다.</p></aside></div></body></html>

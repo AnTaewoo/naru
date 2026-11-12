@@ -1,0 +1,77 @@
+"""BE 도메인 예외 — INTERFACE §6 오류 코드와 1:1. Model 이 던지고 error_view 가 응답으로 만든다.
+
+code ∈ {invalid_query, unauthorized, not_found, no_route, out_of_coverage, geocode_unavailable,
+too_many_reports, not_modeled, rate_limited, push_unavailable, internal}.
+Flask 를 모른다.
+"""
+
+from __future__ import annotations
+
+
+class NaruError(Exception):
+    code = "internal"
+    http_status = 500
+
+    def __init__(self, message: str, field: str | None = None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.field = field
+
+
+class InvalidQueryError(NaruError):
+    code = "invalid_query"
+    http_status = 400
+
+
+class NoRouteError(NaruError):
+    code = "no_route"
+    http_status = 422
+
+
+class GeocodeUnavailableError(NaruError):
+    """카카오 로컬을 못 불렀다 — 키 없음·오류·시간 초과·기록 없음 (INTERFACE §6·§7, ADR-011 B)."""
+
+    code = "geocode_unavailable"
+    http_status = 503
+
+
+class OutOfCoverageError(NaruError):
+    """출발·도착이 보행망에서 max_snap_m 보다 멀다 (ADR-011 그래프 밖). field = from | to."""
+
+    code = "out_of_coverage"
+    http_status = 422
+
+
+class TooManyReportsError(NaruError):
+    """같은 기기·같은 횡단보도를 report_min_interval_s 안에 다시 제보 (INTERFACE §8.2, T7.15)."""
+
+    code = "too_many_reports"
+    http_status = 429
+
+
+class NotModeledError(NaruError):
+    """행진 확률 모델 대상이 아닌 사건 — 없거나, 방향을 모르거나 갈라진 행진 (ADR-015 F, T7.16)."""
+
+    code = "not_modeled"
+    http_status = 404
+
+
+class RateLimitedError(NaruError):
+    """공개 피드 IP 당 분당 요청 상한 (INTERFACE §3.3, T7.17)."""
+
+    code = "rate_limited"
+    http_status = 429
+
+
+class NotFoundError(NaruError):
+    """없는 구독·관심 지역 (INTERFACE §9, T7.8)."""
+
+    code = "not_found"
+    http_status = 404
+
+
+class PushUnavailableError(NaruError):
+    """서버에 VAPID 키가 없다 — 알림을 켤 수 없다 (INTERFACE §9, T7.8)."""
+
+    code = "push_unavailable"
+    http_status = 503

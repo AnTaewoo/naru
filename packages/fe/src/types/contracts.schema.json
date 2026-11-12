@@ -1,0 +1,2901 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "naru_contracts",
+  "title": "NaruContracts",
+  "description": "docs/INTERFACE.md v0.5 — scripts/export_schema.py 생성물. 수정 금지",
+  "type": "object",
+  "properties": {
+    "CandidateSummary": {
+      "$ref": "#/$defs/CandidateSummary"
+    },
+    "ClosureType": {
+      "$ref": "#/$defs/ClosureType"
+    },
+    "Evidence": {
+      "$ref": "#/$defs/Evidence"
+    },
+    "EvidenceKind": {
+      "$ref": "#/$defs/EvidenceKind"
+    },
+    "Impact": {
+      "$ref": "#/$defs/Impact"
+    },
+    "LineGeom": {
+      "$ref": "#/$defs/LineGeom"
+    },
+    "NoticeRef": {
+      "$ref": "#/$defs/NoticeRef"
+    },
+    "PlacePoint": {
+      "$ref": "#/$defs/PlacePoint"
+    },
+    "PointGeom": {
+      "$ref": "#/$defs/PointGeom"
+    },
+    "RoadClass": {
+      "$ref": "#/$defs/RoadClass"
+    },
+    "SegmentGeom": {
+      "$ref": "#/$defs/SegmentGeom"
+    },
+    "Source": {
+      "$ref": "#/$defs/Source"
+    },
+    "Status": {
+      "$ref": "#/$defs/Status"
+    },
+    "SummarySegment": {
+      "$ref": "#/$defs/SummarySegment"
+    },
+    "Window": {
+      "$ref": "#/$defs/Window"
+    },
+    "ZoneGeom": {
+      "$ref": "#/$defs/ZoneGeom"
+    },
+    "ClosureCandidate": {
+      "$ref": "#/$defs/ClosureCandidate"
+    },
+    "CandidateBatch": {
+      "$ref": "#/$defs/CandidateBatch"
+    },
+    "CandidateBatchResponse": {
+      "$ref": "#/$defs/CandidateBatchResponse"
+    },
+    "ClosureState": {
+      "$ref": "#/$defs/ClosureState"
+    },
+    "RouteQuery": {
+      "$ref": "#/$defs/RouteQuery"
+    },
+    "Avoided": {
+      "$ref": "#/$defs/Avoided"
+    },
+    "Baseline": {
+      "$ref": "#/$defs/Baseline"
+    },
+    "Leg": {
+      "$ref": "#/$defs/Leg"
+    },
+    "LegKind": {
+      "$ref": "#/$defs/LegKind"
+    },
+    "LineString": {
+      "$ref": "#/$defs/LineString"
+    },
+    "RouteResponse": {
+      "$ref": "#/$defs/RouteResponse"
+    },
+    "ClosuresQuery": {
+      "$ref": "#/$defs/ClosuresQuery"
+    },
+    "Feature": {
+      "$ref": "#/$defs/Feature"
+    },
+    "FeatureProperties": {
+      "$ref": "#/$defs/FeatureProperties"
+    },
+    "PointGeometry": {
+      "$ref": "#/$defs/PointGeometry"
+    },
+    "PolygonGeometry": {
+      "$ref": "#/$defs/PolygonGeometry"
+    },
+    "FeatureCollection": {
+      "$ref": "#/$defs/FeatureCollection"
+    },
+    "ClosureEventsQuery": {
+      "$ref": "#/$defs/ClosureEventsQuery"
+    },
+    "ClosureEvent": {
+      "$ref": "#/$defs/ClosureEvent"
+    },
+    "DataAsOf": {
+      "$ref": "#/$defs/DataAsOf"
+    },
+    "MultiPolygonGeometry": {
+      "$ref": "#/$defs/MultiPolygonGeometry"
+    },
+    "ClosureEventsResponse": {
+      "$ref": "#/$defs/ClosureEventsResponse"
+    },
+    "GeocodeSearchQuery": {
+      "$ref": "#/$defs/GeocodeSearchQuery"
+    },
+    "Place": {
+      "$ref": "#/$defs/Place"
+    },
+    "GeocodeSearchResponse": {
+      "$ref": "#/$defs/GeocodeSearchResponse"
+    },
+    "GeocodeReverseQuery": {
+      "$ref": "#/$defs/GeocodeReverseQuery"
+    },
+    "GeocodeReverseResponse": {
+      "$ref": "#/$defs/GeocodeReverseResponse"
+    },
+    "NearestCrosswalkQuery": {
+      "$ref": "#/$defs/NearestCrosswalkQuery"
+    },
+    "NearestCrosswalk": {
+      "$ref": "#/$defs/NearestCrosswalk"
+    },
+    "NearestCrosswalkResponse": {
+      "$ref": "#/$defs/NearestCrosswalkResponse"
+    },
+    "ReportRequest": {
+      "$ref": "#/$defs/ReportRequest"
+    },
+    "ReportResponse": {
+      "$ref": "#/$defs/ReportResponse"
+    },
+    "RecentReportsQuery": {
+      "$ref": "#/$defs/RecentReportsQuery"
+    },
+    "ReportCounts": {
+      "$ref": "#/$defs/ReportCounts"
+    },
+    "RecentReportsResponse": {
+      "$ref": "#/$defs/RecentReportsResponse"
+    },
+    "MarchQuery": {
+      "$ref": "#/$defs/MarchQuery"
+    },
+    "MarchKeyframe": {
+      "$ref": "#/$defs/MarchKeyframe"
+    },
+    "MarchResponse": {
+      "$ref": "#/$defs/MarchResponse"
+    },
+    "FeedQuery": {
+      "$ref": "#/$defs/FeedQuery"
+    },
+    "FeedFeature": {
+      "$ref": "#/$defs/FeedFeature"
+    },
+    "FeedProperties": {
+      "$ref": "#/$defs/FeedProperties"
+    },
+    "LineStringGeometry": {
+      "$ref": "#/$defs/LineStringGeometry"
+    },
+    "FeedCollection": {
+      "$ref": "#/$defs/FeedCollection"
+    },
+    "PushKeys": {
+      "$ref": "#/$defs/PushKeys"
+    },
+    "PushSubscription": {
+      "$ref": "#/$defs/PushSubscription"
+    },
+    "SubscribeResponse": {
+      "$ref": "#/$defs/SubscribeResponse"
+    },
+    "UnsubscribeRequest": {
+      "$ref": "#/$defs/UnsubscribeRequest"
+    },
+    "VapidPublicKey": {
+      "$ref": "#/$defs/VapidPublicKey"
+    },
+    "WatchAreaRequest": {
+      "$ref": "#/$defs/WatchAreaRequest"
+    },
+    "WatchArea": {
+      "$ref": "#/$defs/WatchArea"
+    },
+    "WatchAreasResponse": {
+      "$ref": "#/$defs/WatchAreasResponse"
+    },
+    "PushDispatchRequest": {
+      "$ref": "#/$defs/PushDispatchRequest"
+    },
+    "PushDispatchResponse": {
+      "$ref": "#/$defs/PushDispatchResponse"
+    },
+    "ErrorDetail": {
+      "$ref": "#/$defs/ErrorDetail"
+    },
+    "ErrorBody": {
+      "$ref": "#/$defs/ErrorBody"
+    }
+  },
+  "$defs": {
+    "CandidateSummary": {
+      "additionalProperties": false,
+      "description": "공지 item 의 구조화 칸 (v0.12, ADR-012). 문장은 없다 — 화면 문장은 FE i18n 이 만든다.",
+      "properties": {
+        "segments": {
+          "items": {
+            "$ref": "#/$defs/SummarySegment"
+          },
+          "title": "Segments",
+          "type": "array"
+        },
+        "points": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Points",
+          "type": "array"
+        },
+        "reported_people": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reported People"
+        },
+        "roads": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Roads",
+          "type": "array"
+        }
+      },
+      "title": "CandidateSummary",
+      "type": "object"
+    },
+    "ClosureType": {
+      "enum": [
+        "marathon",
+        "march",
+        "rally",
+        "event",
+        "incident"
+      ],
+      "title": "ClosureType",
+      "type": "string"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/EvidenceKind"
+        },
+        "ref": {
+          "title": "Ref",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        }
+      },
+      "required": [
+        "kind",
+        "ref",
+        "at"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "EvidenceKind": {
+      "enum": [
+        "notice",
+        "timetable",
+        "topis_incident",
+        "bus_skip",
+        "bus_return",
+        "rtd_spike"
+      ],
+      "title": "EvidenceKind",
+      "type": "string"
+    },
+    "Impact": {
+      "description": "횡단보도 통행을 막는 재료인가 (ADR-008). 파서의 none 은 BE로 오지 않는다.",
+      "enum": [
+        "blocks",
+        "unknown"
+      ],
+      "title": "Impact",
+      "type": "string"
+    },
+    "LineGeom": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "line",
+          "default": "line",
+          "title": "Kind",
+          "type": "string"
+        },
+        "coordinates": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "minItems": 2,
+          "title": "Coordinates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "coordinates"
+      ],
+      "title": "LineGeom",
+      "type": "object"
+    },
+    "NoticeRef": {
+      "additionalProperties": false,
+      "properties": {
+        "notice_id": {
+          "title": "Notice Id",
+          "type": "string"
+        },
+        "sentence_id": {
+          "title": "Sentence Id",
+          "type": "string"
+        },
+        "source_url": {
+          "title": "Source Url",
+          "type": "string"
+        },
+        "published_at": {
+          "format": "date-time",
+          "title": "Published At",
+          "type": "string"
+        },
+        "excerpt": {
+          "title": "Excerpt",
+          "type": "string"
+        }
+      },
+      "required": [
+        "notice_id",
+        "sentence_id",
+        "source_url",
+        "published_at",
+        "excerpt"
+      ],
+      "title": "NoticeRef",
+      "type": "object"
+    },
+    "PlacePoint": {
+      "additionalProperties": false,
+      "description": "리졸버가 정규형을 좌표로 바꾼 결과. 모델(Claude)이 만든 좌표는 여기 들어올 수 없다.",
+      "properties": {
+        "canonical": {
+          "title": "Canonical",
+          "type": "string"
+        },
+        "lng": {
+          "title": "Lng",
+          "type": "number"
+        },
+        "lat": {
+          "title": "Lat",
+          "type": "number"
+        },
+        "gazetteer_source": {
+          "title": "Gazetteer Source",
+          "type": "string"
+        },
+        "gazetteer_id": {
+          "title": "Gazetteer Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "canonical",
+        "lng",
+        "lat",
+        "gazetteer_source",
+        "gazetteer_id"
+      ],
+      "title": "PlacePoint",
+      "type": "object"
+    },
+    "PointGeom": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "point",
+          "default": "point",
+          "title": "Kind",
+          "type": "string"
+        },
+        "coordinates": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Coordinates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "coordinates"
+      ],
+      "title": "PointGeom",
+      "type": "object"
+    },
+    "RoadClass": {
+      "description": "도로명 접미사. BE가 버퍼 폭을 고른다 (대로 25m / 로 15m / 길 8m — naru_be/config.py).",
+      "enum": [
+        "대로",
+        "로",
+        "길"
+      ],
+      "title": "RoadClass",
+      "type": "string"
+    },
+    "SegmentGeom": {
+      "additionalProperties": false,
+      "description": "구간. 선은 BE CrosswalkIndex.from_segment가 도로 그래프 최단경로로 만든다.",
+      "properties": {
+        "kind": {
+          "const": "segment",
+          "default": "segment",
+          "title": "Kind",
+          "type": "string"
+        },
+        "from_": {
+          "$ref": "#/$defs/PlacePoint"
+        },
+        "to": {
+          "$ref": "#/$defs/PlacePoint"
+        },
+        "via": {
+          "items": {
+            "$ref": "#/$defs/PlacePoint"
+          },
+          "title": "Via",
+          "type": "array"
+        },
+        "road": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Road"
+        },
+        "road_class": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoadClass"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "from_",
+        "to"
+      ],
+      "title": "SegmentGeom",
+      "type": "object"
+    },
+    "Source": {
+      "enum": [
+        "course",
+        "smpa",
+        "topis",
+        "news",
+        "seoul_press",
+        "incident",
+        "bus",
+        "rtd"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "Status": {
+      "enum": [
+        "scheduled",
+        "confirmed",
+        "released",
+        "zone_scheduled"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "SummarySegment": {
+      "additionalProperties": false,
+      "description": "공지 구간 이름 (v0.12, ADR-012) — 파서 spans 정규 이름 그대로, 좌표가 안 풀려도 남는다.",
+      "properties": {
+        "from_": {
+          "title": "From",
+          "type": "string"
+        },
+        "to": {
+          "title": "To",
+          "type": "string"
+        },
+        "via": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Via",
+          "type": "array"
+        }
+      },
+      "required": [
+        "from_",
+        "to"
+      ],
+      "title": "SummarySegment",
+      "type": "object"
+    },
+    "Window": {
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        }
+      },
+      "title": "Window",
+      "type": "object"
+    },
+    "ZoneGeom": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "zone",
+          "default": "zone",
+          "title": "Kind",
+          "type": "string"
+        },
+        "zone_name": {
+          "title": "Zone Name",
+          "type": "string"
+        },
+        "polygon": {
+          "items": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "title": "Polygon",
+          "type": "array"
+        }
+      },
+      "required": [
+        "zone_name",
+        "polygon"
+      ],
+      "title": "ZoneGeom",
+      "type": "object"
+    },
+    "ClosureCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "type": {
+          "$ref": "#/$defs/ClosureType"
+        },
+        "status_hint": {
+          "$ref": "#/$defs/Status"
+        },
+        "impact": {
+          "$ref": "#/$defs/Impact"
+        },
+        "geometry": {
+          "discriminator": {
+            "mapping": {
+              "line": "#/$defs/LineGeom",
+              "point": "#/$defs/PointGeom",
+              "segment": "#/$defs/SegmentGeom",
+              "zone": "#/$defs/ZoneGeom"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PointGeom"
+            },
+            {
+              "$ref": "#/$defs/LineGeom"
+            },
+            {
+              "$ref": "#/$defs/SegmentGeom"
+            },
+            {
+              "$ref": "#/$defs/ZoneGeom"
+            }
+          ],
+          "title": "Geometry"
+        },
+        "window": {
+          "$ref": "#/$defs/Window"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "notice_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NoticeRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "toward": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Toward"
+        },
+        "approx": {
+          "default": false,
+          "title": "Approx",
+          "type": "boolean"
+        },
+        "review_required": {
+          "default": false,
+          "title": "Review Required",
+          "type": "boolean"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CandidateSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "candidate_id",
+        "source",
+        "type",
+        "status_hint",
+        "impact",
+        "geometry",
+        "window",
+        "confidence",
+        "evidence"
+      ],
+      "title": "ClosureCandidate",
+      "type": "object"
+    },
+    "CandidateBatch": {
+      "additionalProperties": false,
+      "properties": {
+        "batch_id": {
+          "title": "Batch Id",
+          "type": "string"
+        },
+        "produced_at": {
+          "format": "date-time",
+          "title": "Produced At",
+          "type": "string"
+        },
+        "producer": {
+          "title": "Producer",
+          "type": "string"
+        },
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/ClosureCandidate"
+          },
+          "title": "Candidates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "batch_id",
+        "produced_at",
+        "producer",
+        "candidates"
+      ],
+      "title": "CandidateBatch",
+      "type": "object"
+    },
+    "CandidateBatchResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "batch_id": {
+          "title": "Batch Id",
+          "type": "string"
+        },
+        "accepted": {
+          "title": "Accepted",
+          "type": "integer"
+        },
+        "review_required": {
+          "title": "Review Required",
+          "type": "integer"
+        },
+        "crosswalks_updated": {
+          "title": "Crosswalks Updated",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "batch_id",
+        "accepted",
+        "review_required",
+        "crosswalks_updated"
+      ],
+      "title": "CandidateBatchResponse",
+      "type": "object"
+    },
+    "ClosureState": {
+      "additionalProperties": false,
+      "description": "횡단보도 하나의 현재 상태. BE Repository 결과이자 /closures Feature properties.",
+      "properties": {
+        "crosswalk_id": {
+          "title": "Crosswalk Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "window": {
+          "$ref": "#/$defs/Window"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "lng": {
+          "title": "Lng",
+          "type": "number"
+        },
+        "lat": {
+          "title": "Lat",
+          "type": "number"
+        },
+        "impact": {
+          "$ref": "#/$defs/Impact",
+          "default": "blocks"
+        },
+        "approx": {
+          "default": false,
+          "title": "Approx",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "crosswalk_id",
+        "status",
+        "confidence",
+        "window",
+        "reason",
+        "evidence",
+        "lng",
+        "lat"
+      ],
+      "title": "ClosureState",
+      "type": "object"
+    },
+    "RouteQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "to": {
+          "title": "To",
+          "type": "string"
+        },
+        "depart_at": {
+          "format": "date-time",
+          "title": "Depart At",
+          "type": "string"
+        },
+        "mode": {
+          "default": "walk",
+          "title": "Mode",
+          "type": "string"
+        },
+        "avoid": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Avoid",
+          "type": "array"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "depart_at"
+      ],
+      "title": "RouteQuery",
+      "type": "object"
+    },
+    "Avoided": {
+      "additionalProperties": false,
+      "properties": {
+        "crosswalk_id": {
+          "title": "Crosswalk Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "until": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Until"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "approx": {
+          "default": false,
+          "title": "Approx",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "crosswalk_id",
+        "status",
+        "reason",
+        "evidence"
+      ],
+      "title": "Avoided",
+      "type": "object"
+    },
+    "Baseline": {
+      "additionalProperties": false,
+      "properties": {
+        "route": {
+          "$ref": "#/$defs/LineString"
+        },
+        "duration_s": {
+          "title": "Duration S",
+          "type": "number"
+        },
+        "distance_m": {
+          "title": "Distance M",
+          "type": "number"
+        }
+      },
+      "required": [
+        "route",
+        "duration_s",
+        "distance_m"
+      ],
+      "title": "Baseline",
+      "type": "object"
+    },
+    "Leg": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/LegKind"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "distance_m": {
+          "title": "Distance M",
+          "type": "number"
+        },
+        "coord_range": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Coord Range",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "distance_m",
+        "coord_range"
+      ],
+      "title": "Leg",
+      "type": "object"
+    },
+    "LegKind": {
+      "enum": [
+        "sidewalk",
+        "crosswalk",
+        "underpass",
+        "overpass",
+        "stairs",
+        "elevator",
+        "station"
+      ],
+      "title": "LegKind",
+      "type": "string"
+    },
+    "LineString": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "LineString",
+          "title": "Type",
+          "type": "string"
+        },
+        "coordinates": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Coordinates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "coordinates"
+      ],
+      "title": "LineString",
+      "type": "object"
+    },
+    "RouteResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "route": {
+          "$ref": "#/$defs/LineString"
+        },
+        "duration_s": {
+          "title": "Duration S",
+          "type": "number"
+        },
+        "distance_m": {
+          "title": "Distance M",
+          "type": "number"
+        },
+        "legs": {
+          "items": {
+            "$ref": "#/$defs/Leg"
+          },
+          "title": "Legs",
+          "type": "array"
+        },
+        "avoided": {
+          "items": {
+            "$ref": "#/$defs/Avoided"
+          },
+          "title": "Avoided",
+          "type": "array"
+        },
+        "baseline": {
+          "$ref": "#/$defs/Baseline"
+        },
+        "computed_at": {
+          "format": "date-time",
+          "title": "Computed At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "route",
+        "duration_s",
+        "distance_m",
+        "legs",
+        "avoided",
+        "baseline",
+        "computed_at"
+      ],
+      "title": "RouteResponse",
+      "type": "object"
+    },
+    "ClosuresQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "title": "Bbox",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bbox",
+        "at"
+      ],
+      "title": "ClosuresQuery",
+      "type": "object"
+    },
+    "Feature": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "Feature",
+          "default": "Feature",
+          "title": "Type",
+          "type": "string"
+        },
+        "geometry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PointGeometry"
+            },
+            {
+              "$ref": "#/$defs/PolygonGeometry"
+            }
+          ],
+          "title": "Geometry"
+        },
+        "properties": {
+          "$ref": "#/$defs/FeatureProperties"
+        }
+      },
+      "required": [
+        "geometry",
+        "properties"
+      ],
+      "title": "Feature",
+      "type": "object"
+    },
+    "FeatureProperties": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/Status"
+        },
+        "confidence": {
+          "title": "Confidence",
+          "type": "number"
+        },
+        "window": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Window",
+          "type": "object"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "crosswalk_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Crosswalk Id"
+        },
+        "zone_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Name"
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence"
+        },
+        "impact": {
+          "$ref": "#/$defs/Impact",
+          "default": "blocks"
+        },
+        "approx": {
+          "default": false,
+          "title": "Approx",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "status",
+        "confidence",
+        "window",
+        "reason"
+      ],
+      "title": "FeatureProperties",
+      "type": "object"
+    },
+    "PointGeometry": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "Point",
+          "default": "Point",
+          "title": "Type",
+          "type": "string"
+        },
+        "coordinates": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Coordinates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "coordinates"
+      ],
+      "title": "PointGeometry",
+      "type": "object"
+    },
+    "PolygonGeometry": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "Polygon",
+          "default": "Polygon",
+          "title": "Type",
+          "type": "string"
+        },
+        "coordinates": {
+          "items": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "title": "Coordinates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "coordinates"
+      ],
+      "title": "PolygonGeometry",
+      "type": "object"
+    },
+    "FeatureCollection": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "FeatureCollection",
+          "default": "FeatureCollection",
+          "title": "Type",
+          "type": "string"
+        },
+        "features": {
+          "items": {
+            "$ref": "#/$defs/Feature"
+          },
+          "title": "Features",
+          "type": "array"
+        }
+      },
+      "required": [
+        "features"
+      ],
+      "title": "FeatureCollection",
+      "type": "object"
+    },
+    "ClosureEventsQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At"
+        },
+        "from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "From"
+        },
+        "to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "To"
+        }
+      },
+      "title": "ClosureEventsQuery",
+      "type": "object"
+    },
+    "ClosureEvent": {
+      "additionalProperties": false,
+      "description": "같은 (reason, window) 의 횡단보도 상태 묶음 (§3.1). status 는 응답 at 기준 (v0.14).",
+      "properties": {
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "window": {
+          "$ref": "#/$defs/Window"
+        },
+        "crosswalks": {
+          "minimum": 1,
+          "title": "Crosswalks",
+          "type": "integer"
+        },
+        "bbox": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Bbox",
+          "type": "array"
+        },
+        "approx": {
+          "default": false,
+          "title": "Approx",
+          "type": "boolean"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClosureType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Source"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CandidateSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "notice": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NoticeRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "districts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Districts",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^[0-9a-f]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "area": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PolygonGeometry"
+            },
+            {
+              "$ref": "#/$defs/MultiPolygonGeometry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Area"
+        },
+        "centroid": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Centroid"
+        }
+      },
+      "required": [
+        "reason",
+        "window",
+        "crosswalks",
+        "bbox",
+        "id",
+        "status",
+        "confidence"
+      ],
+      "title": "ClosureEvent",
+      "type": "object"
+    },
+    "DataAsOf": {
+      "additionalProperties": false,
+      "description": "출처별로 저장된 통제의 가장 늦은 근거 시각 (v0.12, ADR-011 C·ADR-012). 없으면 null.",
+      "properties": {
+        "topis_incident": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Topis Incident"
+        },
+        "topis_notice": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Topis Notice"
+        },
+        "smpa": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Smpa"
+        },
+        "course": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Course"
+        }
+      },
+      "required": [
+        "topis_incident",
+        "topis_notice",
+        "smpa",
+        "course"
+      ],
+      "title": "DataAsOf",
+      "type": "object"
+    },
+    "MultiPolygonGeometry": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "MultiPolygon",
+          "default": "MultiPolygon",
+          "title": "Type",
+          "type": "string"
+        },
+        "coordinates": {
+          "items": {
+            "items": {
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "title": "Coordinates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "coordinates"
+      ],
+      "title": "MultiPolygonGeometry",
+      "type": "object"
+    },
+    "ClosureEventsResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "events": {
+          "items": {
+            "$ref": "#/$defs/ClosureEvent"
+          },
+          "title": "Events",
+          "type": "array"
+        },
+        "coverage": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Coverage",
+          "type": "array"
+        },
+        "data_as_of": {
+          "$ref": "#/$defs/DataAsOf"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "events",
+        "coverage",
+        "data_as_of",
+        "at"
+      ],
+      "title": "ClosureEventsResponse",
+      "type": "object"
+    },
+    "GeocodeSearchQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "q": {
+          "maxLength": 50,
+          "minLength": 2,
+          "title": "Q",
+          "type": "string"
+        },
+        "near": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Near"
+        }
+      },
+      "required": [
+        "q"
+      ],
+      "title": "GeocodeSearchQuery",
+      "type": "object"
+    },
+    "Place": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "address": {
+          "title": "Address",
+          "type": "string"
+        },
+        "coord": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Coord",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "address",
+        "coord"
+      ],
+      "title": "Place",
+      "type": "object"
+    },
+    "GeocodeSearchResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "places": {
+          "items": {
+            "$ref": "#/$defs/Place"
+          },
+          "maxItems": 10,
+          "title": "Places",
+          "type": "array"
+        }
+      },
+      "required": [
+        "places"
+      ],
+      "title": "GeocodeSearchResponse",
+      "type": "object"
+    },
+    "GeocodeReverseQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "lat": {
+          "maximum": 90,
+          "minimum": -90,
+          "title": "Lat",
+          "type": "number"
+        },
+        "lng": {
+          "maximum": 180,
+          "minimum": -180,
+          "title": "Lng",
+          "type": "number"
+        }
+      },
+      "required": [
+        "lat",
+        "lng"
+      ],
+      "title": "GeocodeReverseQuery",
+      "type": "object"
+    },
+    "GeocodeReverseResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Label"
+        },
+        "road_address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Road Address"
+        },
+        "address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Address"
+        }
+      },
+      "required": [
+        "label",
+        "road_address",
+        "address"
+      ],
+      "title": "GeocodeReverseResponse",
+      "type": "object"
+    },
+    "NearestCrosswalkQuery": {
+      "additionalProperties": false,
+      "description": "§8.1 요청 본문 — 저장·로그하지 않는다.",
+      "properties": {
+        "lat": {
+          "maximum": 90,
+          "minimum": -90,
+          "title": "Lat",
+          "type": "number"
+        },
+        "lng": {
+          "maximum": 180,
+          "minimum": -180,
+          "title": "Lng",
+          "type": "number"
+        }
+      },
+      "required": [
+        "lat",
+        "lng"
+      ],
+      "title": "NearestCrosswalkQuery",
+      "type": "object"
+    },
+    "NearestCrosswalk": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "district": {
+          "title": "District",
+          "type": "string"
+        },
+        "coord": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Coord",
+          "type": "array"
+        },
+        "distance_m": {
+          "minimum": 0,
+          "title": "Distance M",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "district",
+        "coord",
+        "distance_m"
+      ],
+      "title": "NearestCrosswalk",
+      "type": "object"
+    },
+    "NearestCrosswalkResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "crosswalk": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NearestCrosswalk"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "crosswalk"
+      ],
+      "title": "NearestCrosswalkResponse",
+      "type": "object"
+    },
+    "ReportRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "crosswalk_id": {
+          "title": "Crosswalk Id",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "blocked",
+            "open"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "accuracy_m": {
+          "maximum": 1000,
+          "minimum": 0,
+          "title": "Accuracy M",
+          "type": "integer"
+        },
+        "source": {
+          "enum": [
+            "user",
+            "field"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "device": {
+          "title": "Device",
+          "type": "string"
+        }
+      },
+      "required": [
+        "crosswalk_id",
+        "state",
+        "accuracy_m",
+        "source",
+        "device"
+      ],
+      "title": "ReportRequest",
+      "type": "object"
+    },
+    "ReportResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "crosswalk_id": {
+          "title": "Crosswalk Id",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "blocked",
+            "open"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "reported_at": {
+          "format": "date-time",
+          "title": "Reported At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "crosswalk_id",
+        "state",
+        "reported_at"
+      ],
+      "title": "ReportResponse",
+      "type": "object"
+    },
+    "RecentReportsQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Ids",
+          "type": "array"
+        },
+        "minutes": {
+          "default": 60,
+          "maximum": 1440,
+          "minimum": 1,
+          "title": "Minutes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ids"
+      ],
+      "title": "RecentReportsQuery",
+      "type": "object"
+    },
+    "ReportCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "blocked": {
+          "minimum": 0,
+          "title": "Blocked",
+          "type": "integer"
+        },
+        "open": {
+          "minimum": 0,
+          "title": "Open",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "blocked",
+        "open"
+      ],
+      "title": "ReportCounts",
+      "type": "object"
+    },
+    "RecentReportsResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "counts": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ReportCounts"
+          },
+          "title": "Counts",
+          "type": "object"
+        }
+      },
+      "required": [
+        "counts"
+      ],
+      "title": "RecentReportsResponse",
+      "type": "object"
+    },
+    "MarchQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "pattern": "^[0-9a-f]{12}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "From"
+        },
+        "to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "To"
+        }
+      },
+      "required": [
+        "event_id"
+      ],
+      "title": "MarchQuery",
+      "type": "object"
+    },
+    "MarchKeyframe": {
+      "additionalProperties": false,
+      "properties": {
+        "t": {
+          "format": "date-time",
+          "title": "T",
+          "type": "string"
+        },
+        "samples": {
+          "items": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "title": "Samples",
+          "type": "array"
+        },
+        "center": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Center",
+          "type": "array"
+        },
+        "radius_m": {
+          "minimum": 0,
+          "title": "Radius M",
+          "type": "number"
+        },
+        "crosswalks": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Crosswalks",
+          "type": "object"
+        }
+      },
+      "required": [
+        "t",
+        "samples",
+        "center",
+        "radius_m",
+        "crosswalks"
+      ],
+      "title": "MarchKeyframe",
+      "type": "object"
+    },
+    "MarchResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "pattern": "^[0-9a-f]{12}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "window": {
+          "$ref": "#/$defs/Window"
+        },
+        "step_s": {
+          "minimum": 1,
+          "title": "Step S",
+          "type": "integer"
+        },
+        "crosswalk_points": {
+          "additionalProperties": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Crosswalk Points",
+          "type": "object"
+        },
+        "keyframes": {
+          "items": {
+            "$ref": "#/$defs/MarchKeyframe"
+          },
+          "title": "Keyframes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "event_id",
+        "window",
+        "step_s",
+        "crosswalk_points",
+        "keyframes"
+      ],
+      "title": "MarchResponse",
+      "type": "object"
+    },
+    "FeedQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At"
+        }
+      },
+      "title": "FeedQuery",
+      "type": "object"
+    },
+    "FeedFeature": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "Feature",
+          "default": "Feature",
+          "title": "Type",
+          "type": "string"
+        },
+        "geometry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PointGeometry"
+            },
+            {
+              "$ref": "#/$defs/LineStringGeometry"
+            },
+            {
+              "$ref": "#/$defs/PolygonGeometry"
+            },
+            {
+              "$ref": "#/$defs/MultiPolygonGeometry"
+            }
+          ],
+          "title": "Geometry"
+        },
+        "properties": {
+          "$ref": "#/$defs/FeedProperties"
+        }
+      },
+      "required": [
+        "geometry",
+        "properties"
+      ],
+      "title": "FeedFeature",
+      "type": "object"
+    },
+    "FeedProperties": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "crosswalk",
+            "area",
+            "march_path"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "event_id": {
+          "pattern": "^[0-9a-f]{12}$",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "event": {
+          "title": "Event",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClosureType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Source"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "start": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Start"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "End"
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "approx": {
+          "default": false,
+          "title": "Approx",
+          "type": "boolean"
+        },
+        "crosswalk_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Crosswalk Id"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "p": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "P"
+        }
+      },
+      "required": [
+        "kind",
+        "event_id",
+        "event",
+        "type",
+        "source",
+        "start",
+        "end",
+        "status",
+        "confidence"
+      ],
+      "title": "FeedProperties",
+      "type": "object"
+    },
+    "LineStringGeometry": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "LineString",
+          "default": "LineString",
+          "title": "Type",
+          "type": "string"
+        },
+        "coordinates": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "minItems": 2,
+          "title": "Coordinates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "coordinates"
+      ],
+      "title": "LineStringGeometry",
+      "type": "object"
+    },
+    "FeedCollection": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "FeatureCollection",
+          "default": "FeatureCollection",
+          "title": "Type",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "generated_at": {
+          "format": "date-time",
+          "title": "Generated At",
+          "type": "string"
+        },
+        "attribution": {
+          "title": "Attribution",
+          "type": "string"
+        },
+        "features": {
+          "items": {
+            "$ref": "#/$defs/FeedFeature"
+          },
+          "title": "Features",
+          "type": "array"
+        }
+      },
+      "required": [
+        "at",
+        "generated_at",
+        "attribution",
+        "features"
+      ],
+      "title": "FeedCollection",
+      "type": "object"
+    },
+    "PushKeys": {
+      "additionalProperties": false,
+      "properties": {
+        "p256dh": {
+          "maxLength": 88,
+          "minLength": 87,
+          "title": "P256Dh",
+          "type": "string"
+        },
+        "auth": {
+          "maxLength": 24,
+          "minLength": 22,
+          "title": "Auth",
+          "type": "string"
+        }
+      },
+      "required": [
+        "p256dh",
+        "auth"
+      ],
+      "title": "PushKeys",
+      "type": "object"
+    },
+    "PushSubscription": {
+      "additionalProperties": false,
+      "description": "브라우저 PushSubscription.toJSON() 그대로.",
+      "properties": {
+        "endpoint": {
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "keys": {
+          "$ref": "#/$defs/PushKeys"
+        },
+        "expirationTime": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expirationtime"
+        }
+      },
+      "required": [
+        "endpoint",
+        "keys"
+      ],
+      "title": "PushSubscription",
+      "type": "object"
+    },
+    "SubscribeResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "active": {
+          "title": "Active",
+          "type": "boolean"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "active",
+        "created_at"
+      ],
+      "title": "SubscribeResponse",
+      "type": "object"
+    },
+    "UnsubscribeRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "title": "Endpoint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "endpoint"
+      ],
+      "title": "UnsubscribeRequest",
+      "type": "object"
+    },
+    "VapidPublicKey": {
+      "additionalProperties": false,
+      "properties": {
+        "public_key": {
+          "maxLength": 88,
+          "minLength": 87,
+          "title": "Public Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "public_key"
+      ],
+      "title": "VapidPublicKey",
+      "type": "object"
+    },
+    "WatchAreaRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "saved",
+            "last_seen"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "lng": {
+          "maximum": 180,
+          "minimum": -180,
+          "title": "Lng",
+          "type": "number"
+        },
+        "lat": {
+          "maximum": 90,
+          "minimum": -90,
+          "title": "Lat",
+          "type": "number"
+        },
+        "radius_m": {
+          "default": 500,
+          "title": "Radius M",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "endpoint",
+        "kind",
+        "lng",
+        "lat"
+      ],
+      "title": "WatchAreaRequest",
+      "type": "object"
+    },
+    "WatchArea": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "kind": {
+          "enum": [
+            "saved",
+            "last_seen"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "lng": {
+          "title": "Lng",
+          "type": "number"
+        },
+        "lat": {
+          "title": "Lat",
+          "type": "number"
+        },
+        "radius_m": {
+          "title": "Radius M",
+          "type": "integer"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Expires At"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "lng",
+        "lat",
+        "radius_m",
+        "created_at",
+        "expires_at"
+      ],
+      "title": "WatchArea",
+      "type": "object"
+    },
+    "WatchAreasResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "areas": {
+          "items": {
+            "$ref": "#/$defs/WatchArea"
+          },
+          "title": "Areas",
+          "type": "array"
+        }
+      },
+      "required": [
+        "areas"
+      ],
+      "title": "WatchAreasResponse",
+      "type": "object"
+    },
+    "PushDispatchRequest": {
+      "additionalProperties": false,
+      "description": "§9.4 — 워커가 60초마다. at 은 테스트·재현용 기준 시각(없으면 서버 지금).",
+      "properties": {
+        "at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At"
+        }
+      },
+      "title": "PushDispatchRequest",
+      "type": "object"
+    },
+    "PushDispatchResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "matched": {
+          "title": "Matched",
+          "type": "integer"
+        },
+        "sent": {
+          "title": "Sent",
+          "type": "integer"
+        },
+        "failed": {
+          "title": "Failed",
+          "type": "integer"
+        },
+        "deactivated": {
+          "title": "Deactivated",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "at",
+        "matched",
+        "sent",
+        "failed",
+        "deactivated"
+      ],
+      "title": "PushDispatchResponse",
+      "type": "object"
+    },
+    "ErrorDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "invalid_query",
+            "unauthorized",
+            "not_found",
+            "no_route",
+            "out_of_coverage",
+            "geocode_unavailable",
+            "too_many_reports",
+            "not_modeled",
+            "rate_limited",
+            "push_unavailable",
+            "internal"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ErrorDetail",
+      "type": "object"
+    },
+    "ErrorBody": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "$ref": "#/$defs/ErrorDetail"
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "title": "ErrorBody",
+      "type": "object"
+    }
+  }
+}

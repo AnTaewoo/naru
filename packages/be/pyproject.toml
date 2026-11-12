@@ -1,0 +1,32 @@
+[project]
+name = "naru-be"
+version = "0.5.0"
+description = "Naru BE — Flask MVC, 통제 상태기계·시간 의존 보행 경로"
+requires-python = ">=3.12"
+dependencies = [
+  "naru-contracts",
+  "flask>=3.0",
+  "gunicorn>=22",
+  "pydantic>=2.9",
+  "pydantic-settings>=2.5",
+  "sqlalchemy>=2.0",
+  "pymysql>=1.1",
+  "alembic>=1.13",
+  "networkx>=3.3",
+  "shapely>=2.0",
+  "pyproj>=3.6",
+  "geopandas>=1.0",
+  "openpyxl>=3.1",
+  "httpx>=0.27", # 카카오 로컬 API (ADR-011 B, T5.8)
+  "pywebpush>=2.5.0",
+]
+
+[tool.uv.sources]
+naru-contracts = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["naru_be"]

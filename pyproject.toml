@@ -1,0 +1,49 @@
+[project]
+name = "naru"
+version = "0.5.0"
+description = "Naru — 통제를 반영하는 보행 우회 내비 (uv 워크스페이스 루트)"
+requires-python = ">=3.12"
+dependencies = ["naru-contracts", "naru-ai", "naru-be"]
+
+[tool.uv.workspace]
+members = ["packages/contracts", "packages/ai", "packages/be"]
+
+[tool.uv.sources]
+naru-contracts = { workspace = true }
+naru-ai = { workspace = true }
+naru-be = { workspace = true }
+
+[dependency-groups]
+dev = [
+  "ruff>=0.6",
+  "mypy>=1.11",
+  "pytest>=8",
+  "import-linter>=2.1",
+  "types-PyMySQL",
+  "folium>=0.17",
+  "types-networkx>=3.6.1.20261031",
+  "types-shapely>=2.1.0.20261030",
+  "types-openpyxl>=3.1.5.20261017",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["packages/contracts", "packages/ai", "packages/be", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "N", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "packages/contracts:packages/ai:packages/be"
+
+[[tool.mypy.overrides]]
+module = ["py_vapid", "py_vapid.*", "pywebpush", "pywebpush.*", "geopandas", "geopandas.*"]
+ignore_missing_imports = true  # 스텁이 없는 서드파티 (ADR-014 D 알림, T7.19 장소 영역 shp)
+
+[tool.pytest.ini_options]
+testpaths = ["packages/contracts/tests", "packages/ai/tests", "packages/be/tests"]
+addopts = "-q"
