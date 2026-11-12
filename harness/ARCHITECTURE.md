@@ -74,7 +74,7 @@
 | `CrosswalkIndex` | `from_point(pt, radius_m=30)` · `from_line(line, buffer_m)` · `from_segment(seg)` → `set[str]` | geometry → crosswalk_ids. STRtree, EPSG:5179. **`from_segment`**: `RoadGraph.shortest_path(from, via, to, road)` → LineString → 버퍼(`road_class`: 대로 25 / 로 15 / 길 8 m) → `from_line` |
 | `RoadGraph` | `shortest_path(points, road=None) -> LineString` | 표준노드링크(또는 도보망) NetworkX. road가 있으면 그 도로명 링크만 |
 | `ClosureEngine` | `apply(candidate, crosswalk_ids) -> list[ClosureState]` · `transition(prev, evidence)` | 상태기계 |
-| `march` (`MarchProfile`·`march_profile`·`p_at`·`keyframes`) | `march_profile(candidates, parts, index, settings) -> MarchProfile \| None` · `p_at(profile, start, end, crosswalk_id, t, settings) -> float \| None` · `keyframes(…)` | 행진 확률 모델 (ADR-015, T7.16). 대상 = 행진·창·이어진 경로 하나. 접수 때 경로 선·길이·행렬·횡단보도별 s 를 사건 행 JSON `closure_events.march` 에. P(t, s) 하나를 라우터(비용 = P × 예정 비용, P ≥ 0.8 제외)·키프레임 API·현장 도구(`prediction.blocked_at`)가 같이 쓴다 |
+| `march` (`MarchProfile`·`march_profile`·`p_at`·`keyframes`) | `march_profile(candidates, parts, index, settings) -> MarchProfile \| None` · `p_at(profile, start, end, crosswalk_id, t, settings) -> float \| None` · `keyframes(…)` | 행진 확률 모델 (ADR-015, T7.16). 대상 = 행진·창·이어진 경로 하나. 접수 때 경로 선·길이·행렬·횡단보도별 s 를 사건 행 JSON `closure_events.march` 에. P(t, s) 는 키프레임 API·피드 `p`·지도 군집 표시용만 — 라우터·현장 도구는 행진도 사건 전 구역(태우 11/12, ADR-015 E 개정) |
 | `PushDesk` | `public_key() -> str` · `subscribe(sub, now)` · `areas(endpoint, now)` · `add_area(req, now)` · `remove_area(endpoint, id)` | 알림 구독·관심 지역 (T7.8). VAPID 공개키는 .env 개인키에서(없으면 503). last_seen 은 150 m 격자·3시간, saved 는 구독당 10. 표 `push_subscriptions`·`watch_areas`·`push_sends`(0008). 매칭·발송은 T7.9 |
 | `FeedDesk` | `collection_at(at) -> FeedResult` · `limiter: RateLimiter` | 공개 피드 Model (T7.17) — events(창 = 그 시각)·states_of_events·restate·marches_of·p_at 를 모아 (사건, 횡단보도) 하나씩, 분 단위 캐시(워커마다). Flask 모름 |
 | `CandidateIntake` | `accept(batch) -> IntakeResult` | 후보 → CrosswalkIndex → ClosureEngine → Repository. 돌발 ↔ 공지가 같은 횡단보도·겹치는 시각이면 공지 후보 전체에 topis_incident 근거(어느 쪽이 먼저 와도). 같은 배치 재수신은 받은 시각만 새로(= data_as_of 돌발) (T6.1) |
@@ -83,7 +83,7 @@
 | `ClosureStateEntity` | SQLAlchemy ORM, 테이블 `closure_states` | crosswalk_id, status, confidence, window_start/end(UTC), evidence(JSON), lng/lat |
 | `ClosureRepository` | `upsert(state)` · `active_at(t, bbox)` · `active_horizon(t, bbox)`(t~t+60분 안 시작 포함, `/route`·`/closures` 공통) `-> list[ClosureState]` | DB 접근은 여기만 |
 | `PedGraph` | `edge.kind ∈ {sidewalk, crosswalk, underpass, overpass, stairs, elevator, station}` | NetworkX 인메모리. 서울 25개 구(T6.9, 2026-11-09 측정): 노드 217,782 · 엣지 282,006 · 횡단보도 21,775(도로 그래프 46,273 · 63,341), 적재 약 13초, gunicorn 워커당 RSS 약 1.5 GB(워커 2개 ≈ 3 GB) |
-| `TimeDependentRouter` | `route(src, dst, t, closures, avoid, marches) -> Path` | A*. cost = dist + vertical + degraded. closed(t) → 제외. 행진 프로필이 있는 사건은 P(t, s) (ADR-015 E) |
+| `TimeDependentRouter` | `route(src, dst, t, closures, avoid) -> Path` | A*. cost = dist + vertical + degraded. closed(t) → 제외, 창 안 예정 +300초. 행진도 같은 규칙(전 구역, ADR-015 E 개정 11/12) |
 | `BaselineRouter` | `route(src, dst) -> Path` | 같은 PedGraph, closures 미적용 |
 | `RoutePlanner` | `plan(query: RouteQuery) -> RouteResult` | 활성 폐쇄 조회 → 두 라우터 → 도메인 결과 |
 
@@ -110,7 +110,7 @@
 | `map/layers/{closure,route,zone,event}Layer.ts` | 순수 함수 | contracts → MapLibre source. event = 지금 지도 사건 중심점(클러스터)·구역 (T7.4) |
 | `map/eventKinds.ts` | 순수 함수 | 사건 종류(통제 중·1시간 안·예정·예정 구역·해제)·칩 수·목록 순서·줌 3단계 (T7.4) |
 | `app/manifest.ts` · `public/sw.js` · `push/usePush.ts` · `push/store.ts` | PWA·알림 (T7.7, T7.10) | 매니페스트(설치), 서비스워커(push → showNotification, 클릭 → `/?event=`), 지원 판정·등록·권한·구독(VAPID 공개키 → pushManager.subscribe → §9)·관심 지역(watch/unwatch 장소 카드의 자리 500 m — 사건 카드 ☆는 태우 11/11 뺌, 내 위치 켰을 때만 last_seen) 훅. 상태는 Provider 없이 모듈 스토어 + `useSyncExternalStore`(ADR-014 D) — endpoint·라벨은 localStorage. 화면은 `PushSetup`(목록·빼기·알림 끄기·개인정보 한 줄)·`PlaceCard` ☆ |
-| `map/layers/marchLayer.ts` | 순수 함수 | 행진 키프레임(§3.2) → 그 시각 프레임(두 키프레임 사이 보간) → heatmap·중심 원·횡단보도 P 6단계 소스. 재생은 ClosureProvider `playMs`(네트워크 없음) (T7.16) |
+| `map/layers/marchLayer.ts` | 순수 함수 | 행진 키프레임(§3.2) → 슬라이더 시각 프레임(두 키프레임 사이 보간) → heatmap·예상 위치 원(최소 250 m·26 px 글로우) 소스 — 표시만. 횡단보도 P 점·재생은 뺐다(태우 11/11·11/12) (T7.16) |
 | `components/TimeSlider` · `LegList` · `EvidencePopover` · `Footer` | client | |
 
 ## 흐름
