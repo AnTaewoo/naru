@@ -53,6 +53,9 @@ from naru_ai.notice.topis_feed import TopisNotices, post_sentences
 from naru_ai.publish import CandidatePublisher, PublishError
 from naru_ai.signal.bus_feed import BusApi, RoutePaths
 from naru_ai.signal.bus_poller import BusPoller, RouteStops
+from naru_ai.signal.citydata import CitydataWatcher
+from naru_ai.signal.citydata_areas import AreaBook
+from naru_ai.signal.citydata_feed import CitydataApi
 from naru_contracts import (
     BusPositionBatchResponse,
     CandidateBatch,
@@ -188,6 +191,22 @@ class IngestWorker:
             per_event=settings.bus_routes_per_event,
             daily_cap=settings.bus_daily_cap,
         )
+        # T7.19 간접 신호 — citydata 활성 통제 근처 장소 5분 기록만(BE 로 안 보낸다)
+        seoul_key = settings.seoul_opendata_key.get_secret_value()
+        if settings.signals_source == "live" and not seoul_key:
+            raise ValueError("SEOUL_OPENDATA_KEY 없음 — 간접 신호 live 를 쓸 수 없다")
+        self.signals = CitydataWatcher(
+            AreaBook.load(raw),
+            CitydataApi(
+                recorded,
+                seoul_key if settings.signals_source == "live" else None,
+                settings.seoul_api_url,
+            ),
+            publisher.events,
+            radius_m=settings.signals_radius_m,
+            per_event=settings.signals_areas_per_event,
+            daily_cap=settings.signals_daily_cap,
+        )
         self.sources = [
             _Source("course", None, lambda _: self._send(self.course_batch())),
             _Source(
@@ -207,6 +226,7 @@ class IngestWorker:
             _Source("topis_map", settings.topis_map_interval_s, self.topis_map_round),
             _Source("bus", settings.bus_interval_s, self.bus_round),
             _Source("push", settings.push_interval_s, self.push_round),  # T7.9 알림 발송
+            _Source("signals", settings.signals_interval_s, self.signals_round),  # T7.19 기록만
         ]
 
     # --- 배치 ---------------------------------------------------------------------
@@ -488,6 +508,11 @@ class IngestWorker:
         if self.settings.bus_record_only:
             return []
         return [self.publisher.publish_bus(b) for b in batches]
+
+    def signals_round(self, now: datetime) -> list[Response]:
+        """활성 통제 근처 장소의 citydata 를 부른다(원문 기록). BE 로 보내지 않는다 (T7.19)."""
+        self.signals.round(now)
+        return []
 
     def run_once(self, include_course: bool = True) -> list[CandidateBatchResponse]:
         batches = [self.course_batch()] if include_course else []

@@ -80,6 +80,15 @@ class Settings(BaseSettings):
     bus_routes_per_event: int = Field(default=3, validation_alias="NARU_BUS_ROUTES_PER_EVENT")
     # 기록만 — BE 로 버스 위치를 안 보낸다(후보·상태 어디에도). ADR-013 보류(태우 2026-11-09)
     bus_record_only: bool = Field(default=True, validation_alias="NARU_BUS_RECORD_ONLY")
+    # T7.19 간접 신호(멘토링 T-E) — citydata(OA-21285) 활성 통제 근처 장소 5분 기록만. recorded =
+    # 그 장소의 가장 최근 기록 재생, live = 호출 + 기록(열린데이터광장 키 공유 — 돌발 288·공지 144)
+    signals_source: Literal["live", "recorded"] = Field(
+        default="recorded", validation_alias="NARU_SIGNALS_SOURCE"
+    )
+    signals_interval_s: int = Field(default=300, validation_alias="NARU_SIGNALS_INTERVAL_S")
+    signals_daily_cap: int = Field(default=200, validation_alias="NARU_SIGNALS_DAILY_CAP")
+    signals_radius_m: float = Field(default=1000.0, validation_alias="NARU_SIGNALS_RADIUS_M")
+    signals_areas_per_event: int = Field(default=2, validation_alias="NARU_SIGNALS_AREAS_PER_EVENT")
     # T7.9 알림 발송 — BE 에 60초마다 POST /internal/push/dispatch (ADR-014 C)
     push_interval_s: int = Field(default=60, validation_alias="NARU_PUSH_INTERVAL_S")
     data_go_kr_key: SecretStr = Field(default=SecretStr(""), validation_alias="DATA_GO_KR_KEY")
