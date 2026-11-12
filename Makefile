@@ -63,7 +63,7 @@ serve:
 	PORT=$(SERVE_FE_PORT) HOSTNAME=127.0.0.1 node packages/fe/dist/standalone/server.js
 
 fetch:
-	@test -n "$(SRC)" || { echo "SRC=seoul_spatial|nodelink|course|station"; exit 1; }
+	@test -n "$(SRC)" || { echo "SRC=seoul_spatial|nodelink|course|station|bus_routes|citydata_areas"; exit 1; }
 	@test -f scripts/fetch_$(SRC).py || { echo "아직 없음 — P0에서 scripts/fetch_$(SRC).py를 만든다"; exit 1; }
 	uv run python scripts/fetch_$(SRC).py
 
