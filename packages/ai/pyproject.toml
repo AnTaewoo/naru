@@ -11,6 +11,7 @@ dependencies = [
   "anthropic>=0.40",
   "shapely>=2.0",
   "pyproj>=3.6",
+  "geopandas>=1.0",  # T7.19 주요 121장소 영역 shp (raw/citydata_areas_*)
   "gpxpy>=1.6",
   "pdfplumber>=0.11",
   "openpyxl>=3.1",
