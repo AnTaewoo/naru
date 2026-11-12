@@ -29,7 +29,7 @@
 | 서울시 교차로·횡단보도 위치, 도로명코드, 카카오 Local API | 정규형 → 좌표 | 공공누리 · 카카오 100,000/일 | Resolver(지명사전) |
 | TOPIS 실시간 돌발정보 | 링크 ID | 1유형 | IncidentIngestor |
 | 서울시 버스위치정보 · 노선 경로·정류소 마스터 | vehId·gpsX/gpsY·sectOrd·stopFlag·dataTm | 개발 1,000/일(일 상한 900) → 운영 상향 | BusPoller(AI) — 전면 통제·마라톤만 기록 (ADR-013 보류) |
-| 서울 실시간 도시데이터 · S-DoT | 장소 121곳 5분 · 센서 10분 | 공개 | CongestionWatcher |
+| 서울 실시간 도시데이터(citydata) | 장소 121곳 5분 — 링크 속도·혼잡도 | 공개(1유형) | CitydataWatcher(AI) — 활성 통제 근처만 기록 (T7.19, ADR-002) |
 | 서울시 도보 네트워크·횡단보도·지하도·육교·역 | 노드·링크 | 1유형 | PedGraph, CrosswalkIndex |
 | TMAP 보행자 API | 경로 | 1,000/일 무료 | 그래프 QA 샘플링만 |
 | LLM | **Claude API** `claude-haiku-5-5` (tool use 구조화 출력, temperature 0, 응답 기록·재생) | 월 $1 미만 (공지 50건/일) | NoticeParser |
@@ -49,7 +49,7 @@
 | `ZoneMatcher` | `match(zone_name) -> ZoneGeom` | 지역명(여의도·광화문 일대) → 폴리곤. v1 |
 | `IncidentIngestor` | `build(incidents, ref, received_at) -> list[ClosureCandidate]` | TOPIS 돌발(OA-13315) 집회(10B02)만 → TOPIS 링크 선(LinkVerInfo, 없으면 돌발 좌표 점)·확신도 0.9·근거 topis_incident(at = 수신 시각). 원문·링크는 `SeoulOpenApi` 가 기록 (T6.1) |
 | `BusPoller` | `batches(now) -> list[BusPositionBatch]` | 전면 통제(공지 파싱 `lanes.scope` full·one_side_full, 워커가 넘김)·마라톤 창(시작 1시간 전 ~ 끝+30분) 횡단보도 100 m 안 노선 3개 60초, 하루 900 → 원문 기록(notice·marathon 폴더). `NARU_BUS_RECORD_ONLY=1`(기본)이면 BE 로 안 보낸다. 부른 노선은 하루 한 번 경로(getRoutePath). 판단 없음, 후보·상태를 안 만든다 (ADR-013 보류, T6.2) |
-| `CongestionWatcher` | `watch(zone) -> CongestionSpike \| None` | confidence 승격만 (보류, ADR-002) |
+| `CitydataWatcher` | `targets(now) -> list[Area]` · `round(now) -> list[Signals]` | 활성 통제(창 1시간 전 ~ 끝 30분 뒤) 중심 1 km 안 주요 121장소(`AreaBook`, raw shp) 사건마다 2곳, 5분, 하루 200 → `recorded/rtd/signals/` 원문 기록만. 링크 속도 LINK_ID 는 표준노드링크와 같다(159/159). confidence 승격은 보류(ADR-002), 11/14 뒤 대조 (T7.19) |
 | `IngestWorker` | `run_forever()` (`--loop`) | 스케줄: 코스 1회 · 공지 5분 · 돌발(OA-13315) 5분 · TOPIS 공지 NoticeList 10분(T6.4, 글 하나 = 문장 하나, 기록 없는 글만 live) · 경찰청 PDF inbox 1분(T6.6) · 버스 60초(전면 통제·마라톤 창만, 기록만) · 혼잡 보류. 소스마다 격리, 연속 3회 실패면 ERROR. 일 상한 LLM 200·버스 900. 웹 페이지는 같은 곳 10분 이상, 키로 쓰는 공개 API 는 그 한도 (ADR-011 E·ADR-013 H) |
 | `CandidatePublisher` | `publish(batch: CandidateBatch) -> None` | httpx → `POST /internal/candidates` |
 
