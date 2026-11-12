@@ -109,11 +109,16 @@ def route(client: FlaskClient, at: str) -> RouteResponse:
     return RouteResponse.model_validate(resp.get_json())
 
 
-def test_route_uses_march_probability(client: FlaskClient) -> None:
-    # 12:00 시작 — 세종대로사거리 셋 P 1.0 → 제외 → 돌아간다(816 m), 피한 곳 셋 scheduled
+def test_route_blocks_march_whole_window(client: FlaskClient) -> None:
+    # 12:00 시작·15:30 — 창 안 예정은 전 구역 +300초(태우 11/12, 군집은 표시만) → 세종대로사거리
+    # 셋을 피해 돌아간다(816 m), 피한 곳 셋 scheduled. 군집 위치와 상관없이 같은 길
     start = route(client, "2026-11-07T12:00:00+09:00")
     assert {a.crosswalk_id for a in start.avoided} == SEJONG
     assert {a.status for a in start.avoided} == {Status.scheduled}
+    # 15:30 — 군집은 고리를 거의 다 돌았지만 세종대로사거리 셋은 여전히 피한다(같은 시각 11/7 다른
+    # 통제 — r04 시의회~숭례문R 등 — 횡단보도도 더 피한다)
+    late_in = route(client, "2026-11-07T15:30:00+09:00")
+    assert {a.crosswalk_id for a in late_in.avoided} >= SEJONG
     # 16:01 — 창 밖, 기준 경로(808 m)
     after = route(client, "2026-11-07T16:01:00+09:00")
     assert after.avoided == [] and after.distance_m < start.distance_m
@@ -123,8 +128,7 @@ def test_route_uses_march_probability(client: FlaskClient) -> None:
 
 
 def test_route_latency_with_march(client: FlaskClient) -> None:
-    """/route p50/p95 — 행진 P 를 횡단보도마다 21 표본으로 계산해도 T6.9(p95 5.1 ms)에서 크게
-    늘지 않는다."""
+    """/route p50/p95 — 행진 사건이 있어도 T6.9(p95 5.1 ms)에서 크게 늘지 않는다."""
     route(client, "2026-11-07T13:00:00+09:00")  # 예열
     took: list[float] = []
     for _ in range(20):

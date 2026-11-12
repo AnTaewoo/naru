@@ -274,7 +274,7 @@ AI와 BE는 서로 import하지 않는다. 후보는 이 엔드포인트로만 �
 ## §5 상태별 라우팅 반응 (엔진·라우터·FE 공통 규칙)
 ARCHITECTURE.md "ClosureState 상태기계" 표가 기준. 임계값(0.7, 0.8, 예정 +300초, 30분, 붙임 150 m)은 `naru_be/config.py` 상수. 바꾸면 이 문서와 ARCHITECTURE 표도 같이.
 - (v0.9, ADR-011 A) `scheduled`(확신도 ≥ 0.7)는 횡단보도에 닿는 시각이 공지 창 안일 때만 그 횡단보도마다 +300초(`scheduled_penalty_s`) — 하드 차단이 아니라 페널티. 창 밖(시작 전·끝난 뒤)은 보통. `confirmed`는 차단. FE 는 `avoided[].status` 로 confirmed "통제 중" / scheduled "공지상 통제 시간 · 현장 확인 전"을 나눈다.
-- (v0.15, ADR-015 E) 행진 확률 모델 대상 사건(§3.2)의 경로 위 횡단보도는 `scheduled`든 `confirmed`든 창 전체 대신 그 시각 P(t, s): 비용 = P × 300초, P ≥ 0.8(`march_p_block`)이면 차단, 창 밖은 P 0, 창 안 하한은 예정 0.2·통제 중 0.5. 비용이 붙은 횡단보도도 `avoided` 에 그 시각 상태로.
+- (v0.15 → 2026-11-12 개정, ADR-015 E 철회) 행진도 다른 통제와 같다 — 사건 전 구역을 창 내내 위 규칙대로(`confirmed` 제외, 창 안 `scheduled`·확신도 ≥ 0.7 은 +300초). 행진 확률 P(§3.2 키프레임, §3.3 피드 `p`)는 표시용이고 라우팅에 쓰지 않는다.
 
 ## §6 오류 응답 (Flask)
 ```json
@@ -408,3 +408,4 @@ BE 가 카카오 로컬 API 를 대신 부른다. 키는 서버 `.env` 의 `KAKA
 | 2026-11-10 | v0.15 (보충) | §9 알림 구독·관심 지역 `GET /push/vapid-public-key`·`POST·DELETE /push/subscribe`·`GET·POST /watch-areas`·`DELETE /watch-areas/{id}`(endpoint 는 헤더 X-Push-Endpoint, last_seen 150 m 격자·3시간, saved 10개), §6 `push_unavailable`(503). 표 0008 | 태우 승인 (ADR-014 C) |
 | 2026-11-11 | v0.15 (보충) | §9.4 `POST /internal/push/dispatch`(워커 60초, 매칭 규칙·밤 07:00·푸시 본문·404/410 끔) | 태우 승인 (ADR-014 C) |
 | 2026-11-11 | v0.15 (보충) | §7.1 `near` 검색 = 반경 5 km 안 앞 5개 + 서울 전체 정확도 순으로 채움(겹침 제외, 최대 10 그대로) — 지도 가운데가 멀면 빈 목록이던 것(운영 '용산' 0건) | 태우 지시 (11/11, T5.8 수정 — 이력만) |
+| 2026-11-12 | v0.15 (보충) | §5 행진 P 라우팅 철회 — 행진도 사건 전 구역을 창 내내(통제 중이면 제외). P 는 §3.2 키프레임·§3.3 피드 `p` 표시용만 (응답 모양 그대로) | 태우 지시 (11/12, ADR-015 E 개정) |

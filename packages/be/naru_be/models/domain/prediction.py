@@ -4,13 +4,13 @@
   confirmed(그 시각 다시 판정) → 막힘 (라우터는 간선 제외)
   scheduled · 확신도 ≥ review_confidence(0.7) · 그 시각이 공지 창 안 → 막힘 (라우터는 +300초)
   그 밖(창 밖·0.7 미만·zone_scheduled·released) → 열림
-  행진 프로필(march, ADR-015)이 있고 경로 위 횡단보도면 위 두 경우에 P(t, s) ≥ march_p_block 일 때만
+  행진도 같다 — 사건 전 구역을 창 내내(태우 11/12, ADR-015 E 개정). 행진 군집(P)은 표시만
 현장 체크리스트(scripts/field_checklist.py)와 field 제보 비교(scripts/field_compare.py)가 쓴다.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Literal
@@ -19,7 +19,6 @@ from naru_be.config import Settings
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.closure_events import event_id, worst
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
-from naru_be.models.domain.march import MarchProfile, p_at
 from naru_be.models.repositories.report_repository import ReportRow
 from naru_contracts import ClosureState, Status
 
@@ -39,22 +38,9 @@ def blocked_at(
     at: datetime,
     engine: ClosureEngine,
     settings: Settings,
-    march: MarchProfile | None = None,
 ) -> Status | None:
     """막힘으로 보면 그 상태(confirmed | scheduled), 아니면 None."""
     status = engine.status_of_state(state, at)
-    start, end = state.window.start, state.window.end
-    if march is not None and state.crosswalk_id in march.s and start and end:
-        counted = status is Status.confirmed or (
-            status is Status.scheduled and state.confidence >= settings.review_confidence
-        )
-        confirmed = status is Status.confirmed
-        p = (
-            p_at(march, start, end, state.crosswalk_id, at, settings, confirmed)
-            if counted
-            else None
-        )
-        return status if p is not None and p >= settings.march_p_block else None
     if status is Status.confirmed or penalized(state, status, at, settings):
         return status
     return None
@@ -92,17 +78,14 @@ def checklist(
     start: datetime,
     end: datetime,
     step: timedelta = timedelta(minutes=1),
-    marches: Mapping[EventKey, MarchProfile] | None = None,
 ) -> list[ChecklistRow]:
-    """[start, end] 에 한 번이라도 막히는 (횡단보도, 사건) — 현장에 들고 나갈 목록. marches 가
-    있으면 행진 사건은 P ≥ march_p_block 인 분만 막힘."""
+    """[start, end] 에 한 번이라도 막히는 (횡단보도, 사건) — 현장에 들고 나갈 목록."""
     found: dict[tuple[str, str], ChecklistRow] = {}
     for st in states:
-        march = marches.get(key_of(st)) if marches else None
         hits: list[tuple[datetime, Status]] = []
         t = start
         while t <= end:
-            status = blocked_at(st, t, engine, settings, march)
+            status = blocked_at(st, t, engine, settings)
             if status is not None:
                 hits.append((t, status))
             t += step
@@ -168,9 +151,8 @@ def compare(
     states: Iterable[ClosureState],
     engine: ClosureEngine,
     settings: Settings,
-    marches: Mapping[EventKey, MarchProfile] | None = None,
 ) -> CompareResult:
-    """제보마다 그 시각 나루 예측과 맞춰 본다 (양성 = 막힘). marches 는 checklist 와 같다."""
+    """제보마다 그 시각 나루 예측과 맞춰 본다 (양성 = 막힘)."""
     by_cw: dict[str, list[ClosureState]] = {}
     for st in states:
         by_cw.setdefault(st.crosswalk_id, []).append(st)
@@ -179,16 +161,7 @@ def compare(
         hits = [
             (status, st.reason)
             for st in by_cw.get(r.crosswalk_id, ())
-            if (
-                status := blocked_at(
-                    st,
-                    r.reported_at,
-                    engine,
-                    settings,
-                    marches.get(key_of(st)) if marches else None,
-                )
-            )
-            is not None
+            if (status := blocked_at(st, r.reported_at, engine, settings)) is not None
         ]
         predicted = worst(s for s, _ in hits) if hits else None
         reason = next((why for s, why in hits if s is predicted), None)

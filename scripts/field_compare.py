@@ -20,7 +20,7 @@ from naru_be.config import Settings
 from naru_be.db import make_engine, make_sessions
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
-from naru_be.models.domain.prediction import CompareResult, Verdict, compare, key_of
+from naru_be.models.domain.prediction import CompareResult, Verdict, compare
 from naru_be.models.repositories.closure_repository import ClosureRepository
 from naru_be.models.repositories.report_repository import ReportRepository
 from naru_contracts import Status
@@ -90,8 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     index = CrosswalkIndex.from_xlsx(spatial / "OA-23081.xlsx", settings)
     repo = ClosureRepository(sessions, settings)
     states = repo.active_between(day0, day1, WORLD)
-    marches = repo.marches_of({key_of(st) for st in states})  # 행진 사건은 P ≥ 0.8 (T7.16)
-    result = compare(reports, states, ClosureEngine(index, settings), settings, marches)
+    result = compare(reports, states, ClosureEngine(index, settings), settings)  # 행진도 전 구역
     out: Path = args.out or Path("docs/eval") / f"field_{args.date:%Y%m%d}.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(render(result, index, args.date, url.rsplit("/", 1)[-1]), "utf-8")

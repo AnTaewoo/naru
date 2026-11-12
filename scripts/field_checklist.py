@@ -25,7 +25,7 @@ from naru_be.config import Settings
 from naru_be.db import make_engine, make_sessions
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
-from naru_be.models.domain.prediction import ChecklistRow, checklist, key_of
+from naru_be.models.domain.prediction import ChecklistRow, checklist
 from naru_be.models.repositories.closure_repository import ClosureRepository
 
 KST = timezone(timedelta(hours=9))
@@ -81,9 +81,8 @@ def main(argv: list[str] | None = None) -> int:
     url = args.database_url or settings.database_url
     repo = ClosureRepository(make_sessions(make_engine(url)), settings)
     states = repo.active_between(start, end, WORLD)
-    marches = repo.marches_of({key_of(st) for st in states})  # 행진 사건은 P ≥ 0.8 인 분만 (T7.16)
     engine = ClosureEngine(index, settings)
-    rows = checklist(states, index, engine, settings, start, end, marches=marches)
+    rows = checklist(states, index, engine, settings, start, end)  # 행진도 전 구역 (11/12)
     if not rows:
         print(
             f"{start:%Y-%m-%d %H:%M}~{end:%H:%M} 막힘 예측 없음 (상태 {len(states)}건)",

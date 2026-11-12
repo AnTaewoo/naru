@@ -43,10 +43,8 @@ class RoutePlanner:
         src, dst = parse_latlng(query.from_, "from"), parse_latlng(query.to, "to")
         closures = self.repo.active_horizon(query.depart_at, self._bbox(src, dst))
         avoid = self.repo.states_of_events(query.avoid)  # T7.6 — 없는 id 는 빈 결과
-        keys = {(s.reason, s.window.start, s.window.end) for s in closures}
-        marches = self.repo.marches_of(keys)  # T7.16 — 프로필이 있는 사건만
         return RouteResult(
-            path=self.router.route(src, dst, query.depart_at, closures, avoid, marches),
+            path=self.router.route(src, dst, query.depart_at, closures, avoid),
             baseline=self.baseline_router.route(src, dst),
             depart_at=query.depart_at,
             computed_at=datetime.now(UTC),

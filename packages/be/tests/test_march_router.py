@@ -1,4 +1,5 @@
-"""T7.16 — 행진 확률을 라우터(비용 = P x 예정 비용, P ≥ 0.8 제외)·현장 도구(blocked_at)가 같이 쓴다.
+"""T7.16 → 태우 11/12 — 행진도 횡단보도 통제는 사건 전 구역(창 내내). 군집(P)은 표시만
+(키프레임 API·지도). 라우터·현장 도구(blocked_at)는 P 를 보지 않는다 (ADR-015 E 개정).
 
 프로필·상태는 test_march 와 같은 기록(11/7 r01 고리 — 세종대로사거리 06-0000036391 s 185.5 ·
 06-0000023206 s 205.2 · 06-0000029520 s 225.0, 종로구청입구 06-0000002104 s 1,036.0). 경로는
@@ -7,7 +8,6 @@
 
 from __future__ import annotations
 
-import math
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -18,6 +18,7 @@ from naru_be.config import Settings
 from naru_be.models.domain.closure_engine import ClosureEngine
 from naru_be.models.domain.crosswalk_index import CrosswalkIndex
 from naru_be.models.domain.march import MarchProfile, p_at
+from naru_be.models.domain.ped_graph import PedEdge
 from naru_be.models.domain.prediction import blocked_at
 from naru_be.models.domain.routers import TimeDependentRouter
 from naru_contracts import (
@@ -55,95 +56,63 @@ def r01_states(
     return states
 
 
-def test_router_uses_p_instead_of_whole_window(
-    course_world: CourseWorld, r01: MarchProfile, r01_states: list[ClosureState]
+def test_march_blocks_whole_window_like_any_closure(
+    course_world: CourseWorld, r01_states: list[ClosureState]
 ) -> None:
     w = course_world
     router = TimeDependentRouter(w.ped, w.engine, w.settings)
-    key = (r01_states[0].reason, r01_states[0].window.start, r01_states[0].window.end)
-    marches = {key: r01}
-    # 12:00 시작 — 기준 경로가 지나는 세종대로사거리 셋(s 185·205·225 < 선행 300)은 P 1.0 → 제외
-    # → 지하보도 우회, 피한 곳 셋 (마라톤 1구간은 둘 — 고리 경로가 06-0000029520 도 고른다)
-    at = datetime(2026, 11, 7, 12, 0, tzinfo=KST)
-    detour = router.route(KYOBO, DAEHANMUN, at, r01_states, marches=marches)
     sejong = {SEJONG_A, SEJONG_B, SEJONG_C}
-    assert {(a.crosswalk_id, a.status) for a in detour.avoided} == {
-        (cid, Status.scheduled) for cid in sejong
-    }
-    # 16:01 창 밖 — P 0, 기준 경로(808 m) 그대로 (옛 규칙도 창 밖은 보통). 12:00 은 그보다 돌아간다
-    # (816.1 m — 세 곳을 다 피하는 길, route_avoid_0430 기록과 같은 거리)
-    late = router.route(
-        KYOBO, DAEHANMUN, at + timedelta(hours=4, minutes=1), r01_states, marches=marches
-    )
-    assert late.avoided == () and 800 < late.distance_m < 830
-    assert 810 < detour.distance_m < 830 and detour.distance_m > late.distance_m
-    # 15:59 — 머리 x_i = 0.1009 x 14,340 x (1 + 0.2u) = 1,158~1,736 m, 꼬리 = 머리 - 1,453:
-    # 세종대로사거리 셋은 x < s + 1,453 ↔ u < 0.66~0.8 → 17~18/21 = 0.81~0.86 → 제외.
-    # 피한 곳은 셋 안에서 하나 이상, 전부 scheduled
-    near_end = router.route(
-        KYOBO, DAEHANMUN, at + timedelta(hours=3, minutes=59), r01_states, marches=marches
-    )
-    assert near_end.avoided and {a.crosswalk_id for a in near_end.avoided} <= sejong
-    assert {a.status for a in near_end.avoided} == {Status.scheduled}
-    assert near_end.distance_m > late.distance_m
-    window = (r01_states[0].window.start, r01_states[0].window.end)
-    assert window[0] is not None and window[1] is not None
-    p = p_at(r01, window[0], window[1], SEJONG_C, at + timedelta(hours=3, minutes=59), w.settings)
-    assert p == pytest.approx(18 / 21)
+    # 12:00 시작·15:30 — 창 안 예정(확신도 0.85)은 횡단보도마다 +300초 → 세종대로사거리 셋을
+    # 피해 돌아간다(816.1 m, route_avoid_0430 기록과 같은 길). 군집(12:00 출발점, 15:30 거의 한
+    # 바퀴)이 어디 있든 같다. 15:59 는 걸어서 닿을 때 16:00 이 지나 창 밖인 곳이 생긴다(시각 의존)
+    at = datetime(2026, 11, 7, 12, 0, tzinfo=KST)
+    start = router.route(KYOBO, DAEHANMUN, at, r01_states)
+    near_end = router.route(KYOBO, DAEHANMUN, at + timedelta(hours=3, minutes=30), r01_states)
+    for r in (start, near_end):
+        assert {(a.crosswalk_id, a.status) for a in r.avoided} == {
+            (cid, Status.scheduled) for cid in sejong
+        }
+        assert 810 < r.distance_m < 830
+    assert near_end.distance_m == start.distance_m
+    # 16:01 창 밖 — 기준 경로(808 m)
+    late = router.route(KYOBO, DAEHANMUN, at + timedelta(hours=4, minutes=1), r01_states)
+    assert late.avoided == () and late.distance_m < start.distance_m
 
 
-def test_blocked_at_with_march(
+def _edge_with(w: CourseWorld, crosswalk_id: str) -> PedEdge:
+    for _, _, data in w.ped.graph.edges(data=True):
+        edge: PedEdge = data["edge"]
+        if crosswalk_id in edge.crosswalk_ids:
+            return edge
+    raise AssertionError(f"그래프에 {crosswalk_id} 간선이 없다")
+
+
+def test_confirmed_march_excludes_crosswalk_away_from_cluster(
     course_world: CourseWorld, r01: MarchProfile, r01_states: list[ClosureState]
 ) -> None:
+    """태우 11/12 운영 확인: 통제 중 행진인데 군집에서 먼 횡단보도는 P 하한 0.5(비용 180 m)라
+    건널 수 있었다. 이제 통제 중이면 사건 전 구역 제외 — 종로구청입구(s 1,036, 12:00 군집은
+    출발점)."""
     w = course_world
-    jongno = next(s for s in r01_states if s.crosswalk_id == JONGNO_GU)
-    sejong = next(s for s in r01_states if s.crosswalk_id == SEJONG_A)
     at = datetime(2026, 11, 7, 12, 0, tzinfo=KST)
-    # 옛 규칙: 창 안 예정은 전부 막힘. 행진 모델: 종로구청입구(s 1,036)는 12:00 에 P 0.2(하한)
-    # → 막힘 아님
-    assert blocked_at(jongno, at, w.engine, w.settings) is Status.scheduled
-    assert blocked_at(jongno, at, w.engine, w.settings, march=r01) is None
-    assert (
-        blocked_at(sejong, at, w.engine, w.settings, march=r01) is Status.scheduled
-    )  # P 1.0 ≥ 0.8
-    # 14:00 — 머리 x_i = 0.1009 x 7,200 x (1 + 0.2u) = 581~872:
-    # 종로구청입구 1,036 - 300 ≤ x ↔ u ≥ 0.065
-    # → u = 0.1 … 1 → 10/21 = 0.48 < 0.8 → 막힘 아님(비용만)
-    assert blocked_at(jongno, at + timedelta(hours=2), w.engine, w.settings, march=r01) is None
-    assert math.isclose(
-        p_at(
-            r01,
-            jongno.window.start,
-            jongno.window.end,
-            JONGNO_GU,
-            at + timedelta(hours=2),
-            w.settings,
-        )
-        or 0,
-        10 / 21,
-    )
-
-
-def test_confirmed_march_floor(
-    course_world: CourseWorld, r01: MarchProfile, r01_states: list[ClosureState]
-) -> None:
-    """통제 중(돌발이 붙은) 행진은 하한 0.5 (태우 11/10 ③) — 종로구청입구 12:00: 예정 0.2,
-    통제 중 0.5."""
-    w = course_world
     jongno = next(s for s in r01_states if s.crosswalk_id == JONGNO_GU)
-    at = datetime(2026, 11, 7, 12, 0, tzinfo=KST)
     start, end = jongno.window.start, jongno.window.end
     assert start is not None and end is not None
+    # 표시용 P 는 그대로 — 예정 0.2(하한), 통제 중 0.5 (키프레임 API·지도 군집)
     assert p_at(r01, start, end, JONGNO_GU, at, w.settings) == 0.2
     assert p_at(r01, start, end, JONGNO_GU, at, w.settings, confirmed=True) == 0.5
-    # 라우터: 통제 중 상태(확신도 0.9 + 돌발 근거)면 같은 횡단보도의 P 가 0.5 → 비용 180 m
-    router = TimeDependentRouter(w.ped, w.engine, w.settings)
     incident = Evidence(kind=EvidenceKind.topis_incident, ref="test", at=at)
     confirmed = [
         s.model_copy(update={"confidence": 0.9, "evidence": [*s.evidence, incident]})
         for s in r01_states
     ]
-    by = router._by_crosswalk(confirmed, {(confirmed[0].reason, start, end): r01})
-    state, march = by[JONGNO_GU][0]
-    assert march is not None and w.engine.status_of_state(state, at) is Status.confirmed
-    assert router._march_p(state, march, Status.confirmed, at) == 0.5
+    router = TimeDependentRouter(w.ped, w.engine, w.settings)
+    by = router._by_crosswalk(confirmed)
+    assert w.engine.status_of_state(by[JONGNO_GU][0], at) is Status.confirmed
+    assert router._closure_cost(_edge_with(w, JONGNO_GU), at, by) is None  # 제외
+    # 예정이면 창 안 +300초(360 m) — 옛 행진 비용 P x 360 = 72 m 가 아니다
+    scheduled = router._by_crosswalk(r01_states)
+    assert router._closure_cost(_edge_with(w, JONGNO_GU), at, scheduled) == pytest.approx(360.0)
+    # 현장 도구도 같은 규칙
+    assert blocked_at(jongno, at, w.engine, w.settings) is Status.scheduled
+    assert blocked_at(by[JONGNO_GU][0], at, w.engine, w.settings) is Status.confirmed
