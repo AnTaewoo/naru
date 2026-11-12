@@ -3,14 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { recorded } from "../../test/recorded";
 import type { MarchResponse } from "../../types/contracts";
-import {
-  frameAt,
-  marchCircle,
-  marchCrosswalkPoints,
-  marchHeatPoints,
-  pColor,
-  probabilityAt,
-} from "./marchLayer";
+import { frameAt, marchCircle, marchHeatPoints, marchLayers } from "./marchLayer";
 
 const body = recorded("march_be5f89a4ebf3").body as MarchResponse;
 const T = (hhmmss: string) => Date.parse(`2026-11-07T${hhmmss}+09:00`);
@@ -29,8 +22,6 @@ describe("marchLayer (T7.16)", () => {
     expect(frame?.points).toHaveLength(21);
     expect(frame?.p["06-0000036391"]).toBe(1.0);
     expect(frame?.p["06-0000002104"]).toBe(0.2);
-    expect(probabilityAt(body, T("12:00:00"))).toBe(1.0);
-    expect(probabilityAt(body, T("12:00:00"), "06-0000002104")).toBe(0.2);
     // 반경 0 이어도 원은 최소 250 m 로 그린다 (태우 11/11 — 슬라이더 시각의 군집이 크게) + 글로우용 중심 점
     const circle = marchCircle(frame);
     expect(circle.features.map((f) => f.geometry.type)).toEqual(["Polygon", "Point"]);
@@ -58,25 +49,16 @@ describe("marchLayer (T7.16)", () => {
     expect(circle.features[0]?.properties.radius_m).toBe(250);
   });
 
-  it("창 밖은 null → 확률 0, 소스는 빈 컬렉션; 끝 시각은 마지막 키프레임", () => {
+  it("창 밖은 null → 소스는 빈 컬렉션; 끝 시각은 마지막 키프레임", () => {
     expect(frameAt(body, T("11:59:59"))).toBeNull();
     expect(frameAt(body, T("16:00:01"))).toBeNull();
-    expect(probabilityAt(body, T("11:00:00"))).toBe(0);
     expect(marchHeatPoints(null).features).toHaveLength(0);
-    expect(marchCrosswalkPoints(body, null).features).toHaveLength(0);
+    expect(marchCircle(null).features).toHaveLength(0);
     const end = frameAt(body, T("16:00:00"));
     expect(end?.center).toEqual(kf(240).center);
   });
 
-  it("횡단보도 P 점 — 경로 위 13곳, 6단계 색(0.2 미만 회색 … 0.8 이상 빨강)", () => {
-    const frame = frameAt(body, T("12:00:00"));
-    const fc = marchCrosswalkPoints(body, frame);
-    expect(fc.features).toHaveLength(13);
-    const byId = new Map(fc.features.map((f) => [f.properties["id"], f.properties]));
-    expect(byId.get("06-0000036391")?.["color"]).toBe(pColor(1.0));
-    expect(byId.get("06-0000002104")?.["color"]).toBe(pColor(0.2));
-    expect(new Set([0.1, 0.2, 0.35, 0.5, 0.65, 0.8].map(pColor)).size).toBe(6);
-    expect(pColor(0.19)).toBe("#b8bcc4");
-    expect(pColor(0.8)).toBe("#e5322d");
+  it("레이어는 군집뿐 — heatmap·글로우·채움·테두리, 횡단보도 P 점 없음 (태우 11/12: 횡단보도 통제는 사건 전 구역)", () => {
+    expect(marchLayers().map((l) => l.type)).toEqual(["heatmap", "circle", "fill", "line"]);
   });
 });

@@ -45,12 +45,9 @@ import {
 } from "./layers/closureLayer";
 import {
   MARCH_CIRCLE_SOURCE_ID,
-  MARCH_CROSSWALK_SOURCE_ID,
   MARCH_HEAT_SOURCE_ID,
-  MARCH_LAYER_IDS,
   frameAt,
   marchCircle,
-  marchCrosswalkPoints,
   marchHeatPoints,
   marchLayers,
   marchSource,
@@ -437,22 +434,17 @@ export function MapView({ visible }: MapViewProps) {
       });
       map.addSource(MARCH_HEAT_SOURCE_ID, marchSource(marchHeatPoints(null)));
       map.addSource(MARCH_CIRCLE_SOURCE_ID, marchSource(marchCircle(null)));
-      map.addSource(MARCH_CROSSWALK_SOURCE_ID, marchSource(marchHeatPoints(null)));
       // 아래부터: 사건 구역 → 예정 구역 → 원래 길 점선 → 경로 실선 → 터널 → (원래 길 보기의 원) →
       // 통제 점 → 사건 클러스터·점 → 입구 마커
       for (const layer of layers.filter((l) => below.has(l.id))) map.addLayer(layer);
-      // 행진 예상 위치(T7.16) — 사건 구역 위, 경로·통제 점 아래 (횡단보도 P 점은 통제 점 위)
-      const marchAll = marchLayers();
-      for (const layer of marchAll.filter((l) => l.id !== MARCH_LAYER_IDS.crosswalk))
-        map.addLayer(layer);
+      // 행진 예상 위치(T7.16) — 사건 구역 위, 경로·통제 점 아래. 표시만(태우 11/12)
+      for (const layer of marchLayers()) map.addLayer(layer);
       for (const layer of zoneLayers()) map.addLayer(layer);
       for (const layer of baselineLayers()) map.addLayer(layer);
       for (const layer of routeLayers()) map.addLayer(layer);
       for (const layer of crossingLayers()) map.addLayer(layer);
       for (const layer of avoidedLayers()) map.addLayer(layer);
       for (const layer of closureLayers()) map.addLayer(layer);
-      for (const layer of marchAll.filter((l) => l.id === MARCH_LAYER_IDS.crosswalk))
-        map.addLayer(layer);
       for (const layer of layers.filter((l) => !below.has(l.id))) map.addLayer(layer);
       for (const layer of entranceLayers()) map.addLayer(layer);
       loaded.current = true;
@@ -603,7 +595,7 @@ export function MapView({ visible }: MapViewProps) {
       : null;
   }, [reportCw]);
 
-  // 행진 예상 위치 (T7.16) — 프레임이 바뀌면 세 소스만 갱신(React 는 레이어를 다시 그리지 않는다)
+  // 행진 예상 위치 (T7.16) — 프레임이 바뀌면 두 소스만 갱신(React 는 레이어를 다시 그리지 않는다)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -612,10 +604,6 @@ export function MapView({ visible }: MapViewProps) {
       if (heat instanceof GeoJSONSource) void heat.setData(marchHeatPoints(marchFrame));
       const circle = map.getSource(MARCH_CIRCLE_SOURCE_ID);
       if (circle instanceof GeoJSONSource) void circle.setData(marchCircle(marchFrame));
-      const cws = map.getSource(MARCH_CROSSWALK_SOURCE_ID);
-      if (cws instanceof GeoJSONSource && marchBody)
-        void cws.setData(marchCrosswalkPoints(marchBody, marchFrame));
-      else if (cws instanceof GeoJSONSource) void cws.setData(marchHeatPoints(null));
     };
     if (loaded.current) run();
     else map.once("load", run);

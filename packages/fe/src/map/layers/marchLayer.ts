@@ -1,7 +1,7 @@
 // 순수 함수: 행진 키프레임(/closures/events/{id}/march, INTERFACE §3.2) → 그 시각의 예상 위치(두 키프레임
 // 사이 보간) → MapLibre 소스·레이어 (ADR-015 G, T7.16). heatmap(표본이 겹칠수록 진하게), 예상 위치 원(크게 —
-// 최소 250 m·화면 최소 26 px, 채움·테두리 + 중심 글로우; 태우 11/11 "슬라이더 시각의 군집이 크게"), 경로 위
-// 횡단보도 P 6단계 색. 공간 연산은 원 폴리곤(표시용)뿐 — 값은 BE 키프레임 그대로
+// 최소 250 m·화면 최소 26 px, 채움·테두리 + 중심 글로우; 태우 11/11 "슬라이더 시각의 군집이 크게"). 표시만 —
+// 횡단보도 통제는 사건 전 구역(태우 11/12). 공간 연산은 원 폴리곤(표시용)뿐 — 값은 BE 키프레임 그대로
 import type {
   ExpressionSpecification,
   GeoJSONSourceSpecification,
@@ -12,13 +12,11 @@ import { COLORS } from "../colors";
 
 export const MARCH_HEAT_SOURCE_ID = "naru-march-heat";
 export const MARCH_CIRCLE_SOURCE_ID = "naru-march-circle";
-export const MARCH_CROSSWALK_SOURCE_ID = "naru-march-crosswalks";
 export const MARCH_LAYER_IDS = {
   heat: "naru-march-heat",
   circleGlow: "naru-march-circle-glow",
   circleFill: "naru-march-circle-fill",
   circleLine: "naru-march-circle-line",
-  crosswalk: "naru-march-crosswalk",
 } as const;
 
 export type LngLat = [number, number];
@@ -78,18 +76,6 @@ export function frameAt(body: MarchResponse, tMs: number): MarchFrame | null {
     radiusM: lerp(a.radius_m, b.radius_m, f),
     p,
   };
-}
-
-/** 카드의 "이 시각 막혀 있을 확률" — 누른 횡단보도가 있으면 그것, 없으면 경로 위 가장 높은 P. 창 밖은 0 */
-export function probabilityAt(
-  body: MarchResponse,
-  tMs: number,
-  crosswalkId: string | null = null,
-): number {
-  const frame = frameAt(body, tMs);
-  if (!frame) return 0;
-  if (crosswalkId !== null && crosswalkId in frame.p) return frame.p[crosswalkId] ?? 0;
-  return Math.max(0, ...Object.values(frame.p));
 }
 
 const EMPTY = { type: "FeatureCollection" as const, features: [] };
@@ -160,43 +146,6 @@ function glowRadius(z: number): ExpressionSpecification {
   return ["max", CIRCLE_MIN_PX, ["*", ["get", "radius_m"], 2 ** z / M_PER_PX_Z0]];
 }
 
-/** P 6단계 — 0.2 미만(하한, 옅은 회색) · 0.35 · 0.5 · 0.65 · 0.8 미만 · 0.8 이상(차단, 빨강) */
-export const P_STEPS = [0.2, 0.35, 0.5, 0.65, 0.8] as const;
-export const P_COLORS = [
-  "#b8bcc4",
-  "#f5d58a",
-  "#f5a300",
-  "#f07f1f",
-  "#ef6c00",
-  COLORS.stop,
-] as const;
-
-export function pColor(p: number): string {
-  let i = 0;
-  while (i < P_STEPS.length && p >= (P_STEPS[i] ?? 1)) i += 1;
-  return P_COLORS[i] ?? COLORS.stop;
-}
-
-/** 경로 위 횡단보도 점 — 그 시각 P 와 색 */
-export function marchCrosswalkPoints(
-  body: MarchResponse,
-  frame: MarchFrame | null,
-): PointCollection {
-  if (!frame) return EMPTY;
-  const features: PointCollection["features"] = [];
-  for (const [id, coord] of Object.entries(body.crosswalk_points)) {
-    const c = pair(coord);
-    const p = frame.p[id];
-    if (!c || p === undefined) continue;
-    features.push({
-      type: "Feature",
-      geometry: { type: "Point", coordinates: c },
-      properties: { id, p, color: pColor(p) },
-    });
-  }
-  return { type: "FeatureCollection", features };
-}
-
 export function marchSource(
   data: PointCollection | ReturnType<typeof marchCircle>,
 ): GeoJSONSourceSpecification {
@@ -221,7 +170,8 @@ const HEAT_RAMP: ExpressionSpecification = [
   "rgba(229, 50, 45, 0.95)",
 ];
 
-/** 레이어 5장 — heatmap, 예상 위치 원(글로우·채움·테두리), 횡단보도 P 점 (고른 행진 사건에만 데이터가 있다) */
+/** 레이어 4장 — heatmap, 예상 위치 원(글로우·채움·테두리) (고른 행진 사건에만 데이터가 있다). 횡단보도 P 점은
+ * 태우 11/12 뺐다 — 행진도 횡단보도 통제는 사건 전 구역, 군집은 표시만 */
 export function marchLayers(): LayerSpecification[] {
   return [
     {
@@ -276,18 +226,6 @@ export function marchLayers(): LayerSpecification[] {
       source: MARCH_CIRCLE_SOURCE_ID,
       filter: ["==", ["geometry-type"], "Polygon"],
       paint: { "line-color": COLORS.soon, "line-width": 3, "line-opacity": 0.9 },
-    },
-    {
-      id: MARCH_LAYER_IDS.crosswalk,
-      type: "circle",
-      source: MARCH_CROSSWALK_SOURCE_ID,
-      paint: {
-        "circle-color": ["get", "color"],
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 4, 16, 8],
-        "circle-stroke-color": "#ffffff",
-        "circle-stroke-width": 1.5,
-        "circle-opacity": 0.95,
-      },
     },
   ];
 }

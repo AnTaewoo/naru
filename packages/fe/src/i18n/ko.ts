@@ -413,10 +413,6 @@ export const MARCH_KO = {
   basis: "공지 일정 기준 예상 위치",
 } as const;
 
-export function marchProbabilityKo(p: number): string {
-  return `이 시각 막혀 있을 확률 ${Math.round(p * 100)}%`;
-}
-
 /** 알림 켜기 (T7.7, ADR-014 C) — 구독·관심 지역은 T7.8~T7.10, 그때까지는 허용만 */
 export const PUSH_KO = {
   title: "통제 알림",
