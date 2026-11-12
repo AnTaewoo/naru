@@ -105,6 +105,13 @@
   - `path_100100001.json` 77,918 B sha256 `ce7c1c0c7cb3…` 정점 599 · `path_100100033.json` 312,864 B `5d63e28d27c3…` 2,406 · `path_100100042.json` 198,233 B `eb9c369e62c3…` 1,528 · `path_100100046.json` 217,342 B `32f90853c746…` 1,680 · `path_100100118.json` 189,073 B `193372278688…` 1,469 · `path_100100185.json` 131,167 B `c1138aa73cf3…` 998 · `path_100900003.json` 46,323 B `ef68f59ba97d…` 349 · `path_100900007.json` 68,848 B `b67c3a108246…` 522
   - 확인(T6.3 test_bus_correction): 기록된 버스 94대가 경로에서 가운데값 0.49 m·최대 17 m — 노선에 맞춘 좌표로 보인다. 노선 길이는 버스 기록의 `rtDist`(km)와 비슷하다(100100001 경로 15.16 km · rtDist 16)
 
+### citydata_areas_20261111 (서울 실시간 도시데이터 주요 121장소, T7.19 — `make fetch SRC=citydata_areas`)
+- 폴더: `data/raw/citydata_areas_20261111/` — 열린데이터광장 OA-21285 페이지 첨부 2개(그대로) + 풀어 둔 `areas_shp/` + 페이지 `datasetView.html` + `_meta.json`(sha256·크기·출처 URL·받은 시각)
+- 출처: `https://data.seoul.go.kr/dataList/OA-21285/A/1/datasetView.do` 첨부(2026.04.02. 게시) → `https://datafile.seoul.go.kr/bigfile/iot/inf/nio_download.do?infId=OA-21285&seq=<24|23>&infSeq=2&useCache=false`(GET — 페이지의 폼 POST 는 seqNo 가 비면 "잘못된 접근"). 2026-11-11 밤, 요청 3(페이지 1 + 파일 2), NaruBot. `scripts/fetch_citydata_areas.py`
+- 라이선스: 공공누리 1유형 (페이지 표기)
+- `서울시 주요 121장소 영역.zip` (134,502 B, sha256 `fda69cd2ee381210…`) → `areas_shp/서울시 주요 121장소 영역/*.shp` 121 폴리곤, EPSG:4326(.prj), 열 `AREA_CD`(POI001…)·`CATEGORY`(관광특구·고궁·문화유산·공원·발달상권·인구밀집지역)·`AREA_NM`. 확인: 교보빌딩(126.9779, 37.5709)은 POI009 광화문·덕수궁·POI088 광화문광장 안(거리 0), POI130 시의회 앞 62 m, POI006 종로·청계 70 m; 논현역은 POI037 신논현역·논현역 안. 워커 `naru_ai.signal.citydata.AreaBook` 이 읽는다
+- `서울시 주요 121장소 목록.xlsx` (18,884 B, sha256 `60aedf332efef153…`) — 시트 '장소목록' 열 `CATEGORY, NO, AREA_CD, AREA_NM, ENG_NM`(121건 + 빈 줄)
+
 ## recorded
 
 | api | 최초 기록 | 파일 수 | 비고 |
@@ -113,7 +120,7 @@
 | topis_notice_archive | 2026-11-11 | 15 | NoticeList(OA-22861) 아카이브 깊이 조사(T7.18, 멘토링 T-D): 끝 인덱스 탐침 11(1/5·n/n, 3826 은 INFO-200)·1000건씩 4(1~3825 전부, 본문 포함, 7.3 MB). 운영 피드 기록 `topis_notice`(1/50)와 다른 폴더 — 테스트 fixture·워커가 그 폴더 전체를 읽는다 (`scripts/record_topis_archive.py api | dump`). 아래 "recorded/topis_notice_archive" |
 | incident | 2026-11-07 | 4 | TOPIS 돌발 — AccMainCode 13 · AccSubCode 43 · AccInfo 53행 (`make record API=incident`). 2026-11-08 AccInfo 1(워커 live 경로 확인, T6.1). 운영 워커(`NARU_INCIDENT_SOURCE=live`)가 5분마다 내용이 바뀔 때만 더한다 |
 | links | 2026-11-07 | 14 | 돌발 링크 4개의 LinkInfo + LinkVerInfo (`make record API=links --limit 4`) + 2026-11-08 집회 링크 3개(`--links`, T6.1). 운영 워커는 처음 보는 링크만 받아 더한다 |
-| rtd | 2026-11-07 | 2 | 실시간 도시데이터 citydata 광화문·덕수궁 (json) — 11/7 15:41(175 KB) + 11/9 08:28(T6.5, 사고통제현황 0건) |
+| rtd | 2026-11-07 | 2 (+ `signals/`) | 실시간 도시데이터 citydata 광화문·덕수궁 (json) — 11/7 15:41(175 KB) + 11/9 08:28(T6.5, 사고통제현황 0건). T7.19 부터 운영 워커(`NARU_SIGNALS_SOURCE=live`)가 활성 통제 근처 장소를 5분마다 `rtd/signals/<ts>_citydata_<AREA_CD>.json` 에 기록만(하루 상한 200, 열린데이터광장 키 공유). 같은 형식(api rtd, params AREA_NM, raw json). 링크 ID ↔ 표준노드링크 대조는 `docs/data/indirect_signals.md` |
 | topis_web | 2026-11-09 | 3 + 4 | TOPIS 홈페이지 원문(T6.5 조사, ADR-011 E — robots 허용·같은 곳 10분 간격·NaruBot): 통제지도 openControlMap.do 와 그 내부 AJAX 응답. 2026-11-11 T7.18 조사 4: robots.txt·공지 게시판 목록 쪽 HTML·목록 AJAX 1쪽·383쪽(마지막). 운영 워커(T7.3)가 10분마다 `selectAccAllListASC` 목록과 처음 보는 통제 도로 `selectAccLinkList_<id>` 를 더한다. 아래 "recorded/… (T6.5 조사)" |
 | data_go_kr_web | 2026-11-09 | 1 | 공공데이터포털 15088841(경찰청_교통돌발정보서비스) 페이지(T6.5) |
 | seoul_opendata_web | 2026-11-09 | 1 | 열린데이터광장 OA-21285(실시간 도시데이터) 페이지(T6.5 — 라이선스 확인) |
@@ -165,6 +172,10 @@
 - 필드(실제): `CITYDATA.{AREA_NM, AREA_CD, LIVE_PPLTN_STTS[{AREA_CONGEST_LVL, AREA_CONGEST_MSG, AREA_PPLTN_MIN, AREA_PPLTN_MAX, PPLTN_TIME, FCST_PPLTN[]}], ROAD_TRAFFIC_STTS, PRK_STTS, SUB_STTS, LIVE_SUB_PPLTN, BUS_STN_STTS, LIVE_BUS_PPLTN, ACDNT_CNTRL_STTS, SBIKE_STTS, WEATHER_STTS}`. 2026-11-07 15:10 "약간 붐빔" 48,000~50,000명
 - 기록 형식: `api, endpoint(키는 <키>), params, called_at(+09:00), status, raw`. 응답 본문의 키도 `<키>`로 가린다
 - 2026-11-09 08:28:44 `data/recorded/rtd/20261109T082844_citydata.json` (186,128 B, sha256 `7388ab7220fb…`, T6.5) — `ACDNT_CNTRL_STTS` 0건(같은 때 OA-13315 AccInfo 08:24 는 서울 9건, 광화문·덕수궁 안 없음). 라이선스 공공누리 1유형(OA-21285 페이지, 아래)
+
+### recorded/rtd/signals (간접 신호 — 활성 통제 근처 장소 citydata, T7.19)
+- 받은 방법: 운영 워커 소스 `signals`(`naru_ai.signal.citydata.CitydataWatcher`, 5분, `NARU_SIGNALS_SOURCE=live`) — 활성 통제(창 1시간 전 ~ 끝 30분 뒤) 중심 1 km 안 주요 121장소(`raw/citydata_areas_20261111`) 사건마다 2곳, 하루 상한 200(열린데이터광장 키 공유). 형식은 `recorded/rtd` 와 같다(`api rtd, params{service citydata, AREA_NM}, called_at, status, raw(json)`, 키 `<키>`). BE 로 보내지 않는다(ADR-002·ADR-013 과 같은 기록만)
+- 2026-11-11 23:27:19 (live 1 — 경로 확인): `rtd/signals/20261111T232719_citydata_POI009.json`(140,997 B) 광화문·덕수궁 — LIVE_PPLTN 여유 8,000~8,500(22:55), AVG_ROAD 서행 23 km/h(23:25), 링크 159
 
 ### recorded/topis_notice_archive (T7.18 조사 — TOPIS 공지 아카이브 깊이, 2026-11-11 14:14~14:16)
 - 받은 방법: `scripts/record_topis_archive.py api`(끝 인덱스 탐색 — 1/5, 1000·2000·4000 n/n, 이분, 끝 5건)·`dump --last 3825`(1~1000, 1001~2000, 2001~3000, 3001~3825). 형식은 `recorded/topis_notice` 와 같다(`SeoulOpenApi.call`, 키는 `<키>`). 운영 피드 기록 폴더(`topis_notice`, 1/50)와 섞지 않는다 — 테스트 fixture 와 워커가 그 폴더 전체를 읽어서, 3826 의 INFO-200 응답이 `TopisNoticeSource` 를 깨뜨렸다(처음 그 폴더에 남긴 15파일은 `relocate` 로 옮김, 내용·이름 그대로)
